@@ -16,6 +16,7 @@ class NotificationMetadata(dataobj.DataObj):
     See the core system model documentation for details on the JSON structure used by this model.
     It provides the "metadata" portion of all Notification objects that extend from this one.
     """
+
     def __init__(self, raw=None):
         """
         Create a new instance of the NotificationMetadata object, optionally around the
@@ -30,104 +31,104 @@ class NotificationMetadata(dataobj.DataObj):
         :param raw: python dict object containing the metadata
         """
         struct = {
-            "objects" : [
+            "objects": [
                 "metadata"
             ],
-            "structs" : {
-                "metadata" : {
-                    "fields" : {
-                        "title" : {"coerce" :"unicode"},
+            "structs": {
+                "metadata": {
+                    "fields": {
+                        "title": {"coerce": "unicode"},
                         # 2020-02-10 TD : additional bibliographic fields
-                        "journal" : {"coerce" :"unicode"},
-                        "volume" : {"coerce" :"unicode"},
-                        "issue" : {"coerce" :"unicode"},
-                        "fpage" : {"coerce" :"unicode"},
-                        "lpage" : {"coerce" :"unicode"},
+                        "journal": {"coerce": "unicode"},
+                        "volume": {"coerce": "unicode"},
+                        "issue": {"coerce": "unicode"},
+                        "fpage": {"coerce": "unicode"},
+                        "lpage": {"coerce": "unicode"},
                         #
-                        "version" : {"coerce" :"unicode"},
-                        "publisher" : {"coerce" :"unicode"},
-                        "type" : {"coerce" :"unicode"},
-                        "language" : {"coerce" :"isolang"},
-                        "publication_date" : {"coerce" :"utcdatetime"},
-                        "date_accepted" : {"coerce" :"utcdatetime"},
-                        "date_submitted" : {"coerce" :"utcdatetime"}
+                        "version": {"coerce": "unicode"},
+                        "publisher": {"coerce": "unicode"},
+                        "type": {"coerce": "unicode"},
+                        "language": {"coerce": "isolang"},
+                        "publication_date": {"coerce": "utcdatetime"},
+                        "date_accepted": {"coerce": "utcdatetime"},
+                        "date_submitted": {"coerce": "utcdatetime"}
                     },
-                    "objects" : [
+                    "objects": [
                         "source", "license_ref"
                     ],
-                    "lists" : {
-                        "identifier" : {"contains" : "object"},
-                        "author" : {"contains" : "object"},
-                        "project" : {"contains" : "object"},
-                        "subject" : {"contains" : "field", "coerce" : "unicode"}
+                    "lists": {
+                        "identifier": {"contains": "object"},
+                        "author": {"contains": "object"},
+                        "project": {"contains": "object"},
+                        "subject": {"contains": "field", "coerce": "unicode"}
                     },
-                    "required" : [],
+                    "required": [],
 
-                    "structs" : {
-                        "source" : {
-                            "fields" : {
-                                "name" : {"coerce" : "unicode"},
+                    "structs": {
+                        "source": {
+                            "fields": {
+                                "name": {"coerce": "unicode"},
                             },
-                            "lists" : {
-                                "identifier" : {"contains" : "object"}
+                            "lists": {
+                                "identifier": {"contains": "object"}
                             },
-                            "structs" : {
-                                "identifier" : {
-                                    "fields" : {
-                                        "type" : {"coerce" : "unicode"},
-                                        "id" : {"coerce" : "unicode"}
+                            "structs": {
+                                "identifier": {
+                                    "fields": {
+                                        "type": {"coerce": "unicode"},
+                                        "id": {"coerce": "unicode"}
                                     }
                                 }
                             }
                         },
-                        "license_ref" : {
-                            "fields" : {
-                                "title" : {"coerce" : "unicode"},
-                                "type" : {"coerce" : "unicode"},
-                                "url" : {"coerce" : "unicode"},
-                                "version" : {"coerce" : "unicode"}
+                        "license_ref": {
+                            "fields": {
+                                "title": {"coerce": "unicode"},
+                                "type": {"coerce": "unicode"},
+                                "url": {"coerce": "unicode"},
+                                "version": {"coerce": "unicode"}
                             }
                         },
-                        "identifier" : {
-                            "fields" : {
-                                "type" : {"coerce" : "unicode"},
-                                "id" : {"coerce" : "unicode"}
+                        "identifier": {
+                            "fields": {
+                                "type": {"coerce": "unicode"},
+                                "id": {"coerce": "unicode"}
                             }
                         },
-                        "author" : {
-                            "fields" : {
-                                "name" : {"coerce" : "unicode"},
+                        "author": {
+                            "fields": {
+                                "name": {"coerce": "unicode"},
                                 # 2019-02-20 TD : add name splitting into first and last 
-                                "firstname" : {"coerce" : "unicode"},
-                                "lastname" : {"coerce" : "unicode"},
+                                "firstname": {"coerce": "unicode"},
+                                "lastname": {"coerce": "unicode"},
                                 # 2019-02-20 TD
-                                "affiliation" : {"coerce" : "unicode"},
+                                "affiliation": {"coerce": "unicode"},
                             },
-                            "lists" : {
-                                "identifier" : {"contains" : "object"}
+                            "lists": {
+                                "identifier": {"contains": "object"}
                             },
-                            "structs" : {
-                                "identifier" : {
-                                    "fields" : {
-                                        "type" : {"coerce" : "unicode"},
-                                        "id" : {"coerce" : "unicode"}
+                            "structs": {
+                                "identifier": {
+                                    "fields": {
+                                        "type": {"coerce": "unicode"},
+                                        "id": {"coerce": "unicode"}
                                     }
                                 }
                             }
                         },
-                        "project" : {
-                            "fields" : {
-                                "name" : {"coerce" : "unicode"},
-                                "grant_number" : {"coerce" : "unicode"},
+                        "project": {
+                            "fields": {
+                                "name": {"coerce": "unicode"},
+                                "grant_number": {"coerce": "unicode"},
                             },
-                            "lists" : {
-                                "identifier" : {"contains" : "object"}
+                            "lists": {
+                                "identifier": {"contains": "object"}
                             },
-                            "structs" : {
-                                "identifier" : {
-                                    "fields" : {
-                                        "type" : {"coerce" : "unicode"},
-                                        "id" : {"coerce" : "unicode"}
+                            "structs": {
+                                "identifier": {
+                                    "fields": {
+                                        "type": {"coerce": "unicode"},
+                                        "id": {"coerce": "unicode"}
                                     }
                                 }
                             }
@@ -250,6 +251,7 @@ class NotificationMetadata(dataobj.DataObj):
         :param val: the last page (number)
         """
         self._set_single("metadata.lpage", val, coerce=dataobj.to_unicode())
+
     #
     # 2020-02-10 TD : end of additional bibliographic fields
     #
@@ -328,7 +330,8 @@ class NotificationMetadata(dataobj.DataObj):
 
         :param val: the language, ideally as an ISO code, or something that can be converted to it
         """
-        self._set_single("metadata.language", val, coerce=dataobj.to_isolang(), allow_coerce_failure=True, allow_none=False, ignore_none=True)
+        self._set_single("metadata.language", val, coerce=dataobj.to_isolang(), allow_coerce_failure=True,
+                         allow_none=False, ignore_none=True)
 
     @property
     def publication_date(self):
@@ -347,7 +350,8 @@ class NotificationMetadata(dataobj.DataObj):
 
         :param val: the publication date, ideally in the form YYYY-MM-DDTHH:MM:SSZ, or a similar form that can be read
         """
-        self._set_single("metadata.publication_date", val, coerce=dataobj.date_str(), allow_coerce_failure=True, allow_none=False, ignore_none=True)
+        self._set_single("metadata.publication_date", val, coerce=dataobj.date_str(), allow_coerce_failure=True,
+                         allow_none=False, ignore_none=True)
 
     @property
     def date_accepted(self):
@@ -366,7 +370,8 @@ class NotificationMetadata(dataobj.DataObj):
 
         :param val: the accepted date, ideally in the form YYYY-MM-DDTHH:MM:SSZ, or a similar form that can be read
         """
-        self._set_single("metadata.date_accepted", val, coerce=dataobj.date_str(), allow_coerce_failure=True, allow_none=False, ignore_none=True)
+        self._set_single("metadata.date_accepted", val, coerce=dataobj.date_str(), allow_coerce_failure=True,
+                         allow_none=False, ignore_none=True)
 
     @property
     def date_submitted(self):
@@ -385,7 +390,8 @@ class NotificationMetadata(dataobj.DataObj):
 
         :param val: the submitted date, ideally in the form YYYY-MM-DDTHH:MM:SSZ, or a similar form that can be read
         """
-        self._set_single("metadata.date_submitted", val, coerce=dataobj.date_str(), allow_coerce_failure=True, allow_none=False, ignore_none=True)
+        self._set_single("metadata.date_submitted", val, coerce=dataobj.date_str(), allow_coerce_failure=True,
+                         allow_none=False, ignore_none=True)
 
     @property
     def identifiers(self):
@@ -426,7 +432,7 @@ class NotificationMetadata(dataobj.DataObj):
         if id is None or type is None:
             return
         uc = dataobj.to_unicode()
-        obj = {"id" : self._coerce(id, uc), "type" : self._coerce(type, uc)}
+        obj = {"id": self._coerce(id, uc), "type": self._coerce(type, uc)}
         self._delete_from_list("metadata.identifier", matchsub=obj, prune=False)
         self._add_to_list("metadata.identifier", obj)
 
@@ -480,7 +486,8 @@ class NotificationMetadata(dataobj.DataObj):
         for obj in objlist:
             for k in list(obj.keys()):
                 if k not in allowed:
-                    raise dataobj.DataSchemaException("Author object must only contain the following keys: {x}".format(x=", ".join(allowed)))
+                    raise dataobj.DataSchemaException("Author object must only contain the following keys: {x}"
+                                                      .format(x=", ".join(allowed)))
 
             # coerce the values of some of the keys
             uc = dataobj.to_unicode()
@@ -565,7 +572,8 @@ class NotificationMetadata(dataobj.DataObj):
         for obj in objlist:
             for k in list(obj.keys()):
                 if k not in allowed:
-                    raise dataobj.DataSchemaException("Project object must only contain the following keys: {x}".format(x=", ".join(allowed)))
+                    raise dataobj.DataSchemaException("Project object must only contain the following keys: {x}"
+                                                      .format(x=", ".join(allowed)))
 
             # coerce the values of some of the keys
             uc = dataobj.to_unicode()
@@ -661,7 +669,8 @@ class NotificationMetadata(dataobj.DataObj):
         allowed = ["title", "type", "url", "version"]
         for k in list(obj.keys()):
             if k not in allowed:
-                raise dataobj.DataSchemaException("License object must only contain the following keys: {x}".format(x=", ".join(allowed)))
+                raise dataobj.DataSchemaException("License object must only contain the following keys: {x}"
+                                                  .format(x=", ".join(allowed)))
 
         # coerce the values of the keys
         uc = dataobj.to_unicode()
@@ -683,7 +692,7 @@ class NotificationMetadata(dataobj.DataObj):
         uc = dataobj.to_unicode()
         type = self._coerce(type, uc)
         url = self._coerce(url, uc)
-        obj = {"title" : type, "type" : type, "url" : url}
+        obj = {"title": type, "type": type, "url": url}
         self._set_single("metadata.license_ref", obj)
 
     @property
@@ -728,7 +737,7 @@ class NotificationMetadata(dataobj.DataObj):
         if id is None or type is None:
             return
         uc = dataobj.to_unicode()
-        obj = {"id" : self._coerce(id, uc), "type" : self._coerce(type, uc)}
+        obj = {"id": self._coerce(id, uc), "type": self._coerce(type, uc)}
         self._delete_from_list("metadata.source.identifier", matchsub=obj, prune=False)
         self._add_to_list("metadata.source.identifier", obj)
 
@@ -759,53 +768,53 @@ class BaseNotification(NotificationMetadata):
         :param raw: python dict object containing the base notification data
         """
         struct = {
-            "fields" : {
-                "id" : {"coerce" :"unicode"},
-                "created_date" : {"coerce" : "utcdatetime"},
-                "last_updated" : {"coerce" : "utcdatetime"},
-                "event" : {"coerce" : "unicode"}
-                #"reason" : {"coerce" : "unicode"}
+            "fields": {
+                "id": {"coerce": "unicode"},
+                "created_date": {"coerce": "utcdatetime"},
+                "last_updated": {"coerce": "utcdatetime"},
+                "event": {"coerce": "unicode"}
+                # "reason" : {"coerce" : "unicode"}
                 # 2016-10-18 TD : additional field for routing reason as needed by DeepGreen
             },
-            "objects" : [
+            "objects": [
                 "provider", "content", "embargo"
             ],
-            "lists" : {
-                "links" : {"contains" : "object"}
+            "lists": {
+                "links": {"contains": "object"}
             },
-            "reqired" : [],
+            "reqired": [],
 
-            "structs" : {
-                "provider" : {
-                    "fields" : {
-                        "id" : {"coerce" :"unicode"},
-                        "agent" : {"coerce" : "unicode"},
-                        "ref" : {"coerce" : "unicode"},
-                        "route" :{"coerce" : "unicode"}
+            "structs": {
+                "provider": {
+                    "fields": {
+                        "id": {"coerce": "unicode"},
+                        "agent": {"coerce": "unicode"},
+                        "ref": {"coerce": "unicode"},
+                        "route": {"coerce": "unicode"}
                     },
-                    "required" : []
+                    "required": []
                 },
-                "content" : {
-                    "fields" : {
-                        "packaging_format" : {"coerce" :"unicode"}
+                "content": {
+                    "fields": {
+                        "packaging_format": {"coerce": "unicode"}
                     },
-                    "required" : []
+                    "required": []
                 },
-                "embargo" : {
-                    "fields" : {
-                        "end" : {"coerce" : "utcdatetime"},
-                        "start" : {"coerce" : "utcdatetime"},
-                        "duration" : {"coerce" : "integer"}
+                "embargo": {
+                    "fields": {
+                        "end": {"coerce": "utcdatetime"},
+                        "start": {"coerce": "utcdatetime"},
+                        "duration": {"coerce": "integer"}
                     }
                 },
-                "links" : {
-                    "fields" : {
-                        "type" : {"coerce" :"unicode"},
-                        "format" : {"coerce" :"unicode"},
-                        "access" : {"coerce" :"unicode", "allowed_values" : ["router", "public"]},
-                        "url" : {"coerce" :"url"},
-                        "packaging" : {"coerce" : "unicode"},
-                        "proxy" : {"coerce" : "unicode"}
+                "links": {
+                    "fields": {
+                        "type": {"coerce": "unicode"},
+                        "format": {"coerce": "unicode"},
+                        "access": {"coerce": "unicode", "allowed_values": ["router", "public"]},
+                        "url": {"coerce": "url"},
+                        "packaging": {"coerce": "unicode"},
+                        "proxy": {"coerce": "unicode"}
                     }
                 }
             }
@@ -813,7 +822,6 @@ class BaseNotification(NotificationMetadata):
 
         self._add_struct(struct)
         super(BaseNotification, self).__init__(raw)
-
 
     # 2016-10-24 TD : adding an API for the embargo duration
     @property
@@ -826,14 +834,13 @@ class BaseNotification(NotificationMetadata):
         return self._get_single("embargo.duration", coerce=dataobj.to_int())
 
     @embargo.setter
-    def embargo(self,val):
+    def embargo(self, val):
         """
         Set the number of month of a possible embargo of the publication
 
         :param val: the integer number of the publication's embargo in months
         """
         self._set_single("embargo.duration", val, coerce=dataobj.to_int())
-
 
     # @property
     # def reason(self):
@@ -901,10 +908,10 @@ class BaseNotification(NotificationMetadata):
 
         uc = dataobj.to_unicode()
         obj = {
-            "url" : self._coerce(url, uc),
-            "type" : self._coerce(type, uc),
-            "format" : self._coerce(format, uc),
-            "access" : self._coerce(access, uc)
+            "url": self._coerce(url, uc),
+            "type": self._coerce(type, uc),
+            "format": self._coerce(format, uc),
+            "access": self._coerce(access, uc)
         }
         if packaging is not None:
             obj["packaging"] = self._coerce(packaging, uc)
@@ -940,32 +947,26 @@ class BaseNotification(NotificationMetadata):
         # metadata for them later
 
         # authors, and all their various properties
-        for a in self.authors:
-            # name
-            if "name" in a:
-                md.add_author_id(a.get("name"), "name")
+        for author in self.authors:
 
             # name
-            if "firstname" in a:
-                md.add_author_id(a.get("firstname"), "firstname")
-
-            # name
-            if "lastname" in a:
-                md.add_author_id(a.get("lastname"), "lastname")
+            _keys = ("name", "firstname", "lastname",)
+            _keys = (k for k in _keys if k in author)
+            for k in _keys:
+                md.add_author_id(author.get(k), k)
 
             # affiliation (and postcode)
-            if "affiliation" in a:
-                aff = a.get("affiliation")
+            if "affiliation" in author:
+                aff = author.get("affiliation")
                 md.add_affiliation(aff)
                 # 2019-02-20 TD : postcodes are not applicable in Germany AR: Rather than comment out, I have added a
                 # config option and set the default to false, as tests were failing
                 if app.config.get("EXTRACT_POSTCODES", False):
-                    codes = postcode.extract_all(aff)
-                    for code in codes:
+                    for code in postcode.extract_all(aff):
                         md.add_postcode(code)
 
             # other author ids
-            for id in a.get("identifier", []):
+            for id in author.get("identifier", []):
                 md.add_author_id(id.get("id"), id.get("type"))
                 if id.get("type") == "email":
                     md.add_email(id.get("id"))
@@ -984,6 +985,7 @@ class BaseNotification(NotificationMetadata):
             md.add_content_type(self.type)
 
         return md
+
 
 class RoutingInformation(dataobj.DataObj):
     """
@@ -1015,15 +1017,15 @@ class RoutingInformation(dataobj.DataObj):
         :param raw: python dict object containing the notification data
         """
         struct = {
-            "fields" : {
-                "analysis_date" : {"coerce" : "utcdatetime"},
+            "fields": {
+                "analysis_date": {"coerce": "utcdatetime"},
                 # 2016-11-24 TD : new field to collect all available ISSN data, mainly for customer convenience...
-                "issn_data" : {"coerce" : "unicode"},
+                "issn_data": {"coerce": "unicode"},
                 # 2016-10-19 TD : additional field for more reporting information (e.g. failing or rejecting!)
-                "reason" : {"coerce" : "unicode"}
+                "reason": {"coerce": "unicode"}
             },
-            "lists" : {
-                "repositories" : {"contains" : "field", "coerce" : "unicode"}
+            "lists": {
+                "repositories": {"contains": "field", "coerce": "unicode"}
             }
         }
 
@@ -1051,7 +1053,6 @@ class RoutingInformation(dataobj.DataObj):
 
     # 2016-11-24 TD : additional string field 'issn_data' -- end --
 
-
     # 2016-10-19 TD : additional string field 'reason' -- start --
     @property
     def reason(self):
@@ -1072,7 +1073,6 @@ class RoutingInformation(dataobj.DataObj):
         self._set_single("reason", val, coerce=dataobj.to_unicode())
 
     # 2016-10-19 TD : additional string field 'reason' -- end --
-
 
     @property
     def analysis_date(self):
@@ -1130,6 +1130,7 @@ class UnroutedNotification(BaseNotification, dao.UnroutedNotificationDAO):
 
     This class also extends a DAO, which means it can be persisted.
     """
+
     def __init__(self, raw=None):
         """
         Create a new instance of the UnroutedNotification object, optionally around the
@@ -1141,7 +1142,7 @@ class UnroutedNotification(BaseNotification, dao.UnroutedNotificationDAO):
         :param raw: python dict object containing the notification data
         """
         super(UnroutedNotification, self).__init__(raw=raw)
-        
+
     def make_routed(self):
         """
         Create an instance of an UnroutedNotification from this object
@@ -1157,18 +1158,18 @@ class UnroutedNotification(BaseNotification, dao.UnroutedNotificationDAO):
         routed = RoutedNotification(d)
         return routed
 
-#    # 2019-06-18 TD : We need just another Notification type: Stalled.
-#    def make_stalled(self):
-#        """
-#        Create an instance of a StalledNotification from this object.
-#
-#        This can be done if the object causes an error in the routing process on analysis.
-#
-#        :return: StalledNotification
-#        """
-#        d = deepcopy(self.data)
-#        stalled = StalledNotification(d)
-#        return stalled
+    #    # 2019-06-18 TD : We need just another Notification type: Stalled.
+    #    def make_stalled(self):
+    #        """
+    #        Create an instance of a StalledNotification from this object.
+    #
+    #        This can be done if the object causes an error in the routing process on analysis.
+    #
+    #        :return: StalledNotification
+    #        """
+    #        d = deepcopy(self.data)
+    #        stalled = StalledNotification(d)
+    #        return stalled
 
     def make_failed(self):
         """
@@ -1206,11 +1207,11 @@ class UnroutedNotification(BaseNotification, dao.UnroutedNotificationDAO):
         if "links" in d:
             keep = []
             for link in d.get("links", []):
-                if provider:        # if you're the provider keep all the links
+                if provider:  # if you're the provider keep all the links
                     if "access" in link:
                         del link["access"]
                     keep.append(link)
-                elif link.get("access") == "router":    # otherwise, only share router links
+                elif link.get("access") == "router":  # otherwise, only share router links
                     del link["access"]
                     keep.append(link)
             if len(keep) > 0:
@@ -1269,7 +1270,7 @@ class RoutedNotification(BaseNotification, RoutingInformation, dao.RoutedNotific
                 del d["provider"]
         if "content" in d and "store_id" in d.get("content", {}):
             del d["content"]["store_id"]
-        #if "repositories" in d:
+        # if "repositories" in d:
         #    del d["repositories"]
         # 2016-09-07 TD : for providers _list_ all repositories being routed to 
         if not provider:
@@ -1280,11 +1281,11 @@ class RoutedNotification(BaseNotification, RoutingInformation, dao.RoutedNotific
         if "links" in d:
             keep = []
             for link in d.get("links", []):
-                if provider:        # if you're the provider keep all the links
+                if provider:  # if you're the provider keep all the links
                     if "access" in link:
                         del link["access"]
                     keep.append(link)
-                elif link.get("access") == "router":    # otherwise, only share router links
+                elif link.get("access") == "router":  # otherwise, only share router links
                     del link["access"]
                     keep.append(link)
             if len(keep) > 0:
@@ -1375,21 +1376,21 @@ class RoutingMetadata(dataobj.DataObj):
         :param raw: python dict object containing the notification data
         """
         struct = {
-            "lists" : {
-                "urls" : {"contains" : "field", "coerce" : "unicode"},
-                "emails" : {"contains" : "field", "coerce" : "unicode"},
-                "affiliations" : {"contains" : "field", "coerce" : "unicode"},
-                "author_ids" : {"contains" : "object"},
-                "postcodes" : {"contains" : "field", "coerce" : "unicode"},
-                "keywords" : {"contains" : "field", "coerce" : "unicode"},
-                "grants" : {"contains" : "field", "coerce" : "unicode"},
-                "content_types" : {"contains" : "field", "coerce" : "unicode"}
+            "lists": {
+                "urls": {"contains": "field", "coerce": "unicode"},
+                "emails": {"contains": "field", "coerce": "unicode"},
+                "affiliations": {"contains": "field", "coerce": "unicode"},
+                "author_ids": {"contains": "object"},
+                "postcodes": {"contains": "field", "coerce": "unicode"},
+                "keywords": {"contains": "field", "coerce": "unicode"},
+                "grants": {"contains": "field", "coerce": "unicode"},
+                "content_types": {"contains": "field", "coerce": "unicode"}
             },
-            "structs" : {
-                "author_ids" : {
-                    "fields" : {
-                        "id" : {"coerce" : "unicode"},
-                        "type" : {"coerce" : "unicode"}
+            "structs": {
+                "author_ids": {
+                    "fields": {
+                        "id": {"coerce": "unicode"},
+                        "type": {"coerce": "unicode"}
                     }
                 }
             }
@@ -1453,7 +1454,7 @@ class RoutingMetadata(dataobj.DataObj):
         :return:
         """
         uc = dataobj.to_unicode()
-        obj = {"id" : self._coerce(id, uc), "type" : self._coerce(type, uc)}
+        obj = {"id": self._coerce(id, uc), "type": self._coerce(type, uc)}
         self._delete_from_list("author_ids", matchsub=obj, prune=False)
         self._add_to_list("author_ids", obj)
 

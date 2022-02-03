@@ -6,7 +6,7 @@ The main initialise() function is run when the app is started every time
 
 from octopus.core import app
 import logging, os
-from service import scheduler
+from service import scheduler, constant
 from logging import Formatter
 from logging.handlers import RotatingFileHandler
 from service.models import Account
@@ -25,14 +25,8 @@ def initialise():
 
     :return:
     """
-    username = 'admin'
-    params = {
-        "id": username,
-        "role": ["admin"],
-        "email": "green@deepgreen.org",
-        "api_key": "admin",
-        "password": username
-    }
+    params = constant.get_admin_detail()
+    username = params['id']
     a = Account.pull('admin')
     if not a:
         a = Account()
@@ -42,7 +36,7 @@ def initialise():
         print("THIS FIRST SUPERUSER ACCOUNT IS INSECURE! GENERATE A NEW PASSWORD FOR IT IMMEDIATELY! OR CREATE A NEW ACCOUNT AND DELETE THIS ONE...")
     else:
         print("Account for 'admin' exists")
-                
+
     file_handler = RotatingFileHandler(app.config.get('LOGFILE', '/home/green/jperlog'), maxBytes=1000000000, backupCount=5)
     lvl = app.config.get('LOGLEVEL', 'info')
     if lvl == 'debug':

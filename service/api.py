@@ -6,14 +6,19 @@ writing a core module that sits underneath this interface) then you should use t
 consume notifications.
 
 Go around it at your own risk!
+
+KTODO refactor all list_* and bulk_* function
 """
+import json
+import uuid
+from typing import Union
 
 from flask_login import current_user
-from service import models, packages
-from octopus.lib import dates, dataobj, http
+
 from octopus.core import app
+from octopus.lib import dates, dataobj, http
 from octopus.modules.store import store
-import uuid, json
+from service import models, packages
 
 
 class ValidationException(Exception):
@@ -21,6 +26,7 @@ class ValidationException(Exception):
     Exception which gets raised if an attempt to validate in incoming notifications fails.
     """
     pass
+
 
 class ParameterException(Exception):
     """
@@ -31,6 +37,7 @@ class ParameterException(Exception):
     """
     pass
 
+
 class UnauthorisedException(Exception):
     """
     Exception which gets raised if there is an authorisation problem which we need to distinguish from
@@ -40,6 +47,7 @@ class UnauthorisedException(Exception):
     but the user is unauthorised, this exception can be raised.
     """
     pass
+
 
 class JPER(object):
     """
@@ -71,7 +79,8 @@ class JPER(object):
         try:
             incoming = models.IncomingNotification(notification)
         except dataobj.DataStructureException as e:
-            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(x=account.id, y=str(e), z=magic))
+            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                             .format(x=account.id, y=str(e), z=magic))
             raise ValidationException("Problem reading notification metadata: {x}".format(x=str(e)))
 
         # if so, convert it to an unrouted notification
@@ -81,7 +90,8 @@ class JPER(object):
         format = note.packaging_format
         if format is None and file_handle is not None:
             msg = "If zipped content is provided, metadata must specify packaging format"
-            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                             .format(z=magic, x=account.id, y=msg))
             raise ValidationException(msg)
 
         # extract the match data from the metadata
@@ -106,11 +116,14 @@ class JPER(object):
             # If this is unsuccessful, we ensure that the local and validated ids are both deleted from
             # the store, then we can raise the exception
             try:
-                packages.PackageManager.ingest(validated_id, s.path(local_id, "validate.zip"), format, storage_manager=s)
+                packages.PackageManager.ingest(validated_id,
+                                               s.path(local_id, "validate.zip"),
+                                               format, storage_manager=s)
             except packages.PackageException as e:
                 s.delete(local_id)
                 s.delete(validated_id)
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=str(e)))
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=str(e)))
                 raise ValidationException("Problem reading from the zip file: {x}".format(x=str(e)))
 
             # If successful, we should extract the metadata from the package, using the validated id and the
@@ -123,7 +136,8 @@ class JPER(object):
             except packages.PackageException as e:
                 s.delete(local_id)
                 s.delete(validated_id)
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=str(e)))
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=str(e)))
                 raise ValidationException("Problem extracting data from the zip file: {x}".format(x=str(e)))
 
             # ensure that we don't keep copies of the files
@@ -133,7 +147,8 @@ class JPER(object):
         # now check that we got some kind of actionable match data from the notification or the package
         if not nma.has_data() and (ma is None or not ma.has_data()):
             msg = "Unable to extract any actionable routing metadata from notification or associated package"
-            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+            app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                             .format(z=magic, x=account.id, y=msg))
             raise ValidationException(msg)
 
         # if we've been given files by reference, check that we can access them
@@ -141,7 +156,8 @@ class JPER(object):
             url = l.get("url")
             if url is None:
                 msg = "All supplied links must include a URL"
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=msg))
                 raise ValidationException(msg)
 
             # just ensure that we can get the first few bytes, and that the response is the right one
@@ -149,23 +165,27 @@ class JPER(object):
 
             if resp is None:
                 msg = "Unable to connecto to server to retrieve {x}".format(x=url)
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=msg))
                 raise ValidationException(msg)
 
             if resp.status_code != 200:
-                msg = "Received unexpected status code when downloading from {x} - {y}".format(x=url, y=resp.status_code)
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+                msg = "Received unexpected status code when downloading from {x} - {y}".format(
+                    x=url, y=resp.status_code)
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=msg))
                 raise ValidationException(msg)
 
             if content is None or content == "":
                 msg = "Received no content when downloading from {x}".format(x=url)
-                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=msg))
+                app.logger.error("Request:{z} - Validate request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=msg))
                 raise ValidationException(msg)
 
         app.logger.debug("Request:{z} - Validate request Account:{x} succeeded".format(z=magic, x=account.id))
 
     @classmethod
-    def create_notification(cls, account, notification, file_handle=None):
+    def create_notification(cls, account, notification, file_handle=None) -> Union[models.UnroutedNotification, bool]:
         """
         Create a new notification in the system on behalf of the Account holder, based on the supplied notification
         and optional binary content.
@@ -186,14 +206,16 @@ class JPER(object):
 
         magic = uuid.uuid4().hex
         app.logger.debug("Request:{z} - Create request received from Account:{x}".format(z=magic, x=account.id))
-        
+
         # add a check for default embargo if the account has a non-zero value set for it
         # incoming notification structure is demonstrated in the account model and also documented at:
         # https://github.com/JiscPER/jper/blob/develop/docs/api/IncomingNotification.md
         if 'embargo' in account.data:
             if 'duration' in account.data['embargo']:
-                if 'embargo' not in notification: notification['embargo'] = {}
-                if 'duration' not in notification['embargo']: notification['embargo']['duration'] = account.data['embargo']['duration']
+                if 'embargo' not in notification:
+                    notification['embargo'] = {}
+                if 'duration' not in notification['embargo']:
+                    notification['embargo']['duration'] = account.data['embargo']['duration']
 
         # add a check for default license if the account has a non-null value set for it
         # incoming notification structure is demonstrated in the account model and also documented at:
@@ -202,27 +224,32 @@ class JPER(object):
             if 'title' in account.data['license']:
                 # 2016-06-28 TD : additional safety check for bare-minimum JSON notification
                 if 'metadata' not in notification: notification['metadata'] = {}
-                if 'license_ref' not in notification['metadata']: 
+                if 'license_ref' not in notification['metadata']:
                     notification['metadata']['license_ref'] = {}
                     # 2016-10-24 TD : bug fix!
                     # if 'title' not in notification['metadata']['license_ref']: notification['metadata']['license_ref']['title'] = account.data['license']['title']
                     # if 'type' not in notification['metadata']['license_ref']: notification['metadata']['license_ref']['type'] = account.data['license']['type']
                     # if 'url' not in notification['metadata']['license_ref']: notification['metadata']['license_ref']['url'] = account.data['license']['url']
                     # if 'version' not in notification['metadata']['license_ref']: notification['metadata']['license_ref']['version'] = account.data['license']['version']
-                    if 'title' in account.data['license']: notification['metadata']['license_ref']['title'] = account.data['license']['title']
-                    if 'type' in account.data['license']: notification['metadata']['license_ref']['type'] = account.data['license']['type']
-                    if 'url' in account.data['license']: notification['metadata']['license_ref']['url'] = account.data['license']['url']
-                    if 'version' in account.data['license']: notification['metadata']['license_ref']['version'] = account.data['license']['version']
+                    if 'title' in account.data['license']:
+                        notification['metadata']['license_ref']['title'] = account.data['license']['title']
+                    if 'type' in account.data['license']:
+                        notification['metadata']['license_ref']['type'] = account.data['license']['type']
+                    if 'url' in account.data['license']:
+                        notification['metadata']['license_ref']['url'] = account.data['license']['url']
+                    if 'version' in account.data['license']:
+                        notification['metadata']['license_ref']['version'] = account.data['license']['version']
 
         # attempt to serialise the record
         try:
             incoming = models.IncomingNotification(notification)
         except dataobj.DataStructureException as e:
-            app.logger.error("Request:{z} - Create request from Account:{x} failed with error '{y}'".format(x=account.id, y=str(e), z=magic))
+            app.logger.error("Request:{z} - Create request from Account:{x} failed with error '{y}'"
+                             .format(x=account.id, y=str(e), z=magic))
             raise ValidationException("Problem reading notification metadata: {x}".format(x=str(e)))
 
         # if successful, convert it to an unrouted notification
-        note = incoming.make_unrouted()
+        note: models.UnroutedNotification = incoming.make_unrouted()
 
         # set the id for the record, as we'll use this when we save the notification, and
         # when we store the associated file
@@ -250,11 +277,13 @@ class JPER(object):
             # the store, then we can raise the exception
             remote = store.StoreFactory.get()
             try:
-                packages.PackageManager.ingest(note.id, tmp.path(local_id, "incoming.zip"), format, storage_manager=remote)
+                packages.PackageManager.ingest(note.id, tmp.path(local_id, "incoming.zip"), format,
+                                               storage_manager=remote)
             except packages.PackageException as e:
                 tmp.delete(local_id)
                 remote.delete(note.id)
-                app.logger.error("Request:{z} - Create request from Account:{x} failed with error '{y}'".format(z=magic, x=account.id, y=str(e)))
+                app.logger.error("Request:{z} - Create request from Account:{x} failed with error '{y}'"
+                                 .format(z=magic, x=account.id, y=str(e)))
                 raise ValidationException("Problem reading from the zip file: {x}".format(x=str(e)))
 
             # remove the local copy
@@ -267,7 +296,8 @@ class JPER(object):
         # if we get to here there was either no package, or the package saved successfully, so we can store the
         # note
         note.save()
-        app.logger.debug("Request:{z} - Create request from Account:{x} succeeded; Notification:{y}".format(z=magic, x=account.id, y=note.id))
+        app.logger.debug("Request:{z} - Create request from Account:{x} succeeded; Notification:{y}"
+                         .format(z=magic, x=account.id, y=note.id))
         return note
 
     @classmethod
@@ -292,22 +322,32 @@ class JPER(object):
         rn = models.RoutedNotification.pull(notification_id)
         if rn is not None:
             if accid == rn.provider_id:
-                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; returns the provider's version of the routed notification".format(z=magic, x=accid, y=notification_id))
+                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; "
+                                 "returns the provider's version of the routed notification"
+                                 .format(z=magic, x=accid, y=notification_id))
                 return rn.make_outgoing(provider=True)
             else:
-                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; returns the public version of the routed notification".format(z=magic, x=accid, y=notification_id))
+                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; "
+                                 "returns the public version of the routed notification"
+                                 .format(z=magic, x=accid, y=notification_id))
                 return rn.make_outgoing()
         if accid is not None and (account.has_role('publisher') or current_user.is_super):
             urn = models.UnroutedNotification.pull(notification_id)
             if urn is not None:
                 if accid == urn.provider_id:
-                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; returns the provider's version of the unrouted notification".format(z=magic, x=accid, y=notification_id))
+                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; "
+                                     "returns the provider's version of the unrouted notification"
+                                     .format(z=magic, x=accid, y=notification_id))
                     return urn.make_outgoing(provider=True)
                 else:
-                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; returns the public version of the unrouted notification".format(z=magic, x=accid, y=notification_id))
+                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; "
+                                     "returns the public version of the unrouted notification"
+                                     .format(z=magic, x=accid, y=notification_id))
                     return urn.make_outgoing()
 
-        app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; no distributable notification of that id found".format(z=magic, x=accid, y=notification_id))
+        app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y}; "
+                         "no distributable notification of that id found"
+                         .format(z=magic, x=accid, y=notification_id))
         return None
 
     @classmethod
@@ -332,8 +372,11 @@ class JPER(object):
                 pm = packages.PackageFactory.incoming(urn.packaging_format)
                 store_filename = pm.zip_name()
             sm = store.StoreFactory.get()
-            app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; returns unrouted notification stored file {b}".format(z=magic, x=account.id, y=notification_id, a=filename, b=store_filename))
-            return sm.get(urn.id, store_filename) # returns None if not found
+            app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; "
+                             "returns unrouted notification stored file {b}"
+                             .format(z=magic, x=account.id, y=notification_id,
+                                     a=filename, b=store_filename))
+            return sm.get(urn.id, store_filename)  # returns None if not found
         else:
             rn = models.RoutedNotification.pull(notification_id)
             if rn is not None:
@@ -346,13 +389,19 @@ class JPER(object):
                         pm = packages.PackageFactory.incoming(rn.packaging_format)
                         store_filename = pm.zip_name()
                     sm = store.StoreFactory.get()
-                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; returns routed notification stored file {b}".format(z=magic, x=account.id, y=notification_id, a=filename, b=store_filename))
+                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; "
+                                     "returns routed notification stored file {b}"
+                                     .format(z=magic, x=account.id, y=notification_id, a=filename, b=store_filename))
                     return sm.get(rn.id, store_filename)
                 else:
-                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; not authorised to receive this content".format(z=magic, x=account.id, y=notification_id, a=filename))
+                    app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; "
+                                     "not authorised to receive this content"
+                                     .format(z=magic, x=account.id, y=notification_id, a=filename))
                     raise UnauthorisedException()
             else:
-                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; no suitable content found to return".format(z=magic, x=account.id, y=notification_id, a=filename))
+                app.logger.debug("Request:{z} - Retrieve request from Account:{x} on Notification:{y} Content:{a}; "
+                                 "no suitable content found to return"
+                                 .format(z=magic, x=account.id, y=notification_id, a=filename))
                 return None
 
     @classmethod
@@ -363,11 +412,10 @@ class JPER(object):
         else:
             lurl = None
             for link in rn.links:
-                if link.get('proxy',False) == pid:
+                if link.get('proxy', False) == pid:
                     lurl = link['url']
             return lurl
-        
-            
+
     @classmethod
     def get_public_url(cls, account, notification_id, content_id):
         urn = models.UnroutedNotification.pull(notification_id)
@@ -381,13 +429,12 @@ class JPER(object):
                 return None
 
     @classmethod
-    def list_notifications(cls, account, since, page=None, page_size=None, repository_id=None, provider=False):
-    # def list_notifications(cls, account, since, page=None, page_size=None, repository_id=None):
-    # 2016-09-07 TD : trial to make some publisher's reporting available
+    def list_notifications(cls, since, page=None, page_size=None, repository_id=None, provider=False):
+        # def list_notifications(cls, account, since, page=None, page_size=None, repository_id=None):
+        # 2016-09-07 TD : trial to make some publisher's reporting available
         """
         List notification which meet the criteria specified by the parameters
 
-        :param account: user Account as which to carry out this action (all users can request notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest notification date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
@@ -398,35 +445,36 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+        since: str = dates.format(since)  # reformat
 
-        if page == 0:
+        if page is not None and page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
 
-        if page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE"):
-            raise ParameterException("page size must be between 1 and {x}".format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
+        if page_size is not None and (page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE")):
+            raise ParameterException("page size must be between 1 and {x}"
+                                     .format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
 
-        nl = models.NotificationList()
-        nl.since = dates.format(since)
-        nl.page = page
-        nl.page_size = page_size
-        nl.timestamp = dates.now()
         qr = {
             "query": {
                 "bool": {
                     "filter": {
                         "range": {
                             "created_date": {
-                                "gte": nl.since
+                                "gte": since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"created_date":{"order":"desc"}}],
-            "from": (page - 1) * page_size,
-            "size": page_size
+            "sort": [{"created_date": {"order": "desc"}}],
         }
-        
+        if page_size is not None and page is not None:
+            qr.update({
+                # 2016-09-06 TD : change of sort order newest first
+                "from": (page - 1) * page_size,
+                "size": page_size
+            })
+
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
             if provider:
@@ -441,83 +489,95 @@ class JPER(object):
             types = 'routed20*'
         res = models.RoutedNotification.query(q=qr, types=types)
         app.logger.debug('List notifications query resulted ' + json.dumps(res))
-        nl.notifications = [models.RoutedNotification(i['_source']).make_outgoing(provider=provider).data for i in res.get('hits',{}).get('hits',[])]
-        nl.total = res.get('hits',{}).get('total',{}).get('value', 0)
+
+        nl = models.NotificationList()
+        nl.since = since
+        nl.page = -1 if page is None else page
+        if page_size is not None:
+            nl.page_size = page_size
+        nl.timestamp = dates.now()
+        nl.notifications = [models.RoutedNotification(i['_source']).make_outgoing(provider=provider).data
+                            for i in res.get('hits', {}).get('hits', [])]
+        nl.total = res.get('hits', {}).get('total', {}).get('value', 0)
         return nl
 
-
     @classmethod
-    def list_matches(cls, account, since, page=None, page_size=None, repository_id=None, provider=False):
+    def list_matches(cls, since: str,
+                     page=None, page_size=None, repository_id=None,
+                     provider=False) -> models.MatchProvenanceList:
         """
         List match provenances which meet the criteria specified by the parameters
 
-        :param account: user Account as which to carry out this action (all users can request matches, so this is primarily for logging purposes)
         :param since: date string for the earliest match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
         :param repository_id: the id of the repository whose matches to return.  If no id is provided, all matches for all repositories will be queried.
+        :param provider: flag to identify publisher
         :return: models.MatchProvenanceList containing the parameters and results
         """
         try:
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+        since: str = dates.format(since)  # reformat
 
-        if page == 0:
+        if page is not None and page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
 
-        if page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE"):
-            raise ParameterException("page size must be between 1 and {x}".format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
+        if page_size is not None and (page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE")):
+            raise ParameterException("page size must be between 1 and {x}"
+                                     .format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
 
-        mpl = models.MatchProvenanceList()
-        mpl.since = dates.format(since)
-        mpl.page = page
-        mpl.page_size = page_size
-        mpl.timestamp = dates.now()
         qr = {
             "query": {
                 "bool": {
                     "filter": {
                         "range": {
                             "created_date": {
-                                "gte": mpl.since
+                                "gte": since
                             }
                         }
                     }
                 }
             },
-            # "sort": [{"analysis_date":{"order":"asc"}}],
-            "sort": [{"created_date":{"order":"desc"}}],
-            # 2016-09-06 TD : change of sort order newest first
-            "from": (page - 1) * page_size,
-            "size": page_size
+            "sort": [{"created_date": {"order": "desc"}}],
         }
-        
+        if page_size is not None and page is not None:
+            qr.update({
+                # 2016-09-06 TD : change of sort order newest first
+                "from": (page - 1) * page_size,
+                "size": page_size
+            })
+
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
             if provider:
-                qr['query']['bool']["must"] = {"match": {"pub.exact": repository_id}}
+                match_by = {"pub.exact": repository_id}
             else:
-                qr['query']['bool']["must"] = {"match": {"repo.exact": repository_id}}
-
+                match_by = {"repo.exact": repository_id}
+            qr['query']['bool']["must"] = {"match": match_by}
             app.logger.debug(str(repository_id) + ' list matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('List all matches for query ' + json.dumps(qr))
 
-        res = models.MatchProvenance.query(q=qr)
-        app.logger.debug('List matches query resulted ' + json.dumps(res))
-        mpl.matches = [models.MatchProvenance(i['_source']).data for i in res.get('hits',{}).get('hits',[])]
-        mpl.total = res.get('hits',{}).get('total',{}).get('value', 0)
+        mpl = models.MatchProvenanceList()
+        mpl.since = since
+        mpl.page = -1 if page is None else page
+        if page_size is not None:
+            mpl.page_size = page_size
+        mpl.timestamp = dates.now()
+
+        query_result = models.MatchProvenance.query(q=qr)
+        mpl.matches = [models.MatchProvenance(i['_source']).data
+                       for i in query_result.get('hits', {}).get('hits', [])]
+        mpl.total = len(mpl.matches)
         return mpl
 
-
-
     @classmethod
-    def list_failed(cls, account, since, page=None, page_size=None, provider_id=None):
+    def list_failed(cls, since, page=None, page_size=None, provider_id=None):
         """
         List failed notifications which meet the criteria specified by the parameters
 
-        :param account: user Account as which to carry out this action (all users can request failed notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest failed analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
@@ -528,38 +588,38 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+        since: str = dates.format(since)  # reformat
 
-        if page == 0:
+        if page is not None and page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
 
-        if page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE"):
-            raise ParameterException("page size must be between 1 and {x}".format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
+        if page_size is not None and (page_size == 0 or page_size > app.config.get("MAX_LIST_PAGE_SIZE")):
+            raise ParameterException("page size must be between 1 and {x}"
+                                     .format(x=app.config.get("MAX_LIST_PAGE_SIZE")))
 
-        fnl = models.FailedNotificationList()
-        fnl.since = dates.format(since)
-        fnl.page = page
-        fnl.page_size = page_size
-        fnl.timestamp = dates.now()
         qr = {
             "query": {
                 "bool": {
                     "filter": {
                         "range": {
                             "created_date": {
-                                "gte": fnl.since
+                                "gte": since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"created_date":{"order":"desc"}}],
+            "sort": [{"created_date": {"order": "desc"}}],
             ## "sort": [{"analysis_date":{"order":"desc"}}],
             ## 2018-03-07 TD : change of sort key to 'created_date', but still newest first
-            # 2016-09-06 TD : change of sort order newest first
-            "from": (page - 1) * page_size,
-            "size": page_size
         }
-        
+        if page_size is not None and page is not None:
+            qr.update({
+                # 2016-09-06 TD : change of sort order newest first
+                "from": (page - 1) * page_size,
+                "size": page_size
+            })
+
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
 
@@ -569,170 +629,15 @@ class JPER(object):
 
         res = models.FailedNotification.query(q=qr)
         app.logger.debug('List failed notifications query resulted ' + json.dumps(res))
-        fnl.failed = [models.FailedNotification(i['_source']).data for i in res.get('hits',{}).get('hits',[])]
-        fnl.total = res.get('hits',{}).get('total',{}).get('value', 0)
-        return fnl
-
-
-    @classmethod
-    def bulk_notifications(cls, account, since, repository_id=None, provider=False):
-    # 2016-09-07 TD : trial to make some publisher's reporting available
-        """
-        Bulk list notification which meet the criteria specified by the parameters
-
-        :param account: user Account as which to carry out this action (all users can request notifications, so this is primarily for logging purposes)
-        :param since: date string for the earliest notification date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
-        :param repository_id: the id of the repository whose notifications to return.  If no id is provided, all notifications for all repositories will be queried.
-        :return: models.NotificationList containing the parameters and results
-        """
-        try:
-            since = dates.parse(since)
-        except ValueError as e:
-            raise ParameterException("Unable to understand since date '{x}'".format(x=since))
-
-        nl = models.NotificationList()
-        nl.since = dates.format(since)
-        nl.page = -1
-        nl.timestamp = dates.now()
-        qr = {
-            "query": {
-                "bool": {
-                    "filter": {
-                        "range": {
-                            "created_date": {
-                                "gte": nl.since
-                            }
-                        }
-                    }
-                }
-            },
-            "sort": [{"created_date":{"order":"desc"}}],
-            ## "sort": [{"analysis_date":{"order":"desc"}}],
-            ## 2018-03-07 TD : change of sort key to 'created_date', but still newest first
-            # "sort": [{"analysis_date":{"order":"asc"}}],
-            # 2016-09-06 TD : change of sort order newest first
-        }
-        
-        if repository_id is not None:
-            # 2016-09-07 TD : trial to filter for publisher's reporting
-            if provider:
-                qr['query']['bool']["must"] = {"match": {"provider.id.exact": repository_id}}
-            else:
-                qr['query']['bool']["must"] = {"match": {"repositories.exact": repository_id}}
-
-            app.logger.debug(str(repository_id) + ' bulk notifications for query ' + json.dumps(qr))
-        else:
-            app.logger.debug('Bulk all notifications for query ' + json.dumps(qr))
-
-        nl.notifications = []
-        types = None
-        if models.RoutedNotification.__conn__.index_per_type:
-            types = 'routed20*'
-        for rn in models.RoutedNotification.iterate(q=qr, types=types):
-            nl.notifications.append(rn.make_outgoing(provider=provider).data)
-        nl.total = len(nl.notifications)
-        return nl
-
-
-    @classmethod
-    def bulk_matches(cls, account, since, repository_id=None, provider=False):
-        """
-        Bulk match provenances which meet the criteria specified by the parameters
-
-        :param account: user Account as which to carry out this action (all users can request matches, so this is primarily for logging purposes)
-        :param since: date string for the earliest match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
-        :param repository_id: the id of the repository whose matches to return.  If no id is provided, all matches for all repositories will be queried.
-        :return: models.MatchProvenanceList containing the parameters and results
-        """
-        try:
-            since = dates.parse(since)
-        except ValueError as e:
-            raise ParameterException("Unable to understand since date '{x}'".format(x=since))
-
-        mpl = models.MatchProvenanceList()
-        mpl.since = dates.format(since)
-        mpl.page = -1
-        mpl.timestamp = dates.now()
-        qr = {
-            "query": {
-                "bool": {
-                    "filter": {
-                        "range": {
-                            "created_date": {
-                                "gte": mpl.since
-                            }
-                        }
-                    }
-                }
-            },
-            # "sort": [{"analysis_date":{"order":"asc"}}],
-            "sort": [{"created_date":{"order":"desc"}}],
-            # 2016-09-06 TD : change of sort order newest first
-        }
-        
-        if repository_id is not None:
-            # 2016-09-07 TD : trial to filter for publisher's reporting
-            if provider:
-                qr['query']['bool']["must"] = {"match": {"pub.exact": repository_id}}
-            else:
-                qr['query']['bool']["must"] = {"match": {"repo.exact": repository_id}}
-
-            app.logger.debug(str(repository_id) + ' bulk matches for query ' + json.dumps(qr))
-        else:
-            app.logger.debug('Bulk all matches for query ' + json.dumps(qr))
-
-        mpl.matches = []
-        for mp in models.MatchProvenance.iterate(q=qr):
-            mpl.matches.append(mp.data)
-        mpl.total = len(mpl.matches)
-        return mpl
-
-
-
-    @classmethod
-    def bulk_failed(cls, account, since, provider_id=None):
-        """
-        Bulk failed notifications which meet the criteria specified by the parameters
-
-        :param account: user Account as which to carry out this action (all users can request failed notifications, so this is primarily for logging purposes)
-        :param since: date string for the earliest failed analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
-        :param provider_id: the id of the provider whose failed notifications to return.  If no id is provided, all failed notifications for all providers will be queried.
-        :return: models.FailedNotificationList containing the parameters and results
-        """
-        try:
-            since = dates.parse(since)
-        except ValueError as e:
-            raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
         fnl = models.FailedNotificationList()
-        fnl.since = dates.format(since)
-        fnl.page = -1
+        fnl.since = since
+        fnl.page = -1 if page is None else page
+        if page_size is not None:
+            fnl.page_size = page_size
+
         fnl.timestamp = dates.now()
-        qr = {
-            "query": {
-                "bool": {
-                    "filter": {
-                        "range": {
-                            "created_date": {
-                                "gte": fnl.since
-                            }
-                        }
-                    }
-                }
-            },
-            "sort": [{"created_date":{"order":"desc"}}],
-        }
-        
-        if provider_id is not None:
-            qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
-
-            app.logger.debug(str(provider_id) + ' bulk failed notifications for query ' + json.dumps(qr))
-        else:
-            app.logger.debug('Bulk all failed notifications for query ' + json.dumps(qr))
-
-        fnl.failed = []
-        for fn in models.FailedNotification.iterate(q=qr):
-            fnl.failed.append(fn.data)
-        fnl.total = len(fnl.failed)
+        fnl.failed = [models.FailedNotification(i['_source']).data
+                      for i in res.get('hits', {}).get('hits', [])]
+        fnl.total = res.get('hits', {}).get('total', {}).get('value', 0)
         return fnl
-

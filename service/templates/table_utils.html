@@ -1,0 +1,19 @@
+{% macro create_table_by_arr(headers, rows, _id='', _class='') %}
+
+    <table {% if _id %} id="{{_id}}" {% endif %}
+           {% if _class %} class="{{_class}}" {% endif %} >
+        <tr>
+            {% for header in headers %}
+            <th>{{ header | safe }}</th>
+            {% endfor %}
+        </tr>
+        {% for row in rows %}
+        <tr>
+            {% for col_val in row %}
+            <td> {{ col_val | safe}}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+{% endmacro %}

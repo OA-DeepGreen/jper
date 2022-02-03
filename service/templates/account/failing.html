@@ -1,5 +1,6 @@
-{% extends "base.html" %} 
-{% block content %} 
+{% extends "base.html" %}
+{% import 'table_utils.html' as table_utils %}
+{% block content %}
 
 <div class="row">
 	<div class="col span-12">
@@ -31,11 +32,11 @@
 			"harvester/helpers/pagination.html" import render_pagination%} {{
 			render_pagination(num_of_pages,page_num,link) }}</div>
 
-			
-			<table id="publisherTable">
 
-			</table>
-				
+			{{ table_utils.create_table_by_arr(table_headers, table_data,
+											   "publisherTable") }}
+
+
 			{% from "harvester/helpers/pagination.html" import render_pagination%}
 		{{ render_pagination(num_of_pages,page_num,link) }}
 		<div class="row">
@@ -48,82 +49,7 @@
 	</div>	
 	</div>
 
-<!--
-				<tr>
-					<th>Send&nbsp;Date</th>
-					<th>ISSN&nbsp;or&nbsp;EISSN</th>
-					<th>DOI</th>
-					<th>Reason</th>
-					<th>Analysis&nbsp;Date</th>
-				</tr>
--->
 
-<script>
-	var obj = JSON.parse ({{ repo|tojson|safe }}); 
-	var tbl = JSON.parse ({{ tabl|tojson|safe }}); 
-
-	var out =[];
-	for (j in tbl.header) {
-		var hdr = tbl.header[j];
-		out[hdr] = jsonpath.query(obj, tbl[hdr]);
-	}
-
-	var ids = jsonpath.query(obj, 'failed[*].id');
-	// var node = '';
-
-	$('#publisherTable').prepend('<tr>\
-		<th>'+tbl.header[0]+'</th> \
-		<th>'+tbl.header[1]+'</th> \
-		<th>'+tbl.header[2]+'</th> \
-		<th>'+tbl.header[3]+'</th> \
-		<th>'+tbl.header[4]+'</th> \
-		</tr>');
-
-	for (variable in ids) {
-		$('#publisherTable tr:last').after('<tr>\
-			<td>'+out[tbl.header[0]][variable]+'</td> \
-			<td>'+out[tbl.header[1]][variable]+'</td> \
-			<td>'+out[tbl.header[2]][variable]+'</td> \
-			<td>'+out[tbl.header[3]][variable]+'</td> \
-			<td>'+out[tbl.header[4]][variable]+'</td> \
-			</tr>');
-	}
-
-/*
-	// var node = '';
-
-	for (variable in obj.failed) {
-		var md = obj.failed[variable].metadata;
-		var issn = 'n/a';
-		var doi = 'n/a';
-		var reason = 'n/a';
-                if ('reason' in obj.failed[variable]) {
-			reason = obj.failed[variable].reason;
-		}
-		for (cnt in md.identifier) {
-			if (md.identifier[cnt].type === 'doi') {
-				doi = md.identifier[cnt].id;
-			}
-			if (md.identifier[cnt].type === 'issn') {
-				if (issn !== 'n/a')
-					issn += ' ; '+md.identifier[cnt].id;
-				else
-					issn = md.identifier[cnt].id;
-			}
-		}
-		$('#publisherTable tr:last').after('<tr>\
-			<td>'+obj.failed[variable].analysis_date+'</td> \
-			<td>'+issn+'</td> \
-			<td>'+doi+'</td> \
-			<td>'+reason+'</td> \
-		</tr>');
-	//node[id] = new PrettyJSON.view.Node({
-	//	el : $('#'+id),
-	//	data : obj.matches[variable]
-	// });
-	}
-*/
-</script>
 
 
 {% endblock %}

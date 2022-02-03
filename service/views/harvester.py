@@ -5,13 +5,13 @@ Webpage - Graphic User Interface for an harvester
 
 @author: Mateusz.Kasiuba
 '''
-from service.models.harvester import HarvesterModel
-from service.forms.webservice import WebserviceForm
-
 from flask import Blueprint, request, flash, redirect
 from flask import render_template, abort
-from flask_login import login_user, logout_user, current_user
-from octopus.core import app
+from flask_login import current_user
+
+from service.__utils import jper_view_utils
+from service.forms.webservice import WebserviceForm
+from service.models.harvester import HarvesterModel
 
 harvester = Blueprint('harvester', __name__)
 harvesterModel = HarvesterModel()
@@ -32,8 +32,8 @@ def webservice(page_num):
     '''
     if not current_user.is_super:
         abort(401)
-        
-    page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
+
+    page_num = jper_view_utils.get_req_page_num()
     webservice, num_of_pages = harvesterModel.get_webservices(int(page_num)-1)
     return render_template('harvester/webservice.html', webservice_list = webservice, num_of_pages = num_of_pages, page_num = int(page_num), name='Web Service List')
 
@@ -46,7 +46,7 @@ def history(page_num):
     '''
     if not current_user.is_super:
         abort(401)
-    page_num =  int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
+    page_num = jper_view_utils.get_req_page_num()
     history, num_of_pages = harvesterModel.get_history(int(page_num)-1)
     return render_template('harvester/history.html', history_list = history, num_of_pages = num_of_pages, page_num = int(page_num), name='History List')
 
@@ -71,10 +71,10 @@ def manage(webservice_id):
         if(webservice_id != 'add'):
             harvesterModel.save_webservice(form, webservice_id)
         else:
-            harvesterModel.save_webservice(form) 
+            harvesterModel.save_webservice(form)
         flash('Record Saved', 'success')
         return redirect('/harvester/webservice')
-        
+
     return render_template('harvester/manage.html', form = form, name=name)
 
 @harvester.route('/delete/<webservice_id>', methods=['GET','POST'])
@@ -84,7 +84,7 @@ def delete(webservice_id):
     '''
     if not current_user.is_super:
         abort(401)
-    
+
     harvesterModel.delete(webservice_id)
-    flash('Record deleted', 'success') 
+    flash('Record deleted', 'success')
     return redirect('/harvester/webservice')

@@ -9,6 +9,8 @@ from octopus.core import app
 from octopus.lib import webapp
 from octopus.lib import dates
 from flask_login import login_user, current_user
+
+from service.__utils import jper_view_utils
 from service.api import JPER, ValidationException, ParameterException, UnauthorisedException
 from service import models
 from werkzeug.routing import BuildError
@@ -38,7 +40,7 @@ def _unauthorised():
     resp.status_code = 401
     return resp
 
-def _bad_request(message):
+def _bad_request(message) -> Response:
     """
     Construct a response object to represent a 400 (Bad Request) around the supplied message
 
@@ -308,7 +310,7 @@ def _list_request(repo_id=None):
         return _bad_request("'pageSize' parameter is not an integer")
 
     try:
-        nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
+        nlist = JPER.list_notifications(since, page=page, page_size=page_size, repository_id=repo_id)
     except ParameterException as e:
         return _bad_request(str(e))
 
@@ -348,20 +350,10 @@ def list_repository_routed(repo_id):
 @blueprint.route("/config/<repoid>", methods=["GET","POST"])
 @webapp.jsonp
 def config(repoid=None):
-    app.logger.debug(current_user.id + " " + request.method + " to config route")
-    if repoid is None:
-        if current_user.has_role('repository'):
-            repoid = current_user.id
-        elif current_user.has_role('admin'):
-            return '' # the admin cannot do anything at /config, but gets a 200 so it is clear they are allowed
-        else:
-            abort(400)
-    elif not current_user.has_role('admin'): # only the superuser can set a repo id directly
-        abort(401)
-    rec = models.RepositoryConfig().pull_by_repo(repoid)
+    rec = jper_view_utils.find_repo_config(repoid)
     if rec is None:
-        rec = models.RepositoryConfig()
-        rec.repository = repoid
+        return ''
+
     if request.method == 'GET':
         # get the config for the current user and return it
         # this route may not actually be needed, but is convenient during development
@@ -371,13 +363,10 @@ def config(repoid=None):
         return resp
     elif request.method == 'POST':
         if request.json:
-            saved = rec.set_repo_config(jsoncontent=request.json,repository=repoid)
+            saved = rec.set_repo_config(jsoncontent=request.json,repository=rec.repo)
         else:
             try:
-                if request.files['file'].filename.endswith('.csv'):
-                    saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'), repository=repoid)
-                elif request.files['file'].filename.endswith('.txt'):
-                    saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'), repository=repoid)
+                saved = jper_view_utils.set_repo_config_by_req_files(rec, rec.repo)
             except:
                 saved = False
         if saved:

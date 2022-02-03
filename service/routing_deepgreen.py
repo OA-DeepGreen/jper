@@ -2,15 +2,28 @@
 Module which handles all the routing mechanics to convert UnroutedNotifications into either
 RoutedNotifications or FailedNotifications
 """
-from octopus.lib import dates
-from service import packages, models
-from octopus.core import app
-from flask import url_for
+import dataclasses
+import itertools
+import re
+import unicodedata
+import uuid
 from copy import deepcopy
 from datetime import datetime
-import uuid, re
-import unicodedata
+from typing import Callable, Union, Iterable
+
+from flask import url_for
 from werkzeug.routing import BuildError
+
+from octopus.core import app
+from octopus.lib import dates
+from service import packages, models
+from service.models import RoutingMetadata, NotificationMetadata, License, RoutedNotification
+
+MatchResult = Union[str, bool]
+MatchFn = Callable[[str, any], MatchResult]
+PartBibid = tuple[str, dict]
+AlRepo = tuple[str, dict, str]
+
 
 class RoutingException(Exception):
     """
@@ -19,12 +32,184 @@ class RoutingException(Exception):
     pass
 
 
+def _yield_part_bibids(issn_data: Iterable[str], doi, publ_date: str) -> Iterable[PartBibid]:
+    # NEW FEATURE
+    # Get all subject repository accounts. Needed for Gold license.
+    # They do not get publications with gold license.
+    subject_repo_bibids = set(models.Account.pull_all_subject_repositories())
+    bibids = [b for b in set(models.Account.pull_all_repositories())
+              if b not in subject_repo_bibids]
+
+    # are there licenses stored for this ISSN?
+    # 2016-10-12 TD : an ISSN could appear in more than one license !
+    lic_data_list = ((issn, models.License.pull_by_journal_id(issn))
+                     for issn in issn_data)
+    lic_data_list = ((issn, lic) for issn, lic in lic_data_list if lic is not None)
+
+    # lic_data includes only valid license for the issn.
+    # It is a list with the url for the journal changing between each entry.
+    # So will only use the first record, as any valid url is fine.
+    lic_data_list = ((get_current_license_data(lic, get_publ_year(publ_date), issn, doi), lic)
+                     for issn, lic in lic_data_list)
+    lic_data_list = ((lic_data[0], lic)
+                     for lic_data, lic in lic_data_list if lic_data)
+
+    for lic_data, lic in lic_data_list:
+        lic_data: dict
+        lic: License
+
+        app.logger.debug(f'prepare part_bibid [{lic.type}][{lic.id}] ')
+        if lic.type == "gold":
+            # All repositories except subject repositories get publications with gold license
+            yield from ((bibid, lic_data) for bibid in bibids)
+
+        if lic.type in ["alliance", "national", "deal", "fid"]:
+            al = models.Alliance.pull_by_key("license_id", lic.id)
+            _participants = al.participants if al else []
+
+            # collect all EZB-Ids of participating institutions of AL
+            identifier_list = itertools.chain.from_iterable(
+                p.get("identifier", []) for p in _participants
+            )
+
+            # note: only first ISSN record found in current license will be considered!
+            identifier_list = (i for i in identifier_list
+                               if i.get("type", None) == "ezb" and i.get('id', None))
+            yield from ((i['id'], lic_data) for i in identifier_list)
+
+
+def _yield_al_repos(part_bibids: Iterable[PartBibid],
+                    unrouted: models.UnroutedNotification) -> Iterable[AlRepo]:
+    # Get only active repository accounts
+    # 2019-06-03 TD : yet a level more to differentiate between active and passive
+    #                 accounts. A new requirement, at a /very/ early stage... gosh.
+    for bibid, lic_data in part_bibids:
+        # 2017-06-06 TD : insert of this safeguard ;
+        #                 although it would be *very* unlikely to be needed here.  Strange.
+        # 2017-03-09 TD : handle DG standard (and somehow passive..) accounts as well.
+        # Regular accounts
+        # 2019-03-21 TD : in some (rare?) test scenarios there might be more than one account
+        # 2019-03-26 TD : case decision - handle multiple, equal accs vs. single accs only
+        acc_list = models.Account.pull_all_by_key("repository.bibid", bibid)
+        is_allow_add = (len(acc_list) <= 1 or
+                        app.config.get("DEEPGREEN_ALLOW_EQUAL_REPOS", False))
+        if not is_allow_add:
+            continue
+
+        def _should_add(_acc):
+            return (_acc is not None and
+                    _acc.has_role("repository") and
+                    not _acc.is_passive)
+
+        bibid_acc_list = itertools.chain(
+            ((bibid, acc) for acc in acc_list),
+            (("a" + bibid, acc) for acc in models.Account.pull_all_by_key("repository.bibid", "a" + bibid)),
+        )
+        bibid_acc_list = ((b, a) for b, a in bibid_acc_list if _should_add(a))
+        for _bibid, _acc in bibid_acc_list:
+            # KTODO this value keep update and overwrite by difference lic_data ???
+            unrouted.embargo = lic_data["embargo"]
+            yield _acc.id, lic_data, _bibid
+
+
+def _match_and_save_provenances(al_repos: Iterable[AlRepo],
+                                unrouted: models.UnroutedNotification,
+                                pmd: RoutingMetadata) -> list[str]:
+    # get a RoutingMetadata object which contains all the extracted metadata from this notification
+    match_data: RoutingMetadata = unrouted.match_data()
+    if pmd is not None:
+        # Add the package routing metadata with the routing metadata from the notification
+        match_data.merge(pmd)
+    app.logger.debug("Routing - Notification:{y} match_data:{x}".format(y=unrouted.id, x=match_data))
+
+    # iterate through all the repository configs, collecting match provenance and id information
+    match_ids = []
+
+    # for rc in models.RepositoryConfig.scroll(page_size=10, keepalive="1m"):
+    # 2016-09-08 TD : iterate through all _qualified_ repositories by the current alliance license
+    for repo, lic_data, bibid in al_repos:
+        app.logger.debug(f'Routing - working for entry [{repo}][{lic_data}][{bibid}] ')
+        rc = models.RepositoryConfig.pull_by_repo(repo)
+        if rc is None:
+            app.logger.warning(f'Routing - repository_conf not found, use default')
+            rc = models.RepositoryConfig()
+        app.logger.debug("Routing - Notification:{y} matching against Repository:{x}"
+                         .format(y=unrouted.id, x=repo))
+        # NEW FEATURE
+        # Does repository want articles for this license?
+        if not license_included(unrouted.id, lic_data, rc):
+            continue
+        prov = models.MatchProvenance()
+        prov.repository = repo
+        # 2016-08-10 TD : fill additional field for origin of notification (publisher) with provider_id
+        prov.publisher = unrouted.provider_id
+        # 2016-10-13 TD : fill additional object of alliance license with data gathered from EZB
+        prov.alliance = lic_data
+        prov.bibid = bibid
+        prov.notification = unrouted.id
+        prov_list = list(match(match_data, rc, repo))
+        if len(prov_list) > 0:
+            app.logger.debug("Routing - Notification:{y} successfully matched Repository:{x}"
+                             .format(y=unrouted.id, x=repo))
+            add_all_provenance(prov, prov_list)
+
+            prov.save()
+            match_ids.append(repo)
+            app.logger.debug("Routing - Provenance:{z} written for Notification:{y} for match to Repisitory:{x}"
+                             .format(x=prov.repository,
+                                     y=unrouted.id,
+                                     z=prov.id))
+        else:
+            app.logger.debug("Routing - Notification:{y} did not match Repository:{x}"
+                             .format(y=unrouted.id, x=repo))
+
+    return match_ids
+
+
+def _save_routed(unrouted: models.UnroutedNotification,
+                 match_ids: list,
+                 issn_data: list[str],
+                 metadata):
+    routing_reason = "Matched to {x} qualified repositories.".format(x=len(match_ids))
+    # repackage the content that came with the unrouted notification (if necessary) into
+    # the formats required by the repositories for which there was a match
+    pack_links = repackage(unrouted, match_ids)
+
+    # update the record with the information, and then
+    # write it to the index
+    routed: RoutedNotification = unrouted.make_routed()
+    routed.reason = routing_reason
+    # 2016-11-24 TD : collecting all available ISSN data of this notifiction
+    if issn_data is not None and len(issn_data) > 0:
+        routed.issn_data = " ; ".join(issn_data)
+    else:
+        routed.issn_data = "None"
+    for pl in pack_links:
+        routed.add_link(pl.get("url"), pl.get("type"), pl.get("format"), pl.get("access"), pl.get("packaging"))
+    routed.repositories = list(set(match_ids))  # make them unique
+    routed.analysis_date = dates.now()
+    if metadata is not None:
+        enhance(routed, metadata)
+    # Modify existing routed links with public access
+    modify_public_links(routed)
+    routed.save()
+
+
+def get_publ_year(publ_date: str) -> str:
+    dt = datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
+    publ_year = str(dt.year)
+    return publ_year
+
+
 # 2019-06-18 TD : a wrapper around the routing.route(obj) call in order to
 #                 be able to catch 'stalled' notifications
-def route(unrouted):
+def route(unrouted: models.UnroutedNotification):
     try:
         rc = _route(unrouted)
     except Exception as e:
+
+        import traceback
+        traceback.print_exc()  # TOBEREMOVE debug
         urid = unrouted.id
         routing_reason = "Stalled: " + str(e)
         notify_failure(unrouted, routing_reason, None, None, '(stalling)')
@@ -33,7 +218,7 @@ def route(unrouted):
     return rc
 
 
-def _route(unrouted):
+def _route(unrouted: models.UnroutedNotification):
     """
     Route an UnroutedNotification to the appropriate repositories
 
@@ -55,225 +240,116 @@ def _route(unrouted):
     """
     app.logger.debug("Routing - Notification:{y}".format(y=unrouted.id))
 
+    # --------------- prepare variable metadata, pmd, issn_data
     # 2016-10-19 TD : introduce a short(!) explanation for more routing information in history logs
-    routing_reason = "n/a"
-    issn_data = []
+    fail_reason = None
+    issn_data: list[str] = []
 
     # first get the packaging system to load and retrieve all the metadata
     # and match data from the content file (if it exists)
     try:
         metadata, pmd = packages.PackageManager.extract(unrouted.id, unrouted.packaging_format)
+        metadata: NotificationMetadata
+        pmd: RoutingMetadata
     except packages.PackageException as e:
-        notify_failure(unrouted, str(e), issn_data, metadata, '')
+        notify_failure(unrouted, str(e), issn_data)
         app.logger.debug("Routing - Notification:{y} failed with error '{x}'".format(y=unrouted.id, x=str(e)))
         raise RoutingException(str(e))
-
-    # get a RoutingMetadata object which contains all the extracted metadata from this notification
-    match_data = unrouted.match_data()
-    if pmd is not None:
-        # Add the package routing metadata with the routing metadata from the notification
-        match_data.merge(pmd)
-
-    app.logger.debug("Routing - Notification:{y} match_data:{x}".format(y=unrouted.id, x=match_data))
 
     # Extract issn and publication date
     # 2016-09-08 TD : start of alliance license legitimation
     issn_data = metadata.get_identifiers("issn")
     publ_date = metadata.publication_date
-    publ_year = None
+    # is issn_data and publ data exist
     if issn_data is not None and len(issn_data) > 0 and publ_date is not None:
-        dt = datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
-        publ_year = str(dt.year)
-        app.logger.debug("Routing - Notification:{y} provides issn_data:{x} and publ_year:{w}".format(y=unrouted.id, x=issn_data, w=publ_year))
+        app.logger.debug("Routing - Notification:{y} provides issn_data:{x} "
+                         "and publ_year:{w}".format(y=unrouted.id, x=issn_data,
+                                                    w=get_publ_year(publ_date)))
     else:
-        routing_reason = "No ISSN/EISSN nor publication date found."
-        app.logger.debug("Routing - Notification:{y} includes no ISSN or no publ_year in metatdata".format(y=unrouted.id, x=issn_data))
+        fail_reason = "No ISSN/EISSN nor publication date found."
+        app.logger.debug("Routing - Notification:{y} includes no ISSN "
+                         "or no publ_year in metatdata".format(y=unrouted.id, x=issn_data))
         issn_data = []
 
+    # --------- get al_repos list
     # Extract doi
     doi = metadata.get_identifiers("doi")
-    if doi is None:
-        doi = "unknown"
-    elif len(doi) == 0:
-        doi = "unknown"
-    else:
-        doi = doi[0]
-
-    bibids = list(set(models.Account.pull_all_repositories()))
-    # NEW FEATURE
-    # Get all subject repository accounts. Needed for Gold license. 
-    # They do not get publications with gold license.
-    subject_repo_bibids = list(set(models.Account.pull_all_subject_repositories()))
-
-    part_bibids = []
-
-    for issn in issn_data:
-        # are there licenses stored for this ISSN?
-        # 2016-10-12 TD : an ISSN could appear in more than one license !
-        lics = models.License.pull_by_journal_id(issn) # matches issn, eissn, doi, etc.
-        if lics is None: # nothing found at all...
-            continue
-        for lic in lics:
-            # lic_data includes only valid license for the issn.
-            # It is a list with the url for the journal changing between each entry.
-            # So will only use the first record, as any valid url is fine.
-            lic_data = get_current_license_data(lic, publ_year, issn, doi)
-            if len(lic_data) == 0:
-                continue
-            if lic.type == "gold":
-                for bibid in bibids:
-                    # All repositories except subject repositories get publications with gold license
-                    if bibid not in subject_repo_bibids:
-                        part_bibids.append((bibid, lic_data[0]))
-            if lic.type == "alliance" or lic.type == "national" or lic.type == "deal" or lic.type == "fid":
-                al = models.Alliance.pull_by_key("license_id", lic.id)
-                if al:
-                    # collect all EZB-Ids of participating institutions of AL
-                    for participant in al.participants:
-                        for i in participant.get("identifier", []):
-                            if i.get("type", None) == "ezb" and i.get('id', None):
-                                # note: only first ISSN record found in current license will be considered!
-                                part_bibids.append((i.get("id"), lic_data[0]))
-
-    # Get only active repository accounts
-    # 2019-06-03 TD : yet a level more to differentiate between active and passive
-    #                 accounts. A new requirement, at a /very/ early stage... gosh.
-    al_repos = []
-    for bibid, lic_data in part_bibids:
-        # 2017-06-06 TD : insert of this safeguard ;
-        #                 although it would be *very* unlikely to be needed here.  Strange.
-        if bibid is None:
-            continue
-        # 2017-03-09 TD : handle DG standard (and somehow passive..) accounts as well.
-        # Regular accounts
-        # 2019-03-21 TD : in some (rare?) test scenarios there might be more than one account
-        # 2019-03-26 TD : case decision - handle multiple, equal accs vs. single accs only
-        add_account = True
-        accounts = models.Account.pull_all_by_key("repository.bibid", bibid)
-        if len(accounts) > 1 and not app.config.get("DEEPGREEN_ALLOW_EQUAL_REPOS", False):
-            add_account = False
-        for acc1 in models.Account.pull_all_by_key("repository.bibid", bibid):
-            if add_account and acc1 is not None and acc1.has_role("repository") and not acc1.is_passive:
-                # extend this to hold all the license data may be?
-                unrouted.embargo = lic_data["embargo"]
-                al_repos.append((acc1.id, lic_data, bibid))
-        for acc2 in models.Account.pull_all_by_key("repository.bibid", "a" + bibid):
-            if add_account and acc2 is not None and acc2.has_role("repository") and not acc2.is_passive:
-                unrouted.embargo = lic_data["embargo"]
-                al_repos.append((acc2.id, lic_data, "a" + bibid))
+    doi = doi[0] if doi else "unknown"
+    part_bibids = _yield_part_bibids(issn_data, doi, metadata.publication_date, )
+    al_repos = _yield_al_repos(part_bibids, unrouted)
+    al_repos = list(al_repos)
 
     # 2019-03-26 TD : continue from here on with all the collected 'al_repos'
     if len(al_repos) > 0:
         app.logger.debug("Routing - Notification:{y} al_repos:{x}".format(y=unrouted.id, x=al_repos))
     else:
-        routing_reason = "No (active!) qualified repositories."
-        app.logger.debug("Routing - Notification {y} No (active!) qualified repositories currently found to receive this notification.  Notification will not be routed!".format(y=unrouted.id))
+        fail_reason = "No (active!) qualified repositories."
+        app.logger.debug(
+            "Routing - Notification {y} No (active!) qualified repositories "
+            "currently found to receive this notification.  "
+            "Notification will not be routed!".format(y=unrouted.id))
     # 2016-09-08 TD : end of checking alliance (and probably other!) license legitimation(s)
 
+    # ---------- match and save provenances by al_repos
     # iterate through all the repository configs, collecting match provenance and id information
-    match_ids = []
     try:
-        # for rc in models.RepositoryConfig.scroll(page_size=10, keepalive="1m"):
-        # 2016-09-08 TD : iterate through all _qualified_ repositories by the current alliance license
-        for repo, lic_data, bibid in al_repos:
-            rc = models.RepositoryConfig.pull_by_repo(repo)
-            if rc is None:
-                rc = models.RepositoryConfig()
-            app.logger.debug(
-                "Routing - Notification:{y} matching against Repository:{x}".format(y=unrouted.id, x=repo))
-            # NEW FEATURE
-            # Does repository want articles for this license?
-            if not license_included(unrouted.id, lic_data, rc):
-                continue
-            prov = models.MatchProvenance()
-            prov.repository = repo
-            # 2016-08-10 TD : fill additional field for origin of notification (publisher) with provider_id
-            prov.publisher = unrouted.provider_id
-            # 2016-10-13 TD : fill additional object of alliance license with data gathered from EZB
-            prov.alliance = lic_data
-            prov.bibid = bibid
-            prov.notification = unrouted.id
-            match(match_data, rc, prov, repo)
-            if len(prov.provenance) > 0:
-                app.logger.debug("Routing - Notification:{y} successfully matched Repository:{x}".format(y=unrouted.id,
-                                                                                                          x=repo))
-                prov.save()
-                match_ids.append(repo)
-                app.logger.debug(
-                    "Routing - Provenance:{z} written for Notification:{y} for match to Repisitory:{x}".format(
-                        x=prov.repository,
-                        y=unrouted.id,
-                        z=prov.id))
-            else:
-                app.logger.debug("Routing - Notification:{y} did not match Repository:{x}".format(y=unrouted.id, x=repo))
-
-    # except esprit.tasks.ScrollException as e:
-    # 2016-09-08 TD : replace ScrollException by more general Exception type as .scroll() is no longer used here (see above)
+        match_ids = _match_and_save_provenances(al_repos, unrouted, pmd)
+        # except esprit.tasks.ScrollException as e:
+        # 2016-09-08 TD : replace ScrollException by more general Exception type
+        # as .scroll() is no longer used here (see above)
     except Exception as e:
         notify_failure(unrouted, str(e), issn_data, metadata, '')
-        app.logger.error("Routing - Notification:{y} failed with error '{x}'".format(y=unrouted.id, x=str(e)))
+        app.logger.error("Routing - Notification:{y} failed with error '{x}'"
+                         .format(y=unrouted.id, x=str(e)))
         raise RoutingException(str(e))
 
-    app.logger.debug("Routing - Notification:{y} matched to {x} repositories".format(y=unrouted.id, x=len(match_ids)))
+    app.logger.debug("Routing - Notification:{y} matched to {x} repositories"
+                     .format(y=unrouted.id, x=len(match_ids)))
 
+    # ----------- save routed
     # if there are matches then the routing is successful, and we want to finalise the
     # notification for the routed index and its content for download
     if len(match_ids) > 0:
-        routing_reason = "Matched to {x} qualified repositories.".format(x=len(match_ids))
-        # repackage the content that came with the unrouted notification (if necessary) into
-        # the formats required by the repositories for which there was a match
-        pack_links = repackage(unrouted, match_ids)
-
-        # update the record with the information, and then
-        # write it to the index
-        routed = unrouted.make_routed()
-        routed.reason = routing_reason
-        # 2016-11-24 TD : collecting all available ISSN data of this notifiction
-        if issn_data is not None and len(issn_data) > 0:
-            routed.issn_data = " ; ".join(issn_data)
-        else:
-            routed.issn_data = "None"
-        for pl in pack_links:
-            routed.add_link(pl.get("url"), pl.get("type"), pl.get("format"), pl.get("access"), pl.get("packaging"))
-        routed.repositories = list(set(match_ids)) # make them unique
-        routed.analysis_date = dates.now()
-        if metadata is not None:
-            enhance(routed, metadata)
-        # Modify existing routed links with public access
-        modify_public_links(routed)
-        routed.save()
+        _save_routed(unrouted, match_ids, issn_data, metadata)
         app.logger.debug("Routing - Notification:{y} successfully routed".format(y=unrouted.id))
         return True
     else:
-        if routing_reason == "n/a":
-            routing_reason = "No match in qualified repositories."
         # log the failure
         app.logger.error("Routing - Notification:{y} was not routed".format(y=unrouted.id))
-        notify_failure(unrouted, routing_reason, issn_data, metadata, '')
+
+        fail_reason = fail_reason or "No match in qualified repositories."
+        notify_failure(unrouted, fail_reason, issn_data, metadata, '')
         return False
 
     # Note that we don't delete the unrouted notification here - that's for the caller to decide
 
 
-def match(notification_data, repository_config, provenance, acc_id):
+def _no_val_change(val):
+    return val
+
+
+@dataclasses.dataclass
+class MatchAlgorithm:
+    repo_prop: str
+    match_prop: str
+    match_fn: MatchFn
+
+
+@dataclasses.dataclass
+class MatchedProvenanceData:
     """
-    Match the incoming notification data, to the repository config and determine
-    if there is a match.
-
-    If there is a match, all criteria for the match will be added to the provenance
-    object
-
-    :param notification_data:   models.RoutingMetadata
-    :param repository_config:   models.RepositoryConfig
-    :param provenance:          models.MatchProvenance
-    :param acc_id:              Account id matching the bib_id
-    :return:  True if there was a match, False if not
+    Data structure for save / add function "add_provenance"
     """
-    # just to give us a short-hand without compromising the useful names in the method sig
-    md = notification_data
-    rc = repository_config
 
-    match_algorithms = {
+    repo_prop: str
+    repo_val: any
+    match_prop: str
+    match_val: any
+    match_msg: str
+
+
+def _yield_match_algorithm() -> Iterable[MatchAlgorithm]:
+    match_algorithms: dict[str, dict[str, MatchFn]] = {
         "domains": {
             "urls": domain_url,
             "emails": domain_email
@@ -307,79 +383,115 @@ def match(notification_data, repository_config, provenance, acc_id):
         }
         match_algorithms["strings"]["postcodes"] = postcode_match
 
-    repo_property_values = {
-        "author_ids": author_id_string
-    }
+    for repo_prop, sub in match_algorithms.items():
+        for match_prop, fn in sub.items():
+            yield MatchAlgorithm(repo_prop, match_prop, fn)
 
-    match_property_values = {
-        "author_ids": author_id_string
-    }
+
+def match(noti_data: models.RoutingMetadata,
+          repo_conf: models.RepositoryConfig,
+          acc_id: str) -> Iterable[MatchedProvenanceData]:
+    """
+    Match the incoming notification data, to the repository config and determine
+    if there is a match.
+
+    If there is a match, all criteria for the match will be added to the provenance
+    object
+
+    :param noti_data:   models.RoutingMetadata
+    :param repo_conf:   models.RepositoryConfig
+    :param acc_id:              Account id matching the bib_id
+    :return:  True if there was a match, False if not
+    """
+
+    new_prov_list: list[MatchedProvenanceData] = []
+
+    # NEW FEATURE
+    # Check if repository has role match_all'
+    # if yes, do not need to match affiliations
+    # Need to do this just once
+    match_algorithms: list[MatchAlgorithm] = list(_yield_match_algorithm())
+    for match_alg in match_algorithms:
+        if match_alg.match_prop == 'affiliations':
+            match_msg = has_match_all(acc_id)
+            if match_msg is not False:
+                new_prov_list.append(MatchedProvenanceData(match_alg.repo_prop, '',
+                                                           match_alg.match_prop, '',
+                                                           match_msg))
+            break  # reference original logic of `check_match_all`
 
     # do the required matches
-    matched = False
-    check_match_all = True
-    match_affiliation = True
-    for repo_property, sub in match_algorithms.items():
-        for match_property, fn in sub.items():
-            # NEW FEATURE
-            # Check if repository has role match_all'
-            # if yes, do not need to match affiliations
-            # Need to do this just once
-            if match_property == 'affiliations' and check_match_all:
-                m = has_match_all(acc_id)
-                check_match_all = False
-                if m is not False:
-                    match_affiliation = False
-                    matched = True
-                    provenance.add_provenance(repo_property, "", match_property, "", m)
-            for rprop in getattr(rc, repo_property):
-                for mprop in getattr(md, match_property):
-                    if match_property == 'affiliations' and match_affiliation:
-                        m = fn(rprop, mprop)
-                    else:
-                        m = fn(rprop, mprop)
-                    if m is not False: # it will be a string then
-                        matched = True
-                        # convert the values that have matched to string values suitable for provenance
-                        rval = repo_property_values.get(repo_property)(
-                            rprop) if repo_property in repo_property_values else rprop
-                        mval = match_property_values.get(match_property)(
-                            mprop) if match_property in match_property_values else mprop
-
-                        # record the provenance
-                        provenance.add_provenance(repo_property, rval, match_property, mval, m)
+    todo_prov_list: Iterable[Iterable[MatchedProvenanceData]] = (
+        _create_matched_provenance_data_list(noti_data, repo_conf,
+                                             match_alg.repo_prop,
+                                             match_alg.match_prop,
+                                             match_alg.match_fn)
+        for match_alg in match_algorithms
+    )
+    new_prov_list.extend(itertools.chain.from_iterable(todo_prov_list))
 
     # if none of the required matches hit, then no need to look at the optional refinements
-    if not matched:
-        return False
+    if new_prov_list:
+        # record the provenance
+        yield from new_prov_list
+    else:
+        app.logger.debug('stop matching [general], none of the required matches hit ')
+        return
 
-    # do the match refinements
+    # -------- do the match refinements --------------------
     # if the configuration specifies a keyword, it must match the notification data, otherwise
     # the match fails
-    if len(rc.keywords) > 0:
-        trip = False
-        for rk in rc.keywords:
-            for mk in md.keywords:
-                m = exact(rk, mk)
-                if m is not False:  # then it is a string
-                    trip = True
-                    provenance.add_provenance("keywords", rk, "keywords", mk, m)
-        if not trip:
-            return False
-
     # as above, if the config requires a content type it must match the notification data or the match fails
-    if len(rc.content_types) > 0:
-        trip = False
-        for rc in rc.content_types:
-            for mc in md.content_types:
-                m = exact(rc, mc)
-                if m is True:
-                    trip = True
-                    provenance.add_provenance("content_types", rc, "content_types", mc, m)
-        if not trip:
-            return False
+    refinement_props = (prop for prop in ["keywords", "content_types"]
+                        if len(getattr(repo_conf, prop)))
 
-    return len(provenance.provenance) > 0
+    for prop in refinement_props:
+        prov_list = _create_matched_provenance_data_list(noti_data, repo_conf,
+                                                         prop, prop, exact)
+        prov_list = list(prov_list)
+        if prov_list:
+            yield from prov_list
+        else:
+            app.logger.debug(f'stop matching [{prop}], none of the required matches hit ')
+            return  # exit function rather than continue the for loop
+
+
+def _create_matched_provenance_data_list(noti_data: models.RoutingMetadata,
+                                         repo_conf: models.RepositoryConfig,
+                                         repo_prop: str, match_prop: str,
+                                         match_fn: MatchFn) -> Iterable[MatchedProvenanceData]:
+    repo_val_factory_map = {
+        "author_ids": author_id_string
+    }
+
+    match_val_factory_map = {
+        "author_ids": author_id_string
+    }
+
+    data = itertools.product(getattr(repo_conf, repo_prop),
+                             getattr(noti_data, match_prop))
+    data = ((repo_val, match_val, match_fn(repo_val, match_val),)
+            for repo_val, match_val in data)
+    data = (case for case in data if case[2] is not False)
+    data = (MatchedProvenanceData(repo_prop, repo_val,
+                                  match_prop, match_val,
+                                  match_msg) for repo_val, match_val, match_msg in data)
+
+    for prov in data:
+        prov: MatchedProvenanceData
+
+        # convert the values that have matched to string values suitable for provenance
+        prov.repo_val = repo_val_factory_map.get(prov.repo_prop, _no_val_change)(prov.repo_val)
+        prov.match_val = match_val_factory_map.get(prov.match_prop, _no_val_change)(prov.match_val)
+        yield prov
+
+
+def add_all_provenance(provenance: models.MatchProvenance,
+                       prov_list: Iterable[MatchedProvenanceData]):
+    for p in prov_list:
+        provenance.add_provenance(p.repo_prop, p.repo_val,
+                                  p.match_prop, p.match_val,
+                                  p.match_msg)
 
 
 def enhance(routed, metadata):
@@ -628,7 +740,8 @@ def modify_public_links(routed):
         routed.add_link(l.get("url"), l.get("type"), l.get("format"), l.get("access"), l.get("packaging"))
 
 
-def get_current_license_data(lic, publ_year, issn, doi):
+def get_current_license_data(lic: License, publ_year: str,
+                             issn: str, doi) -> list[dict]:
     lic_data = []
     for jrnl in lic.journals:
         # check anew for each journal included in the license
@@ -647,10 +760,10 @@ def get_current_license_data(lic, publ_year, issn, doi):
                 if p.get("end", None):
                     yt = str(p["end"])
                 break
-        if ys <= publ_year <= yt:
+        if ys <= publ_year <= yt:  # KTODO str compare year??
             is_ezb = False
             url = ''
-            for l in jrnl.get("link", {}):
+            for l in jrnl.get("link", []):
                 if l.get("type", None) == "ezb":
                     is_ezb = True
                     url = l.get("url", '')
@@ -675,7 +788,8 @@ def get_current_license_data(lic, publ_year, issn, doi):
 def license_included(urid, lic_data, rc):
     lic = lic_data.get('id', None)
     if rc and lic and lic in rc.excluded_license:
-        reason = "Routing - Notification {y} License {x} is excluded by repository.  Notification will not be routed!".format(y=urid, x=lic)
+        reason = "Routing - Notification {y} License {x} is excluded by repository.  " \
+                 "Notification will not be routed!".format(y=urid, x=lic)
         app.logger.debug(reason)
         return False
     reason = "Routing - Notification {y} license {x} is not excluded by repository.".format(y=urid, x=lic)
@@ -683,7 +797,7 @@ def license_included(urid, lic_data, rc):
     return True
 
 
-def domain_url(domain, url):
+def domain_url(domain, url) -> MatchResult:
     """
     normalise the domain: strip prefixes and URL paths.  If either ends with the other, it is a match
 
@@ -717,7 +831,7 @@ def domain_url(domain, url):
     return False
 
 
-def domain_email(domain, email):
+def domain_email(domain, email) -> MatchResult:
     """
     normalise the domain: strip prefixes an URL paths.  Normalise the email: strip everything before @.  If either ends with the other it is a match
 
@@ -769,7 +883,7 @@ def domain_email(domain, email):
     return False
 
 
-def author_match(author_obj_1, author_obj_2):
+def author_match(author_obj_1, author_obj_2) -> MatchResult:
     """
     Match two author objects against eachother
 
@@ -792,7 +906,7 @@ def author_match(author_obj_1, author_obj_2):
     return False
 
 
-def author_string_match(author_string, author_obj):
+def author_string_match(author_string, author_obj) -> MatchResult:
     """
     Match an arbitrary string against the id in the author object
 
@@ -831,7 +945,7 @@ def postcode_match(pc1, pc2):
     return False
 
 
-def exact_substring(s1, s2):
+def exact_substring(s1, s2) -> MatchResult:
     """
     normalised s1 must be an exact substring of normalised s2
 
@@ -882,7 +996,7 @@ def exact_substring(s1, s2):
     return False
 
 
-def exact(s1, s2):
+def exact(s1, s2) -> MatchResult:
     """
     normalised s1 must be identical to normalised s2
 
@@ -931,9 +1045,11 @@ def _normalise(s):
 def has_match_all(acc_id):
     acc = models.Account.pull(acc_id)
     if acc.has_role('match_all'):
-        app.logger.debug("Routing: User account {x} has role match all, so no affiliation match needed".format(x=acc_id))
+        app.logger.debug("Routing: User account {x} has role match all, "
+                         "so no affiliation match needed".format(x=acc_id))
         return "Repository has role 'match_all'. Matching on all affiliations."
     return False
+
 
 ####################################################
 # Functions for turning objects into their string representations

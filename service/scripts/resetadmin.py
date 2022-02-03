@@ -6,6 +6,7 @@ account and builds a new one in its place.  This means no historical data will
 be kept from the before time.
 """
 from octopus.core import add_configuration, app
+from service import constant
 from service.models import Account
 
 if __name__ == "__main__":
@@ -22,17 +23,10 @@ if __name__ == "__main__":
     a = Account.pull('admin')
     if not a:
         a = Account()
-    username = 'admin'
-    password = 'D33pGr33n'
-    params = {
-        "id": username,
-        "role": ["admin"],
-        "email": "green@deepgreen.org",
-        "api_key": "admin",
-        "password": password
-    }
+    params = constant.get_admin_detail()
+    params["password"] = 'D33pGr33n'
     a.add_account(params)
     a.save()
-    print("superuser account reseted for user " + username + " with password " + password)
+    print("superuser account reseted for user " + params['id'] + " with password " + params['password'])
     print("THIS SUPERUSER ACCOUNT IS INSECURE! GENERATE A NEW PASSWORD FOR IT IMMEDIATELY! OR CREATE A NEW ACCOUNT AND DELETE THIS ONE...")
 

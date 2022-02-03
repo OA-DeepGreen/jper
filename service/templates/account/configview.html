@@ -8,89 +8,63 @@
 			<div>
 				<strong>Last updated:</strong>
 			</div>
-			<div id="updated"></div>
+			<div id="updated"> {{ config_data.get('last_updated') }} </div>
 			<p></p>
 			<div>
 				<strong>Repository:</strong>
 			</div>
-			<div id="repository"></div>
+			<div id="repository">{{ config_data.get('repo') }}</div>
 			<p></p>
 			<div>
 				<strong>Created date:</strong>
 			</div>
-			<div id="created"></div>
+			<div id="created">{{ config_data.get('created_date') }}</div>
 			<p></p>
 			<div>
 				<strong>Config-Id:</strong>
 			</div>
-			<div id="id"></div>
+			<div id="id">{{ config_data.get('id') }}</div>
 		</aside>
 	</div>
 </div>
 
+{% macro create_configview_table(data, _id='', _title='') %}
+	{% if data %}
 
+	<section class="is-collapsible show_hide__container is-collapsible--button"
+			 data-collapsible>
+		<h2 class="show_hide__trigger">{{ _title | safe }}</h2>
+		<div class="show_hide__target">
+			<div class="cms">
+				<table id="{{ _id | safe}}">
+					<tr>
+						<th>{{_title | safe}}</th>
+					</tr>
+					{% for val in data %}
+					<tr>
+						<td> {{ val }}</td>
+					</tr>
+					{% endfor %}
+				</table>
+			</div>
+		</div>
+	</section>
 
-
+    {% endif %}
+{% endmacro %}
 
 <div class="row">
-	<div class="span col-12" id="container"></div>
+	<div class="span col-12" id="container">
+		{{ create_configview_table(config_data.get('strings'), 'strings', 'Strings') }}
+		{{ create_configview_table(config_data.get('name_variants'), 'name_variants', 'Name Variants') }}
+		{{ create_configview_table(config_data.get('domains'), 'domains', 'Domains') }}
+		{{ create_configview_table(config_data.get('grants'), 'grants', 'Grants') }}
+		{{ create_configview_table(config_data.get('keywords'), 'keywords', 'Keywords') }}
+		{{ create_configview_table([config_data.get('institutional_identifier','')],
+									'institutional_identifier',
+									'Institutional identifier') }}
+
+	</div>
 </div>
-<script>
-var obj = JSON.parse({{ repo|tojson|safe }});
 
-
-
-print_table = function(data,id,title){
-	if(typeof data === "undefined"){
-		return 0;
-	}
-	$('#container').append('<section\
-			class="is-collapsible show_hide__container is-collapsible--button"\
-			data-collapsible>\
-			<h2 class="show_hide__trigger">'+title+'</h2>\
-			<div class="show_hide__target">\
-				<div class="cms">\
-				<table id="'+id+'">\
-						<tr>\
-							<th>'+title+'</th>\
-						</tr>\
-				</table>\
-				</div>\
-			</div>\
-		</section>\
-		');
-	
-	for (variable in data) {
-	$('#'+id+' tr:last').after('<tr>\
-			<td>'+data[variable]+'</td> \
-			</tr>');	
-	}
-}
-
-print_table(obj.strings,'strings','Strings');
-print_table(obj.name_variants,'name_variants','Name Variants');
-// print_table(obj.postcodes,'postcodes', 'Postcodes');
-// 2016-09-26 TD : 'postcodes' are taken out as match critria; esp. for Germany
-print_table(obj.domains,'domains', 'Domains');
-// 2016-09-26 TD : Additional listing of grant numbers if provided
-print_table(obj.grants,'grants', 'Grants');
-//print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-// 2016-09-26 TD : Response time for this field _really_ unacceptable if 20000+ 
-//                 IDs are about to be listed...
-// 2019-04-23 TD : These field are switched off for now due to DSGVO (Thank you EU!)
-// // 2019-02-25 TD : give it a new try; together with the keyword field!
-// print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-print_table(obj.keywords,'keywords', 'Keywords');
-var a = []
-a.push(obj.institutional_identifier)
-print_table(a,'institutional_identifier', 'Institutional identifier');
-
-$('#updated').append(obj.last_updated);
-$('#created').append(obj.created_date);
-$('#repository').append(obj.repo);
-// $('#repository').append(obj.repository);
-// 2016-09-26 TD : Field 'repository' changed to 'repo' due to ES 2.3.3 (and higher)
-$('#id').append(obj.id);
-
-</script>
 {% endblock %}

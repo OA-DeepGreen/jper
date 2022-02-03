@@ -1,194 +1,75 @@
 """
 Blueprint for providing account management
 """
+import csv
+import itertools
+import json
+import math
+import time
+import uuid
+import warnings
+from datetime import timedelta
+from io import StringIO, BytesIO
+from itertools import zip_longest
+from typing import Iterable, Union, Callable
 
-import uuid, json, time, requests
-
-from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file
-from service.forms.adduser import AdduserForm
+import requests
+from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file, Response
 from flask_login import login_user, logout_user, current_user
+from jsonpath_rw_ext import parse
+
 from octopus.core import app
 from octopus.lib import dates
-from service.api import JPER, ParameterException
-from service.views.webapi import _bad_request
-from service.repository_licenses import get_matching_licenses
-import math
-import csv
-from jsonpath_rw_ext import parse
-from itertools import zip_longest
 from service import models
-from io import StringIO, TextIOWrapper, BytesIO
-from datetime import timedelta
+from service.__utils import jper_view_utils
+from service.api import JPER, ParameterException
+from service.forms.adduser import AdduserForm
+from service.models import Account
+from service.repository_licenses import get_matching_licenses
+from service.views.utils.acc_table_template import AccTableTemplate, FailedNotificationTableTemplate, \
+    MatchedTableTemplate, NotificationTableTemplate
+from service.views.webapi import _bad_request
 
 blueprint = Blueprint('account', __name__)
 
-# Notification table/csv for repositories
-ntable = {
-            "screen" : ["Send Date", ["DOI","Publisher"], ["Publication Date", "Embargo"], "Title", "Analysis Date"],
-            "header" : ["Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
-     "Analysis Date" : "notifications[*].analysis_date",
-         "Send Date" : "notifications[*].created_date",
-           "Embargo" : "notifications[*].embargo.duration",
-               "DOI" : "notifications[*].metadata.identifier[?(@.type=='doi')].id",
-         "Publisher" : "notifications[*].metadata.publisher",
-             "Title" : "notifications[*].metadata.title",
-  "Publication Date" : "notifications[*].metadata.publication_date"
-}
-
-# Matching table/csv for providers (with detailed reasoning)
-mtable = {
-         "screen" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to {EZB-Id}", "Term", "Appears in {notification_field}"],
-         "header" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
-  "Analysis Date" : "matches[*].created_date",
-  "ISSN or EISSN" : "matches[*].alliance.issn",
-            "DOI" : "matches[*].alliance.doi",
-        "License" : "matches[*].alliance.link",
-   "Forwarded to" : "matches[*].bibid",
-           "Term" : "matches[*].provenance[0].term",
-     "Appears in" : "matches[*].provenance[0].notification_field"
-}
-
-# Rejected table/csv for providers
-ftable = {
-         "screen" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
-         "header" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
-      "Send Date" : "failed[*].created_date",
-  "Analysis Date" : "failed[*].analysis_date",
-  "ISSN or EISSN" : "failed[*].issn_data",
-            "DOI" : "failed[*].metadata.identifier[?(@.type=='doi')].id",
-         "Reason" : "failed[*].reason"
-}
-
 # Config table/csv for repositories
 ctable = {
-        # "screen" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        # "header" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        "screen" : ["Name Variants", "Domains", "Grant Numbers", "Keywords"],
-        "header" : ["Name Variants", "Domains", "Grant Numbers", "Dummy1", "Dummy2", "Keywords"],
- "Name Variants" : "repoconfig[0].name_variants[*]",
-       "Domains" : "repoconfig[0].domains[*]",
-#     "Postcodes" : "repoconfig[0].postcodes[*]",
- "Grant Numbers" : "repoconfig[0].grants[*]",
-        "Dummy1" : "repoconfig[0].author_ids[?(@.type=='xyz1')].id",
-        "Dummy2" : "repoconfig[0].author_ids[?(@.type=='xyz2')].id",
-#        "ORCIDs" : "repoconfig[0].author_ids[?(@.type=='orcid')].id",
-# "Author Emails" : "repoconfig[0].author_ids[?(@.type=='email')].id",
-      "Keywords" : "repoconfig[0].keywords[*]",
+    # "screen" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
+    # "header" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
+    "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords"],
+    "header": ["Name Variants", "Domains", "Grant Numbers", "Dummy1", "Dummy2", "Keywords"],
+    "Name Variants": "repoconfig[0].name_variants[*]",
+    "Domains": "repoconfig[0].domains[*]",
+    #     "Postcodes" : "repoconfig[0].postcodes[*]",
+    "Grant Numbers": "repoconfig[0].grants[*]",
+    "Dummy1": "repoconfig[0].author_ids[?(@.type=='xyz1')].id",
+    "Dummy2": "repoconfig[0].author_ids[?(@.type=='xyz2')].id",
+    #        "ORCIDs" : "repoconfig[0].author_ids[?(@.type=='orcid')].id",
+    # "Author Emails" : "repoconfig[0].author_ids[?(@.type=='email')].id",
+    "Keywords": "repoconfig[0].keywords[*]",
 }
 
 
-def _list_failrequest(provider_id=None, bulk=False):
-    """
-    Process a list request, either against the full dataset or the specific provider_id supplied
-    This function will pull the arguments it requires out of the Flask request object.  See the API documentation
-    for the parameters of these kinds of requests.
-
-    :param provider_id: the provider id to limit the request to
-    :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
-    :return: Flask response containing the list of notifications that are appropriate to the parameters
-    """
-    since = _validate_date(param='since')
-    page = _validate_page()
-    page_size = _validate_page_size()
-
-    try:
-        if bulk is True:
-            flist = JPER.bulk_failed(current_user, since, provider_id=provider_id)
-        else:
-            flist = JPER.list_failed(current_user, since, page=page, page_size=page_size, provider_id=provider_id)
-    except ParameterException as e:
-        return _bad_request(str(e))
-
-    return flist.json()
-
-
-def _list_matchrequest(repo_id=None, provider=False, bulk=False):
+def _list_data_by_table_template(table_template: AccTableTemplate, bulk=False) -> dict:
     """
     Process a list request, either against the full dataset or the specific repo_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
     for the parameters of these kinds of requests.
 
-    :param repo_id: the repo id to limit the request to
-    :param provider: (boolean) whether the repo_id belongs to a publisher or not
+    :param table_template: table_template object for generate table rows as dict
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
-    :return: Flask response containing the list of notifications that are appropriate to the parameters
+    :return: dict which contain table rows
     """
-    since = _validate_date(param='since')
-    page = _validate_page()
-    page_size = _validate_page_size()
+    since = _validate_date_or_abort(param='since')
+    page = None if bulk else _validate_page()
+    page_size = None if bulk else _validate_page_size()
 
     try:
-        # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
-        # 2016-11-24 TD : bulk switch to decrease the number of different calls
-        if bulk:
-            mlist = JPER.bulk_matches(current_user, since, repository_id=repo_id, provider=provider)
-        else:
-            # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            mlist = JPER.list_matches(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
-                                      provider=provider)
+        table_data = table_template.list_data(since, page=page, page_size=page_size)
+        return table_data
     except ParameterException as e:
-        return _bad_request(str(e))
-
-    return mlist.json()
-
-
-def _list_request(repo_id=None, provider=False, bulk=False):
-    """
-    Process a list request, either against the full dataset or the specific repo_id supplied
-    This function will pull the arguments it requires out of the Flask request object.  See the API documentation
-    for the parameters of these kinds of requests.
-
-    :param repo_id: the repo id to limit the request to
-    :param provider: (boolean) whether the repo_id belongs to a publisher or not
-    :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
-    :return: Flask response containing the list of notifications that are appropriate to the parameters
-    """
-    since = _validate_date(param='since')
-    page = _validate_page()
-    page_size = _validate_page_size()
-
-    try:
-        # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
-        # 2016-11-24 TD : bulk switch to decrease the number of different calls
-        if bulk is True:
-            nlist = JPER.bulk_notifications(current_user, since, repository_id=repo_id, provider=provider)
-        else:
-            # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
-                                            provider=provider)
-    except ParameterException as e:
-        return _bad_request(str(e))
-
-    return nlist.json()
-
-
-# 2016-11-24 TD : *** DEPRECATED: this function shall not be called anymore! ***
-# 2016-11-15 TD : process a download request of a notification list -- start --
-def _download_request(repo_id=None, provider=False):
-    """
-    Process a download request, either against the full dataset or the specific repo_id supplied
-    This function will pull the arguments it requires out of the Flask request object. 
-    See the API documentation for the parameters of these kinds of requests.
-
-    :param repo_id: the repo id to limit the request to
-    :return: StringIO containing the list of notifications that are appropriate to the parameters
-    """
-    since = request.values.get("since")
-
-    if since is None or since == "":
-        return _bad_request("Missing required parameter 'since'")
-
-    try:
-        since = dates.reformat(since)
-    except ValueError as e:
-        return _bad_request("Unable to understand since date '{x}'".format(x=since))
-
-    try:
-        nbulk = JPER.bulk_notifications(current_user, since, repository_id=repo_id)
-    except ParameterException as e:
-        return _bad_request(str(e))
-
-    return nbulk.json()
+        app.logger.debug(str(e))
+        abort(400, "Invalid parameter")
 
 
 def _sword_logs(repo_id, from_date, to_date):
@@ -201,26 +82,31 @@ def _sword_logs(repo_id, from_date, to_date):
 
     :return: Sword log data
     """
-    logs = None
     try:
         logs_raw = models.RepositoryDepositLog().pull_by_date_range(repo_id, from_date, to_date)
         logs = logs_raw.get('hits', {}).get('hits', {})
-        deposit_record_logs = {}
-        if logs and len(logs) > 0:
-            for log in logs:
-                info = log.get('_source', {})
-                if info and info.get('messages', []):
-                    for msg in info['messages']:
-                        if msg.get('deposit_record', None) and msg['deposit_record'] != "None":
-                            detailed_log = models.DepositRecord.pull(msg['deposit_record'])
-                            if detailed_log and detailed_log.messages:
-                                deposit_record_logs[msg['deposit_record']] = detailed_log.messages
+        messages: Iterable[dict] = itertools.chain.from_iterable(
+            (log.get('_source') or {}).get('messages', [])
+            for log in logs
+        )
+        messages = (msg for msg in messages
+                    if msg.get('deposit_record', None) and msg['deposit_record'] != "None")
+        deposit_keys: set[str] = {msg['deposit_record'] for msg in messages}
+        deposit_key_obj_list = ((_id, models.DepositRecord.pull(_id))
+                                for _id in deposit_keys)
+        deposit_record_logs = {_id: _log.messages
+                               for _id, _log in deposit_key_obj_list
+                               if _log and _log.messages}
+
     except ParameterException as e:
         return _bad_request(str(e))
     return logs, deposit_record_logs
 
 
-def _validate_date(param='since'):
+def _validate_date(param='since') -> Union[str, Response]:
+    # KTODO should not return response object in error case, suggest use raise or abort instead
+    warnings.warn('return response will make confused, use suggest _validate_date_or_abort instead',
+                  DeprecationWarning)
     since = request.values.get(param, None)
     if since is None or since == "":
         return _bad_request("Missing required parameter 'since'")
@@ -229,6 +115,19 @@ def _validate_date(param='since'):
         since = dates.reformat(since)
     except ValueError:
         return _bad_request("Unable to understand since date '{x}'".format(x=since))
+
+    return since
+
+
+def _validate_date_or_abort(param='since'):
+    since = request.values.get(param, None)
+    if since is None or since == "":
+        abort(400, "Missing required parameter 'since'")
+
+    try:
+        since = dates.reformat(since)
+    except ValueError:
+        abort(400, "Unable to understand since date '{x}'".format(x=since))
 
     return since
 
@@ -329,140 +228,127 @@ def index():
 # 2016-11-15 TD : enable download option ("csv", for a start...)
 @blueprint.route('/download/<account_id>', methods=["GET", "POST"])
 def download(account_id):
+    acc = _pull_acc_or_404(account_id)
+
+    table_template = _choice_table_template(is_provider=acc.has_role('publisher'),
+                                            is_rejected=request.args.get('rejected', False),
+                                            account_id=account_id)
+
+    res = _list_data_by_table_template(table_template, bulk=True)
+
+    return _send_file_by_xtable(table_template.get_table_schema(), res,
+                                table_template.get_fprefix(),
+                                account_id, csv.QUOTE_ALL)
+
+
+def _pull_acc_or_404(account_id) -> Account:
     acc = models.Account.pull(account_id)
     if acc is None:
         abort(404)
+    return acc
 
-    provider = acc.has_role('publisher')
-    data = None
 
-    if provider:
-        if request.args.get('rejected', False):
-            fprefix = "failed"
-            xtable = ftable
-            html = _list_failrequest(provider_id=account_id, bulk=True)
+def _get_req_date_str(key: str, default_date='01/06/2019') -> str:
+    date = request.args.get(key)
+    if date == '':
+        date = default_date
+    return date
+
+
+def _create_acc_link(date: str, acc: Account):
+    api_key = current_user.data['api_key'] if current_user.has_role('admin') else acc.data['api_key']
+    return f'{acc.id}?since={date}&api_key={api_key}'
+
+
+def _get_num_of_pages(results: dict) -> int:
+    num_of_pages = int(math.ceil(results.get('total', 1) / results.get('pageSize', 1)))
+    return num_of_pages
+
+
+def _choice_table_template(is_provider: bool, is_rejected: bool,
+                           account_id: str) -> AccTableTemplate:
+    if is_provider:
+        if is_rejected:
+            table_template = FailedNotificationTableTemplate(provider_id=account_id, )
         else:
-            fprefix = "matched"
-            xtable = mtable
-            html = _list_matchrequest(repo_id=account_id, provider=provider, bulk=True)
+            table_template = MatchedTableTemplate(is_provider=is_provider, repository_id=account_id)
     else:
-        fprefix = "routed"
-        xtable = ntable
-        html = _list_request(repo_id=account_id, provider=provider, bulk=True)
-
-    res = json.loads(html)
-
-    rows = []
-    for hdr in xtable["header"]:
-        rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
-
-    rows = list(zip_longest(*rows, fillvalue=''))
-    #
-    # Python 3 you need to use StringIO with csv.write. send_file requires BytesIO, so you have to do both.
-    strm = StringIO()
-    writer = csv.writer(strm, delimiter=',', quoting=csv.QUOTE_ALL)
-    writer.writerow(xtable["header"])
-    writer.writerows(rows)
-    mem = BytesIO()
-    mem.write(strm.getvalue().encode('utf-8-sig'))
-    mem.seek(0)
-    strm.close()
-    fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
-    return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+        table_template = NotificationTableTemplate(is_provider=is_provider, repository_id=account_id)
+    return table_template
 
 
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
-    acc = models.Account.pull(repo_id)
-    if acc is None:
-        abort(404)
-    #
-    provider = acc.has_role('publisher')
-    if provider:
-        data = _list_matchrequest(repo_id=repo_id, provider=provider)
-    else:
-        data = _list_request(repo_id=repo_id, provider=provider)
-    #
-    link = '/account/details'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
-    if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+    acc = _pull_acc_or_404(repo_id)
 
-    results = json.loads(data)
-    data_to_display = _notifications_for_display(results, ntable)
+    provider: bool = acc.has_role('publisher')
+    table_template = _choice_table_template(is_provider=provider,
+                                            is_rejected=False,
+                                            account_id=repo_id)
 
-    page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
-    num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
+    date = _get_req_date_str('since')
+    link = f'/account/details/{_create_acc_link(date, acc)}'
+
+    results = _list_data_by_table_template(table_template)
+    page_num = jper_view_utils.get_req_page_num()
+    num_of_pages = _get_num_of_pages(results)
+    table_schema = table_template.get_table_schema()
     if provider:
-        return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
+        return render_template('account/matching.html',
+                               table_headers=table_schema['header'],
+                               table_data=_to_table_data(table_schema, results),
                                num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
-    return render_template('account/details.html', repo=data, results=data_to_display,
+    return render_template('account/details.html', repo=json.dumps(results),
+                           results=_notifications_for_display(results, table_schema),
                            num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
+
+
+def _render_table_template(table_template, template_path,
+                           link_factory: Callable[[str], str]):
+    data_obj: dict = _list_data_by_table_template(table_template)
+
+    date = _get_req_date_str('since')
+    table_schema = table_template.get_table_schema()
+    return render_template(template_path,
+                           table_headers=table_schema['header'],
+                           table_data=_to_table_data(table_schema, data_obj),
+                           num_of_pages=_get_num_of_pages(data_obj),
+                           page_num=jper_view_utils.get_req_page_num(),
+                           link=link_factory(date),
+                           date=date)
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
 @blueprint.route('/matching/<repo_id>', methods=["GET", "POST"])
 def matching(repo_id):
-    acc = models.Account.pull(repo_id)
-    if acc is None:
-        abort(404)
-    #
-    provider = acc.has_role('publisher')
-    data = _list_matchrequest(repo_id=repo_id, provider=provider)
-    #
-    link = '/account/matching'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
-    if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+    acc = _pull_acc_or_404(repo_id)
 
-    results = json.loads(data)
+    table_template = MatchedTableTemplate(repository_id=repo_id,
+                                          is_provider=acc.has_role('publisher'))
 
-    page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
-    num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
+    return _render_table_template(
+        table_template,
+        'account/matching.html',
+        lambda _date: f'/account/matching/{_create_acc_link(_date, acc)}'
+    )
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
 def failing(provider_id):
-    acc = models.Account.pull(provider_id)
-    if acc is None:
-        abort(404)
-    #
-    # provider = acc.has_role('publisher')
+    acc = _pull_acc_or_404(provider_id)
+
     # 2016-10-19 TD : not needed here for the time being
-    data = _list_failrequest(provider_id=provider_id)
-    #
-    link = '/account/failing'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
-    if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
-
-    results = json.loads(data)
-
-    page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
-    num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)], num_of_pages=num_of_pages,
-                           page_num=page_num, link=link, date=date)
+    table_template = FailedNotificationTableTemplate(provider_id=provider_id)
+    return _render_table_template(
+        table_template,
+        'account/failing.html',
+        lambda _date: f'/account/failing/{_create_acc_link(_date, acc)}'
+    )
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
 def sword_logs(repo_id):
-    acc = models.Account.pull(repo_id)
-    if acc is None:
-        abort(404)
+    acc = _pull_acc_or_404(repo_id)
     if not acc.has_role('repository'):
         abort(404)
     latest_log = models.RepositoryDepositLog().pull_by_repo(repo_id)
@@ -487,7 +373,8 @@ def sword_logs(repo_id):
     if not to_date:
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
     logs_data, deposit_record_logs = _sword_logs(repo_id, from_date, to_date)
-    return render_template('account/sword_log.html', last_updated=last_updated, status=latest_log.status, logs_data=logs_data, deposit_record_logs=deposit_record_logs,
+    return render_template('account/sword_log.html', last_updated=last_updated, status=latest_log.status,
+                           logs_data=logs_data, deposit_record_logs=deposit_record_logs,
                            account=acc, api_base_url=app.config.get("API_BASE_URL"), from_date=from_date_display,
                            to_date=to_date_display, deposit_dates=deposit_dates, )
 
@@ -495,40 +382,22 @@ def sword_logs(repo_id):
 @blueprint.route("/configview", methods=["GET", "POST"])
 @blueprint.route("/configview/<repoid>", methods=["GET", "POST"])
 def configView(repoid=None):
-    app.logger.debug(current_user.id + " " + request.method + " to config route")
-    if repoid is None:
-        if current_user.has_role('repository'):
-            repoid = current_user.id
-        elif current_user.has_role('admin'):
-            return ''  # the admin cannot do anything at /config, but gets a 200 so it is clear they are allowed
-        else:
-            abort(400)
-    elif not current_user.has_role('admin'):  # only the superuser can set a repo id directly
-        abort(401)
-    rec = models.RepositoryConfig().pull_by_repo(repoid)
+    rec = jper_view_utils.find_repo_config(repoid)
     if rec is None:
-        rec = models.RepositoryConfig()
-        rec.repo = repoid
-        # rec.repository = repoid
-        # 2016-09-16 TD : The field 'repository' has changed to 'repo' due to
-        #                 a bug fix coming with a updated version ES 2.3.3 
+        return ''
+
     if request.method == 'GET':
         # get the config for the current user and return it
         # this route may not actually be needed, but is convenient during development
         # also it should be more than just the strings data once complex configs are accepted
-        json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo=json_data)
+        return render_template('account/configview.html',
+                                config_data=rec.data)
     elif request.method == 'POST':
         if request.json:
-            saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
+            saved = rec.set_repo_config(jsoncontent=request.json, repository=rec.repo)
         else:
             try:
-                if request.files['file'].filename.endswith('.csv'):
-                    saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
-                elif request.files['file'].filename.endswith('.txt'):
-                    saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                saved = jper_view_utils.set_repo_config_by_req_files(rec, rec.repo)
             except:
                 saved = False
         if saved:
@@ -539,13 +408,11 @@ def configView(repoid=None):
 
 @blueprint.route('/<username>', methods=['GET', 'POST', 'DELETE'])
 def username(username):
-    acc = models.Account.pull(username)
+    acc = _pull_acc_or_404(username)
 
-    if acc is None:
-        abort(404)
-    elif (request.method == 'DELETE' or
-          (request.method == 'POST' and
-           request.values.get('submit', '').split(' ')[0].lower() == 'delete')):
+    if (request.method == 'DELETE' or
+            (request.method == 'POST' and
+             request.values.get('submit', '').split(' ')[0].lower() == 'delete')):
         if not current_user.is_super:
             abort(401)
         else:
@@ -612,36 +479,26 @@ def pubinfo(username):
         acc.data['embargo'] = {}
     # 2016-07-12 TD: proper handling of two independent forms using hidden input fields
     if request.values.get('embargo_form', False):
-        if request.values.get('embargo_duration', False):
-            acc.data['embargo']['duration'] = request.values['embargo_duration']
-        else:
-            acc.data['embargo']['duration'] = 0
+        acc.data['embargo']['duration'] = request.values.get('embargo_duration') or 0
 
     if 'license' not in acc.data:
         acc.data['license'] = {}
     # 2016-07-12 TD: proper handling of two independent forms using hidden input fields
     if request.values.get('license_form', False):
-        if request.values.get('license_title', False):
-            acc.data['license']['title'] = request.values['license_title']
-        else:
-            acc.data['license']['title'] = ""
-        if request.values.get('license_type', False):
-            acc.data['license']['type'] = request.values['license_type']
-        else:
-            acc.data['license']['type'] = ""
-        if request.values.get('license_url', False):
-            acc.data['license']['url'] = request.values['license_url']
-        else:
-            acc.data['license']['url'] = ""
-        if request.values.get('license_version', False):
-            acc.data['license']['version'] = request.values['license_version']
-        else:
-            acc.data['license']['version'] = ""
-
+        acc.data['license'].update(
+            {
+                key: request.values.get(f'license_{key}') or ''
+                for key in ['title', 'type', 'url', 'version']
+            }
+        )
     acc.save()
     time.sleep(2)
     flash('Thank you. Your publisher details have been updated.', "success")
     return redirect(url_for('.username', username=username))
+
+
+def _get_req_values_split(values, split_key=','):
+    return values.split(split_key) if values else []
 
 
 @blueprint.route('/<username>/repoinfo', methods=['POST'])
@@ -654,52 +511,28 @@ def repoinfo(username):
         acc.data['repository'] = {}
     # 2016-10-04 TD: proper handling of two independent forms using hidden input fields
     # if request.values.get('repo_profile_form',False):
-    if request.values.get('repository_software', False):
-        acc.data['repository']['software'] = request.values['repository_software']
-    else:
-        acc.data['repository']['software'] = ''
-    if request.values.get('repository_url', False):
-        acc.data['repository']['url'] = request.values['repository_url'].strip()
-    else:
-        acc.data['repository']['url'] = ''
-    if request.values.get('repository_name', False):
-        acc.data['repository']['name'] = request.values['repository_name']
-    else:
-        acc.data['repository']['name'] = ''
-    if request.values.get('repository_sigel', False):
-        acc.data['repository']['sigel'] = request.values['repository_sigel'].split(',')
-    else:
-        acc.data['repository']['sigel'] = []
-    if request.values.get('repository_bibid', False):
-        acc.data['repository']['bibid'] = request.values['repository_bibid'].strip().upper()
-    else:
-        acc.data['repository']['bibid'] = ''
+
+    acc.data['repository'].update({
+        'software': request.values.get('repository_software') or '',
+        'url': (request.values.get('repository_url') or '').strip(),
+        'name': request.values.get('repository_name') or '',
+        'sigel': _get_req_values_split(request.values.get('repository_sigel')),
+        'bibid': (request.values.get('repository_bibid') or '').strip().upper(),
+    })
 
     if 'sword' not in acc.data:
         acc.data['sword'] = {}
     # 2016-10-04 TD: proper handling of two independent forms using hidden input fields
     # if request.values.get('repo_sword_form',False):
-    if request.values.get('sword_username', False):
-        acc.data['sword']['username'] = request.values['sword_username']
-    else:
-        acc.data['sword']['username'] = ''
-    if request.values.get('sword_password', False):
-        acc.data['sword']['password'] = request.values['sword_password']
-    else:
-        acc.data['sword']['password'] = ''
-    if request.values.get('sword_collection', False):
-        acc.data['sword']['collection'] = request.values['sword_collection'].strip()
-    else:
-        acc.data['sword']['collection'] = ''
-    if request.values.get('sword_deposit_method', False):
-        acc.data['sword']['deposit_method'] = request.values['sword_deposit_method'].strip()
-    else:
-        acc.data['sword']['deposit_method'] = ''
 
-    if request.values.get('packaging', False):
-        acc.data['packaging'] = [s.strip() for s in request.values['packaging'].split(',')]
-    else:
-        acc.data['packaging'] = []
+    acc.data['sword'].update({
+        'username': request.values.get(f'sword_username') or '',
+        'password': request.values.get(f'sword_password') or '',
+        'collection': (request.values.get(f'sword_collection') or '').strip(),
+        'deposit_method': (request.values.get(f'sword_deposit_method') or '').strip(),
+    })
+
+    acc.data['packaging'] = [s.strip() for s in _get_req_values_split(request.values.get('packaging'))]
 
     acc.save()
     time.sleep(2)
@@ -719,6 +552,31 @@ def apikey(username):
     return redirect(url_for('.username', username=username))
 
 
+def _to_table_data(tbl_schema: dict, data: dict, default_val='') -> Iterable[tuple]:
+    rows = (
+        (m.value for m in parse(tbl_schema[hdr]).find(data))
+        for hdr in tbl_schema["header"]
+    )
+    rows = zip_longest(*rows, fillvalue=default_val)
+    return rows
+
+
+def _send_file_by_xtable(xtable: dict, res: dict, fprefix: str, account_id: str, quoting):
+    rows = _to_table_data(xtable, res)
+
+    # Python 3 you need to use StringIO with csv.write and send_file requires BytesIO, so you have to do both.
+    strm = StringIO()
+    writer = csv.writer(strm, delimiter=',', quoting=quoting)
+    writer.writerow(xtable["header"])
+    writer.writerows(rows)
+    mem = BytesIO()
+    mem.write(strm.getvalue().encode('utf-8-sig'))
+    mem.seek(0)
+    strm.close()
+    fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
+    return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+
+
 @blueprint.route('/<username>/config', methods=["GET", "POST"])
 def config(username):
     if current_user.id != username and not current_user.is_super:
@@ -728,27 +586,8 @@ def config(username):
         rec = models.RepositoryConfig()
         rec.repository = username
     if request.method == "GET":
-        fprefix = "repoconfig"
-        xtable = ctable
         res = {"repoconfig": [json.loads(rec.json())]}
-
-        rows = []
-        for hdr in xtable["header"]:
-            rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
-
-        rows = list(zip_longest(*rows, fillvalue=''))
-
-        # Python 3 you need to use StringIO with csv.write and send_file requires BytesIO, so you have to do both.
-        strm = StringIO()
-        writer = csv.writer(strm, delimiter=',', quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(xtable["header"])
-        writer.writerows(rows)
-        mem = BytesIO()
-        mem.write(strm.getvalue().encode('utf-8-sig'))
-        mem.seek(0)
-        strm.close()
-        fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=username, x=dates.now())
-        return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+        return _send_file_by_xtable(ctable, res, "repoconfig", username, csv.QUOTE_MINIMAL)
 
     elif request.method == "POST":
         try:
@@ -766,12 +605,9 @@ def config(username):
                     elif fn.endswith('.txt'):
                         saved = rec.set_repo_config(textfile=strm, repository=username)
             else:
-                if request.files['file'].filename.endswith('.csv'):
-                    saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=username)
-                elif request.files['file'].filename.endswith('.txt'):
-                    saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=username)
+                _saved = jper_view_utils.set_repo_config_by_req_files(rec, username)
+                if _saved is not None:
+                    saved = _saved
             if saved:
                 flash('Thank you. Your match config has been updated.', "success")
             else:
@@ -818,31 +654,36 @@ def changerole(username, role):
 
 
 @blueprint.route('/<username>/sword_activate', methods=['POST'])
-def sword_activate(username):
-    if current_user.id != username and not current_user.is_super:
-        abort(401)
-    acc = models.Account.pull(username)
-    sword_status = models.sword.RepositoryStatus.pull(acc.id)
-    if sword_status and sword_status.status == 'failing':
-        sword_status.activate()
-        sword_status.save()
-    time.sleep(2)
+def sword_activate(uname):
+    redirect_to = _sword_change_status(uname)
     flash('The sword connection has been activated.', "success")
-    return redirect(url_for('.username', username=username))
+    return redirect_to
 
 
 @blueprint.route('/<username>/sword_deactivate', methods=['POST'])
-def sword_deactivate(username):
-    if current_user.id != username and not current_user.is_super:
-        abort(401)
-    acc = models.Account.pull(username)
-    sword_status = models.sword.RepositoryStatus.pull(acc.id)
-    if sword_status and sword_status.status in ['succeeding', 'problem']:
-        sword_status.deactivate()
-        sword_status.save()
-    time.sleep(2)
+def sword_deactivate(uname):
+    redirect_to = _sword_change_status(uname)
     flash('The sword connection has been deactivated.', "success")
-    return redirect(url_for('.username', username=username))
+    return redirect_to
+
+
+def _sword_change_status(uname):
+    if current_user.id != uname and not current_user.is_super:
+        abort(401)
+    acc = models.Account.pull(uname)
+    sword_status = models.sword.RepositoryStatus.pull(acc.id)
+
+    handler = {
+        'succeeding': sword_status.deactivate,
+        'problem': sword_status.deactivate,
+        'failing': sword_status.activate,
+    }
+    handler_fn = handler.get((sword_status and sword_status.status))
+    if handler_fn:
+        handler_fn()
+        sword_status.save()
+        time.sleep(2)
+    return redirect(url_for('.username', username=uname))
 
 
 @blueprint.route('/<username>/matches')

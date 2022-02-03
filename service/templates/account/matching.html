@@ -1,5 +1,6 @@
-{% extends "base.html" %} 
-{% block content %} 
+{% extends "base.html" %}
+{% import 'table_utils.html' as table_utils %}
+{% block content %}
 
 <div class="row">
 	<div class="col span-12">
@@ -31,12 +32,11 @@
 			"harvester/helpers/pagination.html" import render_pagination%} {{
 			render_pagination(num_of_pages,page_num,link) }}</div>
 
-			<table id="publisherTable" class="tablesorter-green">
+			{{ table_utils.create_table_by_arr(table_headers, table_data,
+											   "publisherTable","tablesorter-green") }}
 
-			</table>
-				
 			{% from "harvester/helpers/pagination.html" import render_pagination%}
-		{{ render_pagination(num_of_pages,page_num,link) }}
+			{{ render_pagination(num_of_pages,page_num,link) }}
 		<div class="row">
 			<div class="col span-1"></div>
 			<div class="col span-1"></div>
@@ -47,56 +47,7 @@
 	</div>	
 	</div>
 
-<!--
-			<table id="publisherTable">
-				<tr>
-					<th>Analysis&nbsp;Date</th>
-					<th>ISSN&nbsp;or&nbsp;EISSN</th>
-					<th>DOI</th>
-					<th>License</th>
-					<th>Forwarded&nbsp;to</th>
-					<th>Term</th>
-					<th>Appears&nbsp;in</th>
-				</tr>
-
-			</table>
--->
-
-
 <script>
-	var obj = JSON.parse ({{ repo|tojson|safe }});
-	var tbl = JSON.parse ({{ tabl|tojson|safe }});
-
-	var out = [];
-	for (j in tbl.header) {
-		var hdr = tbl.header[j];
-		out[hdr] = jsonpath.query(obj, tbl[hdr]);
-	}
-
-	var ids = jsonpath.query(obj, 'matches[*].id');
-	// var node = '';
-
-	$('#publisherTable').prepend('<tr>\
-		<th>'+tbl.header[0]+'</th> \
-		<th>'+tbl.header[1]+'</th> \
-		<th>'+tbl.header[2]+'</th> \
-		<th>'+tbl.header[3]+'</th> \
-		<th>'+tbl.header[4]+'</th> \
-		<th>'+tbl.header[5]+'</th> \
-		<th>'+tbl.header[6]+'</th> \
-		</tr>');
-
-	for (variable in ids) {
-		$('#publisherTable tr:last').after('<tr>\
-			<td>'+out[tbl.header[0]][variable]+'</td> \
-			<td>'+out[tbl.header[1]][variable]+'</td> \
-			<td>'+out[tbl.header[2]][variable]+'</td> \
-			<td>'+out[tbl.header[3]][variable]+'</td> \
-			<td>'+out[tbl.header[4]][variable]+'</td> \
-			<td>'+out[tbl.header[5]][variable]+'</td> \
-			<td>'+out[tbl.header[6]][variable]+'</td> \
-			</tr>');
-	}
     $("#publisherTable").tablesorter();
 </script>
 
