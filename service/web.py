@@ -89,6 +89,9 @@ app.register_blueprint(reports, url_prefix="/reports")
 from service.views.query import blueprint as query
 app.register_blueprint(query, url_prefix="/query")
 
+from service.views.search_objs import blueprint as search_objs
+app.register_blueprint(search_objs, url_prefix="/search_objs")
+
 if app.config.get("FUNCTIONAL_TEST_MODE", False):
     from service.views.test import blueprint as test
     app.register_blueprint(test, url_prefix="/test")

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1> xxxxxxx </h1>
+
+
+
+
+<!-- jquery ui -->
+<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/jquery-ui-1.11.1/jquery-ui.css') }}">
+
+<!-- select2 -->
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='js/vendor/select2-3.5.1/select2.css') }}">
+
+<!-- bootstrap styles -->
+<!--<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/bootstrap-3.3.1/css/bootstrap.min.css') }}">-->
+
+<!-- nvd3 styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/nvd3-1.8.1/nv.d3.css') }}">
+
+<!-- datepicker styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/bootstrap-daterangepicker-2.1.22/daterangepicker.css') }}">
+
+<!-- edges styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.Facetview.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.Tabbed.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.BasicRangeSelectorRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.FacetFilterSetterRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.MultiDateRangeRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.NSeparateORTermSelectorRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.NumericRangeEntryRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.ORTermSelectorRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.PagerRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.RefiningANDTermSelectorRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.ResultsDisplayRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.SearchingNotificationRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.SelectedFiltersRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.TabularResultsRenderer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.FullSearchControllerRenderer.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edges/google.edges.css') }}">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<main class="container page-content">
+    <div id="public-journal-search"></div>
+    <div class="modal" id="modal-help" tabindex="-1" role="dialog" aria-labelledby="modalLabel-help" style="display: none;">
+        <div class="modal__dialog" role="document">
+            <p class="label">Tips</p>
+            <h3 class="modal__title" id="modalLabel-help">
+                Refining your search
+            </h3>
+            <ul>
+                <li>Searching for words separated by space(s) will add an Implicit AND between each word. For example searching for 'international development' will search for both <i>international</i> and <i>development</i>.</li>
+                <li>To search a phrase, add quotation marks, for example “international development”.</li>
+                <li>To broaden your search:
+                    <ul>
+                        <li>use the Boolean OR, for example 'bird OR flu OR avian';</li>
+                        <li>use the truncation character * to replace characters, for example 'sustain*' retrieves records with sustain, sustainability, sustainable, sustained, sustaining.</li>
+                    </ul>
+                </li>
+            </ul>
+            <button type="button" data-dismiss="modal" class="modal__close">Close</button>
+        </div>
+    </div>
+</main>
+
+
+<!--<div class="container"><div class="content">-->
+<!--    <div style="margin-top: 30px">-->
+<!--        <div id="statics"></div>-->
+<!--    </div>-->
+<!--    <div style="margin-top: 30px">-->
+<!--        <div id="edges"></div>-->
+<!--    </div>-->
+<!--    <div style="margin-top: 30px">-->
+<!--        <div id="wna">-->
+<!--            <div id="map-canvas"></div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--    <div style="margin-top: 30px">-->
+<!--        <div id="facetview"></div>-->
+<!--    </div>-->
+<!--    <div style="margin-top: 30px">-->
+<!--        <a href="#" id="managed-url">url for producing the above search</a>-->
+<!--    </div>-->
+<!--</div></div>-->
+
+
+
+
+{% endblock %}
+
+{% block extra_js_bottom %}
+
+
+
+<!-- edges example import -->
+
+
+
+<!-- jquery -->
+<!--
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/jquery-1.11.1/jquery-1.11.1.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/jquery-ui-1.11.1/jquery-ui.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/select2-3.5.1/select2.min.js') }}"></script>
+-->
+
+<!-- nvd3 (+d3) -->
+<!--<script type="text/javascript" src="vendor/d3/d3.v2.js"></script>
+<script type="text/javascript" src="vendor/nvd3/fisheye.js"></script>
+<script type="text/javascript" src="vendor/nvd3/nv.d3.js"></script>-->
+
+
+<!--
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/d3-3.5.17/d3.min.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/nvd3-1.8.1/nv.d3.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/vendor/PapaParse-4.1.2/papaparse.min.js') }}"></script>
+
+
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/es.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/edges.jquery.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/edges.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/edges.csv.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/charts.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/maps.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/ranges.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/search.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/selectors.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/tables.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/templates/bs3.Facetview.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/templates/bs3.Tabbed.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.BasicRangeSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.FacetFilterSetterRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SelectedFiltersRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.MultiDateRangeRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.NSeparateORTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.NumericRangeEntryRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ORTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.PagerRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.RefiningANDTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsDisplayRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SearchingNotificationRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SelectedFiltersRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.TabularResultsRenderer.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/d3.edges.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/google.edges.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/nvd3.edges.js') }}"></script>
+-->
+
+<!-- <script type="text/javascript" src="{{ url_for('static', filename='js/vendor/d3-v3/d3.min.js') }}"></script> -->
+<!-- <script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.edges.js') }}"></script> -->
+<!--<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/highcharts.edges.js') }}"></script>-->
+
+<!-- END edges example import -->
+
+
+
+<!----------------  doaj import -->
+
+<!--<script type="text/javascript" src="/static/js/doaj.fieldrender.edges.js?v={{config.get('DOAJ_VERSION')}}"></script>-->
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/edges.jquery.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/es7x.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/edges.js') }}"></script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/templates/bs3.Facetview.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/selectors.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/search.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultCountRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SortRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.FacetFilterSetterRenderer.js') }}"></script>
+
+
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.RefiningANDTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ORTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsFieldsByRowRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.PagerRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SelectedFiltersRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SearchingNotificationRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.DateHistogramSelectorRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsDisplayRenderer.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.FullSearchControllerRenderer.js') }}"></script>
+
+<!-- --------------------- END  DOAJ import -->
+
+
+
+
+
+
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/deepgreen_edges.js') }}"></script>
+
+
+
+
+{% endblock extra_js_bottom %}
