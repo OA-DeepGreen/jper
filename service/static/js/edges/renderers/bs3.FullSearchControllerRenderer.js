@@ -35,7 +35,6 @@ $.extend(true, edges, {
             this.namespace = "edges-bs3-search-controller";
 
             this.draw = function () {
-                debugger
                 // reset these on each draw
                 this.shareBoxOpen = false;
                 this.showShortened = false;

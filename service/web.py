@@ -89,6 +89,9 @@ app.register_blueprint(reports, url_prefix="/reports")
 from service.views.query import blueprint as query
 app.register_blueprint(query, url_prefix="/query")
 
+from service.views.query_edges import blueprint as query_edges
+app.register_blueprint(query_edges, url_prefix="/query-edges")
+
 from service.views.search_objs import blueprint as search_objs
 app.register_blueprint(search_objs, url_prefix="/search_objs")
 

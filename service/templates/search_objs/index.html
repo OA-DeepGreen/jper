@@ -1,9 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1> xxxxxxx </h1>
-
-
 
 
 <!-- jquery ui -->
@@ -13,13 +10,14 @@
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='js/vendor/select2-3.5.1/select2.css') }}">
 
 <!-- bootstrap styles -->
-<!--<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/bootstrap-3.3.1/css/bootstrap.min.css') }}">-->
+<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/bootstrap-3.3.1/css/bootstrap.min.css') }}">
 
 <!-- nvd3 styles -->
 <link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/nvd3-1.8.1/nv.d3.css') }}">
 
 <!-- datepicker styles -->
-<link rel="stylesheet" href="{{ url_for('static', filename='js/vendor/bootstrap-daterangepicker-2.1.22/daterangepicker.css') }}">
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='js/vendor/bootstrap-daterangepicker-2.1.22/daterangepicker.css') }}">
 
 <!-- edges styles -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/edges/bs3.Facetview.css') }}">
@@ -42,34 +40,36 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/edges/google.edges.css') }}">
 
 
+<style>
+    #gd-edges-main {
+        width: 900px;
+    }
+</style>
 
 
-
-
-
-
-
-
-
-
-
+<h1> xxxxxxx </h1>
 
 
 <main class="container page-content">
-    <div id="public-journal-search"></div>
-    <div class="modal" id="modal-help" tabindex="-1" role="dialog" aria-labelledby="modalLabel-help" style="display: none;">
+    <div id="gd-edges-main"></div>
+    <div class="modal" id="modal-help" tabindex="-1" role="dialog" aria-labelledby="modalLabel-help"
+         style="display: none;">
         <div class="modal__dialog" role="document">
             <p class="label">Tips</p>
             <h3 class="modal__title" id="modalLabel-help">
                 Refining your search
             </h3>
             <ul>
-                <li>Searching for words separated by space(s) will add an Implicit AND between each word. For example searching for 'international development' will search for both <i>international</i> and <i>development</i>.</li>
+                <li>Searching for words separated by space(s) will add an Implicit AND between each word. For example
+                    searching for 'international development' will search for both <i>international</i> and <i>development</i>.
+                </li>
                 <li>To search a phrase, add quotation marks, for example “international development”.</li>
                 <li>To broaden your search:
                     <ul>
                         <li>use the Boolean OR, for example 'bird OR flu OR avian';</li>
-                        <li>use the truncation character * to replace characters, for example 'sustain*' retrieves records with sustain, sustainability, sustainable, sustained, sustaining.</li>
+                        <li>use the truncation character * to replace characters, for example 'sustain*' retrieves
+                            records with sustain, sustainability, sustainable, sustained, sustaining.
+                        </li>
                     </ul>
                 </li>
             </ul>
@@ -100,16 +100,12 @@
 <!--</div></div>-->
 
 
-
-
 {% endblock %}
 
 {% block extra_js_bottom %}
 
 
-
 <!-- edges example import -->
-
 
 
 <!-- jquery -->
@@ -175,7 +171,6 @@
 <!-- END edges example import -->
 
 
-
 <!----------------  doaj import -->
 
 <!--<script type="text/javascript" src="/static/js/doaj.fieldrender.edges.js?v={{config.get('DOAJ_VERSION')}}"></script>-->
@@ -187,33 +182,206 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/edges/templates/bs3.Facetview.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/selectors.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/edges/components/search.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultCountRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SortRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.FacetFilterSetterRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultCountRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.SortRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.FacetFilterSetterRenderer.js') }}"></script>
 
 
-
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.RefiningANDTermSelectorRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ORTermSelectorRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsFieldsByRowRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.PagerRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SelectedFiltersRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.SearchingNotificationRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.DateHistogramSelectorRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsDisplayRenderer.js') }}"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/edges/renderers/bs3.FullSearchControllerRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.RefiningANDTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.ORTermSelectorRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsFieldsByRowRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.PagerRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.SelectedFiltersRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.SearchingNotificationRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.DateHistogramSelectorRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.ResultsDisplayRenderer.js') }}"></script>
+<script type="text/javascript"
+        src="{{ url_for('static', filename='js/edges/renderers/bs3.FullSearchControllerRenderer.js') }}"></script>
 
 <!-- --------------------- END  DOAJ import -->
 
 
-
-
-
-
+<script type="text/javascript" src="{{ url_for('static', filename='js/dgcore.js') }}"></script>
 
 <script type="text/javascript" src="{{ url_for('static', filename='js/deepgreen_edges.js') }}"></script>
 
+<script>
 
+    let searchSetting = {}
+
+
+    searchSetting = {
+        search_url: "http://localhost:5998/query-edges/License",
+        // search_url: "http://localhost:5998/query-edges/FailedNotification",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "status", display: "Status"},
+                    {field: "name", display: "Name"},
+                    {field: "type", display: "Type"},
+                    {field: "last_updated", display: "Last updated"},
+                ]
+            })
+        }),
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "name.exact", display: "Name"},
+                    {field: "created_date", display: "Created date"},
+                    {field: "last_updated", display: "Last updated"},
+                ],
+                fieldOptions: [
+                    {field: "name.exact", display: "Name"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "type",
+                field: "type.exact",
+                display: "Type",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "status",
+                field: "status.exact",
+                display: "Status",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "type.exact": "Type",
+                    "status.exact": "Status",
+                }
+            }),
+
+        ],
+    }
+
+    searchSetting = {
+        // search_url: "http://localhost:5998/query-edges/Account",
+        search_url: "http://localhost:5998/query-edges/FailedNotification",
+        // search_url: "http://localhost:5998/query-edges/UnroutedNotification",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "iss_data", display: "Issn Data"},
+                    {field: "provider.id", display: "Provider"},
+                    {field: "reason", display: "Reason"},
+                    {field: "analysis_date", display: "Analysis date"},
+                ]
+            })
+        }),
+
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "iss_data.exact", display: "Issn Data"},
+                    {field: "analysis_date.exact", display: "Analysis date"},
+                    {field: "created_date", display: "Created date"},
+                ],
+                fieldOptions: [
+                    {field: "reason", display: "Reason"},
+                    {field: "metadata.journal", display: "Journal"},
+                    {field: "metadata.Title", display: "Title"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "issn_data",
+                field: "issn_data.exact",
+                display: "Issn Data",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "provider_id",
+                field: "provider.id.exact",
+                display: "Provider",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "issn_data.exact": "Issn Data",
+                    "provider.id.exact": "Provider",
+                }
+            }),
+        ],
+    }
+
+
+    searchSetting = {
+        search_url: "http://localhost:5998/query-edges/UnroutedNotification",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "content.packaging_format", display: "Packaging format"},
+                    {field: "provider.id", display: "Provider"},
+                    {field: "created_date", display: "Created date"},
+                ]
+            })
+        }),
+
+        opt_components: [
+            edges.newRefiningANDTermSelector({
+                id: "content_packaging_format",
+                field: "content.packaging_format.exact",
+                display: "Packaging format",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "provider_id",
+                field: "provider.id.exact",
+                display: "Provider",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "content.packaging_format.exact": "Packaging format",
+                    "provider.id.exact": "Provider",
+                }
+            }),
+
+        ],
+    }
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initSearchUi(searchSetting);
+    })
+</script>
 
 
 {% endblock extra_js_bottom %}

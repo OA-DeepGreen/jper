@@ -536,7 +536,6 @@ var edges = {
         };
 
         this.getRenderPackObject = function(oname, params) {
-            debugger
             for (var i = 0; i < this.renderPacks.length; i++) {
                 var rp = this.renderPacks[i];
                 if (rp && rp.hasOwnProperty(oname)) {
@@ -871,8 +870,6 @@ var edges = {
             this.context = this.edge.jq("#" + this.id);
 
             // set the renderer from default if necessary
-            console.log(this)
-            debugger;
             if (!this.renderer) {
                 this.renderer = this.edge.getRenderPackObject(this.defaultRenderer);
             }
