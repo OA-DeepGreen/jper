@@ -41,8 +41,18 @@
                         {% endif %}">
                             <a href="{{ url_for('reports.index') }}">Reports</a>
                         </li>
-                        <li class="nav__item">
-                            <a href="{{ url_for('search_objs.index') }}" >Search</a>
+                        <li class="nav__item has-popup">
+                            <a>Search</a>
+                            <div class="submenu submenu--left">
+                                <ul>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='Account') }}">Account</a></li>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='License') }}">License</a></li>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='Alliance') }}">Alliance</a></li>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='UnroutedNotification') }}">Unrouted Notification</a></li>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='RoutedNotification') }}">Routed Notification</a></li>
+                                    <li><a href="{{ url_for('search-objs.index', target_query='FailedNotification') }}">Failed Notification</a></li>
+                                </ul>
+                            </div>
                         </li>
                     {% endif %}
                     {% endif %}
