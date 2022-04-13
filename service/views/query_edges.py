@@ -37,6 +37,10 @@ def query(path=''):
     :param path:
     :return:
     """
+
+    if not getattr(current_user, 'is_super', False):
+        abort(401)
+
     pathparts = path.strip('/').split('/')
     if len(pathparts) < 1:
         abort(400)
@@ -76,13 +80,6 @@ def query(path=''):
         abort(400)
 
     res = dao_class.query(q)
-
-    # TOBEREMOVE
-    # res = queryService.search(domain, index_type, q, account, request.values)
-    # except exceptions.AuthoriseException as e:
-    #     abort(403)
-    # except exceptions.NoSuchObjectException as e:
-    #     abort(404)
 
     resp = make_response(json.dumps(res))
     resp.mimetype = "application/json"
