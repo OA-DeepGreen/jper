@@ -93,7 +93,7 @@ from service.views.query_edges import blueprint as query_edges
 app.register_blueprint(query_edges, url_prefix="/query-edges")
 
 from service.views.search_objs import blueprint as search_objs
-app.register_blueprint(search_objs, url_prefix="/search_objs")
+app.register_blueprint(search_objs, url_prefix="/search-objs")
 
 if app.config.get("FUNCTIONAL_TEST_MODE", False):
     from service.views.test import blueprint as test
