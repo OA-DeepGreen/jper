@@ -1,0 +1,55 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Unrouted Notification {% endblock %}
+
+{% block search_content %}
+<script>
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='UnroutedNotification') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "content.packaging_format", display: "Packaging format"},
+                    {field: "provider.id", display: "Provider"},
+                    {field: "created_date", display: "Created date"},
+                ]
+            })
+        }),
+
+        opt_components: [
+            edges.newRefiningANDTermSelector({
+                id: "content_packaging_format",
+                field: "content.packaging_format.exact",
+                display: "Packaging format",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "provider_id",
+                field: "provider.id.exact",
+                display: "Provider",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "content.packaging_format.exact": "Packaging format",
+                    "provider.id.exact": "Provider",
+                }
+            }),
+
+        ],
+    }
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+

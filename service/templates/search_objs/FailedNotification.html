@@ -1,0 +1,68 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Failed Notification {% endblock %}
+
+{% block search_content %}
+<script>
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='FailedNotification') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "iss_data", display: "Issn Data"},
+                    {field: "provider.id", display: "Provider"},
+                    {field: "reason", display: "Reason"},
+                    {field: "analysis_date", display: "Analysis date"},
+                ]
+            })
+        }),
+
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "iss_data.exact", display: "Issn Data"},
+                    {field: "analysis_date.exact", display: "Analysis date"},
+                    {field: "created_date", display: "Created date"},
+                ],
+                fieldOptions: [
+                    {field: "reason", display: "Reason"},
+                    {field: "metadata.journal", display: "Journal"},
+                    {field: "metadata.Title", display: "Title"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "issn_data",
+                field: "issn_data.exact",
+                display: "Issn Data",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "provider_id",
+                field: "provider.id.exact",
+                display: "Provider",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "issn_data.exact": "Issn Data",
+                    "provider.id.exact": "Provider",
+                }
+            }),
+        ],
+    }
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+

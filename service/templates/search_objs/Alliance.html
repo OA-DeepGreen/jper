@@ -1,0 +1,60 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Alliance {% endblock %}
+
+{% block search_content %}
+<script>
+
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='Alliance') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "license_id", display: "License id"},
+                    {field: "status", display: "Status"},
+                    {field: "identifier*.type", display: "Identifier"},
+                ]
+            })
+        }),
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "created_date", display: "Created date"},
+                    {field: "last_updated", display: "Last updated"},
+                ],
+                fieldOptions: [
+                    {field: "status.exact", display: "Status"},
+                    {field: "license_id", display: "License id"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "status",
+                field: "status.exact",
+                display: "Status",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "status.exact": "Status",
+                }
+            }),
+
+        ],
+    }
+
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+

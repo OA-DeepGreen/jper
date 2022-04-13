@@ -1,0 +1,76 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Routed Notification {% endblock %}
+
+{% block search_content %}
+<script>
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='RoutedNotification') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "content.packaging_format", display: "Packaging format"},
+                    {field: "provider.id", display: "Provider"},
+                    {field: "created_date", display: "Created date"},
+                    {field: "metadata.title", display: "Title"},
+                    {field: "metadata.journal", display: "Journal"},
+                    {field: "metadata.publisher", display: "Publisher"},
+                    {field: "reason", display: "Reason"},
+                ]
+            })
+        }),
+
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "metadata.title.exact", display: "Title"},
+                    {field: "metadata.journal.exact", display: "Journal"},
+                    {field: "metadata.publisher.exact", display: "Publisher"},
+                    {field: "created_date", display: "Created date"},
+                    {field: "last_updated", display: "Last updated"},
+                ],
+                fieldOptions: [
+                    {field: "metadata.title.exact", display: "Title"},
+                    {field: "metadata.journal.exact", display: "Journal"},
+                    {field: "metadata.publisher.exact", display: "Publisher"},
+                    {field: "reason.exact", display: "Reason"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "metadata_publisher",
+                field: "metadata.publisher.exact",
+                display: "Publisher",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "provider_id",
+                field: "provider.id.exact",
+                display: "Provider",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "metadata.publisher.exact": "Publisher",
+                    "provider.id.exact": "Provider",
+                }
+            }),
+
+        ],
+    }
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+

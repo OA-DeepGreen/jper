@@ -1,0 +1,53 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Account {% endblock %}
+
+{% block search_content %}
+<script>
+
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='Account') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "email", display: "Email"},
+                    {field: "api_key", display: "Api key"},
+                    {field: "role", display: "Role"},
+                    {field: "last_updated", display: "Last updated"},
+                ]
+            })
+        }),
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [],
+                fieldOptions: [
+                    {field: "email.exact", display: "Email"},
+                    {field: "id.exact", display: "Id"},
+                    {field: "api_key", display: "Api key"},
+                    {field: "role", display: "Role"},
+                ]
+            }),
+
+            edges.newRefiningANDTermSelector({
+                id: "role",
+                field: "role.exact",
+                display: "Role",
+                size: 10,
+                category: "facet"
+            }),
+        ],
+    }
+
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+

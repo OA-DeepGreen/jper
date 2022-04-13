@@ -1,0 +1,69 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} License {% endblock %}
+
+{% block search_content %}
+<script>
+
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='License') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsDisplayRenderer({
+                fieldDisplayMap: [
+                    {field: "id", display: "ID"},
+                    {field: "name", display: "Name"},
+                    {field: "type", display: "Type"},
+                    {field: "status", display: "Status"},
+                    {field: "last_updated", display: "Last updated"},
+                ]
+            })
+        }),
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "name.exact", display: "Name"},
+                    {field: "created_date", display: "Created date"},
+                    {field: "last_updated", display: "Last updated"},
+                ],
+                fieldOptions: [
+                    {field: "name.exact", display: "Name"},
+                ]
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "type",
+                field: "type.exact",
+                display: "Type",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "status",
+                field: "status.exact",
+                display: "Status",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newSelectedFilters({
+                id: "selected-filters",
+                category: "selected-filters",
+                fieldDisplays: {
+                    "type.exact": "Type",
+                    "status.exact": "Status",
+                }
+            }),
+
+        ],
+    }
+
+
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
+
