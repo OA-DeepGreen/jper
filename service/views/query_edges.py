@@ -1,4 +1,7 @@
-import json, urllib.request, urllib.error, urllib.parse
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
 from functools import wraps
 
 from flask import Blueprint, request, abort, make_response, current_app
@@ -57,29 +60,13 @@ def query(path=''):
         except ValueError:
             abort(400)
 
-    # KTODO auth
-    account = None
-    if current_user is not None and not current_user.is_anonymous:
-        account = current_user._get_current_object()
-
-    # queryService = DOAJ.queryService()
-
-    """
-    
-        qs = {'query': {'match_all': {}}}
-
-    for item in request.values:
-        if item not in ['q','source','callback','_'] and isinstance(qs,dict):
-            qs[item] = request.values[item]
-
-    resp = make_response( json.dumps(klass().query(q=qs)) )
-    """
-
-    dao_class = getattr(models, model_class_name)
-    if not dao_class:
-        abort(400)
-
-    res = dao_class.query(q)
+    if model_class_name == 'RoutedNotification':
+        res = models.RoutedNotification.query(q, types='routed20*')
+    else:
+        dao_class = getattr(models, model_class_name)
+        if not dao_class:
+            abort(400)
+        res = dao_class.query(q)
 
     resp = make_response(json.dumps(res))
     resp.mimetype = "application/json"
