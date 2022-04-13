@@ -1,6 +1,6 @@
 $.extend(true, dgcore, {
 
-    initSearchUi: function (settings) {
+    initCommonSearchUi: function (settings) {
 
         var _components = [
             // edges.newPager({
