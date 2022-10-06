@@ -40,6 +40,22 @@
                 size: 10,
                 category: "facet"
             }),
+
+            edges.newRefiningANDTermSelector({
+                id: "packaging",
+                field: "packaging.exact",
+                display: "Packaging",
+                size: 10,
+                category: "facet"
+            }),
+
+            edges.newRefiningANDTermSelector({
+                id: "software",
+                field: "repository.software.exact",
+                display: "Software",
+                size: 10,
+                category: "facet"
+            }),
         ],
     }
 
