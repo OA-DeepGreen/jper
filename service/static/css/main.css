@@ -306,3 +306,28 @@ margin-bottom:0;
 .active:after {
     content: "\2796"; /* Unicode character for "minus" sign (-) */
 }
+
+.lic_upload label {
+    min-width: 8em;
+    display: inline-block;
+}
+
+.hide_file_upload {
+    display: none;
+}
+
+.detail_row {
+    display: none;
+}
+
+.file_tbl dt {
+    font-weight: bold;
+}
+.file_tbl dd {
+  margin: 0;
+  padding: 0 0 0.5em 0;
+}
+
+div.actions div {
+   margin-bottom: 5px;
+}

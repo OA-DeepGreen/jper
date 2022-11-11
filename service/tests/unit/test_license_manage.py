@@ -351,7 +351,7 @@ class TestLicenseManage(ESTestCase):
             checker()
 
         old_page = load_lic_detail_page_helper(client)
-        incorrect_id_list = {l.id for l in License.pull_all_by_status_ezb_id('active', new_lrf.ezb_id)}
+        incorrect_id_list = {l.id for l in License.pull_all_by_status_and_id('active', new_lrf.ezb_id)}
 
         # run
         resp: Response = send_active_lic_related_file(client, new_lrf.id, follow_redirects=True)
@@ -366,7 +366,7 @@ class TestLicenseManage(ESTestCase):
 
         # only one active record for each ezb_id
         time.sleep(3)  # wait for License.save()
-        active_lic_id_list = {l.id for l in License.pull_all_by_status_ezb_id('active', new_lrf.ezb_id)}
+        active_lic_id_list = {l.id for l in License.pull_all_by_status_and_id('active', new_lrf.ezb_id)}
         active_lic_id_list = active_lic_id_list - incorrect_id_list
         self.assertEqual(len(list(active_lic_id_list)), 1)
 

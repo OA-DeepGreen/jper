@@ -10,8 +10,9 @@ from octopus.lib import dataobj
 from service import dao
 from service.__utils import ez_dao_utils, ez_query_maker
 
-LRF_TYPES = ["alliance", "national", "open", "gold", "deal", "fid"]
+LICENSE_TYPES = ["alliance", "national", "gold", "deal", "fid", "hybrid"]
 LRF_STATUS = ["validation failed", "validation passed", "active", "archived", ]
+LRF_FILE_TYPES = ["license", "participant"]
 
 LIC_STATUS_ACTIVE = 'active'
 LIC_STATUS_INACTIVE = 'inactive'
@@ -408,7 +409,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                 "last_updated": {"coerce": "utcdatetime"},
                 "name": {"coerce": "unicode"},
                 "type": {"coerce": "unicode",
-                         "allowed_values": ["alliance", "national", "open", "gold", "deal", "fid"]},
+                         "allowed_values": ["alliance", "national", "open", "gold", "deal", "fid", "hybrid"]},
                 "status": {"coerce": "unicode", "allowed_values": ['active', 'inactive']},
             },
             # not (yet?) needed here
@@ -710,9 +711,6 @@ class License(dataobj.DataObj, dao.LicenseDAO):
         else:
             return None
 
-    @classmethod
-    def pull_by_journal_id(cls, journal_id):
-        return cls.pull_by_key('journal.identifier.id', journal_id)
 
     def set_license_data(self, ezbid, name, type='alliance', csvfile=None, jsoncontent=None,
                          init_status='active'):
@@ -767,8 +765,8 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                         volume['end'] = row[x].strip()
                     elif x == 'letztes issue' and len(row[x].strip()) > 0:
                         issue['end'] = row[x].strip()
-                    elif x == 'Embargo' and len(row[x].strip()) > 0 and row[x].strip().isnumeric():
-                        journal['embargo']['duration'] = int(row[x].strip())
+                    elif x == 'Embargo' and len(row[x].strip()) > 0:
+                        journal['embargo']['duration'] = row[x].strip()
 
                 journal['period'] = [year, volume, issue]
                 if journal not in self.data.get('journal', []):
@@ -805,16 +803,16 @@ class LicRelatedFile(dataobj.DataObj, dao.LicRelatedFileDAO):
                 "created_date": {"coerce": "utcdatetime"},
                 "last_updated": {"coerce": "utcdatetime"},
                 "file_name": {"coerce": "unicode"},
-                "type": {"coerce": "unicode",
-                         "allowed_values": LRF_TYPES},
+                "type": {"coerce": "unicode", "allowed_values": LICENSE_TYPES},
                 "ezb_id": {"coerce": "unicode"},
+                "name": {"coerce": "unicode"},
                 "status": {"coerce": "unicode", "allowed_values": LRF_STATUS},
                 "upload_date": {"coerce": "utcdatetime"},
                 "admin_notes": {"coerce": "unicode"},
                 "validation_notes": {"coerce": "unicode"},
                 "record_id": {"coerce": "unicode"},
-
-                # if this record is for participant, it will contain lic_related_file_id of licnese
+                "file_type": {"coerce": "unicode", "allowed_values": LRF_FILE_TYPES},
+                # if this record is for participant, it will contain lic_related_file_id of license
                 "lic_related_file_id": {"coerce": "unicode"},
             },
         }
@@ -830,7 +828,7 @@ class LicRelatedFile(dataobj.DataObj, dao.LicRelatedFileDAO):
         return record_cls
 
     def is_license(self) -> bool:
-        return self.data.get("lic_related_file_id") is None
+        return self.data.get("file_type") == "license"
 
     def is_active(self) -> bool:
         return self.data.get("status") == 'active'
@@ -886,6 +884,22 @@ class LicRelatedFile(dataobj.DataObj, dao.LicRelatedFileDAO):
         self._set_single("file_name", val, coerce=dataobj.to_unicode())
 
     @property
+    def name(self):
+        return self._get_single("name", coerce=dataobj.to_unicode())
+
+    @name.setter
+    def name(self, val):
+        self._set_single("name", val, coerce=dataobj.to_unicode())
+
+    @property
+    def admin_notes(self):
+        return self._get_single("admin_notes", coerce=dataobj.to_unicode())
+
+    @admin_notes.setter
+    def admin_notes(self, val):
+        self._set_single("admin_notes", val, coerce=dataobj.to_unicode())
+
+    @property
     def lic_related_file_id(self):
         return self._get_single("lic_related_file_id", coerce=dataobj.to_unicode())
 
@@ -909,3 +923,11 @@ class LicRelatedFile(dataobj.DataObj, dao.LicRelatedFileDAO):
     @type.setter
     def type(self, val):
         self._set_single("type", val, coerce=dataobj.to_unicode())
+
+    @property
+    def file_type(self):
+        return self._get_single("file_type", coerce=dataobj.to_unicode())
+
+    @file_type.setter
+    def file_type(self, val):
+        self._set_single("file_type", val, coerce=dataobj.to_unicode())

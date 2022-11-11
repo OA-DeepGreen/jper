@@ -50,19 +50,19 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config", help="additional configuration to load (e.g. for testing)")
 
     parser.add_argument("-t", "--table", help=".csv table data file")
-    parser.add_argument("-l", "--licence", help="licence type of .csv table data ('alliance','national', 'deal', 'fid' or 'gold')")
+    lic_help_text = "licence type of .csv table data ('alliance', 'national', 'deal', 'fid', 'hybrid' or 'gold')"
+    parser.add_argument("-l", "--licence", help=lic_help_text)
 
     args = parser.parse_args()
 
     if args.config:
         add_configuration(app, args.config)
 
-
     if not args.table or not args.licence:
         parser.print_help()
         exit(0)
 
-    if not args.licence in ["alliance", "national", "deal", "gold", "fid"]:
+    if args.licence not in ["alliance", "national", "deal", "gold", "fid", "hybrid"]:
         parser.print_help()
         exit(0)
 

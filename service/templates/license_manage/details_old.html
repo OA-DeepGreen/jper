@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<h1>License File Management</h1>
+
+
+<form id="upload-license-form" method="POST" action="/license-manage/upload-license"
+      enctype="multipart/form-data">
+    <h2>Upload License</h2>
+    <div class="lic_upload">
+        <div>
+            <label for="license_name">License Name:</label>
+            <input type="text" name="license_name" id="license_name"/><br/><br/>
+        </div>
+        <div>
+            <label for="lic_type">License type:</label>
+            <select name="lic_type" id="lic_type">
+                {% for lic_type in allowed_lic_types %}
+                <option value="{{ lic_type }}">{{ lic_type }}</option>
+                {% endfor %}
+            </select><br/><br/>
+        </div>
+        <div>
+            <label for="ezb_id">EZB id:</label>
+            <input type="text" name="ezb_id" id="ezb_id"/><br/><br/>
+        </div>
+        <div>
+            <label for="admin_notes">Admin Notes: </label>
+            <textarea name="admin_notes" id="admin_notes"></textarea><br/><br/>
+        </div>
+        <div>
+            <input type="file" name="file" id="upload-btn" class="input--large"/><br/><br/>
+        </div>
+        <div>
+            <input type="submit" value="Submit"/><br/><br/>
+        </div>
+    </div>
+</form>
+
+
+<h2>Current License and Participant Files</h2>
+<table class="file_tbl">
+    <thead>
+    <tr>
+        <th>License File</th>
+        <th>Upload Date</th>
+        <th>Type</th>
+        <th>Participant List</th>
+        <th>Upload Date</th>
+        <th>Update</th>
+        <th>Deactivate</th>
+    </tr>
+    </thead>
+    {% for l in active_list %}
+    <tr>
+        <td>
+            <a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=l.lic_lrf_id ) }}">
+                {{ l.lic_filename }}
+            </a>
+        </td>
+        <td> {{ l.lic_upload_date }}</td>
+        <td> {{ l.lic_type }}</td>
+        <td>
+            {% if l.parti_filename %}
+            <a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=l.parti_lrf_id ) }}">
+                {{ l.parti_filename }}
+            </a>
+            {% endif %}
+
+            {% if not l.parti_filename %}
+            <form method="POST"
+                  action="{{ url_for('license-manage.upload_participant') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="lic_lrf_id" value="{{ l.lic_lrf_id }}">
+                <input type="file" name="file" class="hide_file_upload submit_on_change"/>
+                <button class="trigger_file_btn"> Add</button>
+            </form>
+            {% endif %}
+        </td>
+        <td>
+            {{ l.parti_upload_date }}
+        </td>
+        <td>
+            <form method="POST"
+                  action="{{ url_for('license-manage.update_license') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="lic_lrf_id" value="{{ l.lic_lrf_id }}">
+                <input type="hidden" name="parti_lrf_id" value="{{ l.parti_lrf_id }}">
+                <input type="file" name="file" class="hide_file_upload submit_on_change"/>
+                <button class="long_act_btn trigger_file_btn">
+                    License
+                </button>
+            </form>
+
+            {% if l.parti_lrf_id %}
+            <form method="POST"
+                  action="{{ url_for('license-manage.update_participant') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="lic_lrf_id" value="{{ l.lic_lrf_id }}">
+                <input type="hidden" name="parti_lrf_id" value="{{ l.parti_lrf_id }}">
+                <input type="file" name="file" class="hide_file_upload submit_on_change"/>
+                <button class="long_act_btn trigger_file_btn">
+                    Participant
+                </button>
+            </form>
+            {% endif %}
+        </td>
+        <td>
+            <form method="POST" action="{{ url_for('license-manage.deactivate_license') }}">
+                <input type="hidden" name="lic_lrf_id" value="{{ l.lic_lrf_id }}">
+                <input type="hidden" name="parti_lrf_id" value="{{ l.parti_lrf_id }}">
+                <button type="submit" class="long_act_btn act_btn">
+                    License
+                </button>
+            </form>
+
+            {% if l.parti_lrf_id %}
+            <form method="POST" action="{{ url_for('license-manage.deactivate_participant') }}">
+                <input type="hidden" name="lrf_id" value="{{ l.parti_lrf_id }}">
+                <button type="submit" class="long_act_btn act_btn">
+                    Participant
+                </button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+
+
+</table>
+
+
+<h2>History</h2>
+<table class="file_tbl">
+    <thead>
+    <tr>
+        <th>File name</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Upload Date</th>
+        <th>Active</th>
+        <th>Delete</th>
+    </tr>
+    </thead>
+
+    {% for l in history_list %}
+    <tr>
+        <td>
+            <a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=l.get('id') ) }}">
+                {{ l.get('file_name') }}
+            </a>
+        </td>
+        <td> {{ l.get('type') }}</td>
+        <td>
+            <a class="toggle_detail_btn" toggle_detail="detail_row_{{loop.index0}}" href="#">
+                {{ l.get('status') }}
+            </a>
+        </td>
+        <td> {{ l.get('upload_date') }}</td>
+        <td>
+            {% if l.get('status') not in ['validation failed'] %}
+            <form method="POST" action="{{ url_for('license-manage.active_lic_related_file') }}">
+                <input type="hidden" name="lrf_id" value="{{ l.get('id') }}">
+                <input class="act_btn" type="submit" value="Active"/>
+            </form>
+            {% endif %}
+        </td>
+        <td>
+            {% if l.get('status') in allowed_del_status %}
+            <form method="POST" action="{{ url_for('license-manage.delete_lic_related_file') }}">
+                <input type="hidden" name="lrf_id" value="{{ l.get('id') }}">
+                <input class="act_btn" type="submit" value="Delete"/>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    <tr id="detail_row_{{loop.index0}}" class="detail_row">
+        <td colspan="6">
+            <div>
+                <span style="font-weight: bold">Validation notes:</span>
+                <span>{{ l.get('validation_notes', '') }}</span>
+            </div>
+            <div>
+                <span style="font-weight: bold">Admin notes:</span>
+                <span>{{ l.get('admin_notes', '') }}</span>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+
+<style>
+    .lic_upload {
+        /*border: #0a0a0a 1px solid;*/
+        margin: 15px;
+    }
+
+    .long_act_btn {
+        width: 80px;
+        font-size: 13px;
+    }
+
+    .hide_file_upload {
+        display: none;
+    }
+
+    .file_tbl tr td {
+        font-size: 12px;
+    }
+
+    .act_btn, .trigger_file_btn {
+        font-size: 13px;
+    }
+
+    .file_tbl button[disabled], input[disabled] {
+        border: 1px solid #999999;
+        background-color: #cccccc;
+        color: #666666;
+
+    }
+    .detail_row {
+        display: none;
+    }
+
+
+</style>
+
+<script>
+
+
+    $('.trigger_file_btn').click((e) => {
+        e.preventDefault()
+        const jq_form = $(e.target.parentElement)
+        const jq_file = jq_form.find('input[type=file]')
+        jq_file.trigger('click')
+    })
+
+    $('.submit_on_change').change((e) => {
+        const jq_file = $(e.target)
+        if (jq_file[0].files.length) {
+            jq_file.parent('form').submit()
+        }
+
+        // disable submit button
+        const jq_submit_btn = jq_file.parent().find('.trigger_file_btn')
+        jq_submit_btn.attr("disabled", true);
+    })
+
+    $('.act_btn').click((e) => {
+        const jq_btn = $(e.target)
+        jq_btn.attr("disabled", true);
+        jq_btn.parent('form').submit()
+    })
+
+    $('.toggle_detail_btn').click((e) => {
+        e.preventDefault()
+        const jq_btn = $(e.target)
+        const jq_detail = $('#' + jq_btn.attr('toggle_detail'))
+        jq_detail.toggle()
+    })
+
+
+</script>
+
+
+{% endblock %}

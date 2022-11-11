@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     
         
-    repos = Account.pull_all_by_key(key='role', value='repository')
+    repos = Account.pull_all_by_key(key='role.exact', value='repository')
     hidden = { r.id: r.data['repository']['bibid'] for r in repos if r.data['repository']['bibid'].startswith('a') }
     regular = { r.id: r.data['repository']['bibid'].upper() for r in repos if not r.data['repository']['bibid'].startswith('a') }
 

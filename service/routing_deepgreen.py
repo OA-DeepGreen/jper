@@ -67,13 +67,12 @@ def _route(unrouted):
         notify_failure(unrouted, str(e), issn_data, metadata, '')
         app.logger.debug("Routing - Notification:{y} failed with error '{x}'".format(y=unrouted.id, x=str(e)))
         raise RoutingException(str(e))
-
     # get a RoutingMetadata object which contains all the extracted metadata from this notification
     match_data = unrouted.match_data()
     if pmd is not None:
         # Add the package routing metadata with the routing metadata from the notification
+        # This copies just the author affiliation, author name and subject (as keyword)
         match_data.merge(pmd)
-
     app.logger.debug("Routing - Notification:{y} match_data:{x}".format(y=unrouted.id, x=match_data))
 
     # Extract issn and publication date
@@ -99,23 +98,25 @@ def _route(unrouted):
     else:
         doi = doi[0]
 
-    bibids = list(set(models.Account.pull_all_repositories()))
+    bibids = models.Account.pull_all_active_repositories()
     # NEW FEATURE
     # Get all subject repository accounts. Needed for Gold license. 
     # They do not get publications with gold license.
-    subject_repo_bibids = list(set(models.Account.pull_all_subject_repositories()))
+    subject_repo_bibids = models.Account.pull_all_active_subject_repositories()
 
-    part_bibids = []
+    # participating repositories - who would like to receive article if matching
+    part_bibids = {}
 
     gold_article_license = _is_article_license_gold(metadata, unrouted.provider_id)
+    app.logger.debug("Staring get all matching license")
 
     for issn in issn_data:
         # are there licenses stored for this ISSN?
         # 2016-10-12 TD : an ISSN could appear in more than one license !
-        lics = models.License.pull_by_journal_id(issn) # matches issn, eissn, doi, etc.
+        # matches issn, eissn, doi, etc for active licences.
+        lics = models.License.pull_all_by_status_and_issn('active', issn)
         if lics is None: # nothing found at all...
             continue
-        lics = (lic for lic in lics if lic.is_active())
         for lic in lics:
             # lic_data includes only valid license for the issn.
             # It is a list with the url for the journal changing between each entry.
@@ -126,53 +127,42 @@ def _route(unrouted):
             if lic.type == "gold" or (lic.type == "hybrid" and gold_article_license):
                 for bibid in bibids:
                     # All repositories except subject repositories get publications with gold license
-                    if bibid not in subject_repo_bibids:
-                        part_bibids.append((bibid, lic_data[0]))
+                    if bibid not in subject_repo_bibids.keys():
+                        if bibid not in part_bibids:
+                            part_bibids[bibid] = []
+                        part_bibids[bibid].append(lic_data[0])
             elif lic.type in ["alliance", "national", "deal", "fid", "hybrid"]:
-                al = models.Alliance.pull_by_key("license_id", lic.id)
-                if al and al.is_active():
+                al_list = models.Alliance.pull_all_by_status_and_license_id("active", lic.id)
+                if not al_list:
+                    continue
+                for al in al_list:
                     # collect all EZB-Ids of participating institutions of AL
                     for participant in al.participants:
                         for i in participant.get("identifier", []):
                             if i.get("type", None) == "ezb" and i.get('id', None):
                                 # note: only first ISSN record found in current license will be considered!
-                                part_bibids.append((i.get("id"), lic_data[0]))
+                                bibid = i.get("id")
+                                if bibid in bibids:
+                                    if bibid not in part_bibids:
+                                        part_bibids[bibid] = []
+                                    part_bibids[bibid].append(lic_data[0])
 
     # Get only active repository accounts
     # 2019-06-03 TD : yet a level more to differentiate between active and passive
     #                 accounts. A new requirement, at a /very/ early stage... gosh.
+    app.logger.debug("Starting get repo for all matched license")
     al_repos = []
-    for bibid, lic_data in part_bibids:
-        # 2017-06-06 TD : insert of this safeguard ;
-        #                 although it would be *very* unlikely to be needed here.  Strange.
+
+    for bibid, lic_data in part_bibids.items():
         if bibid is None:
             continue
-        # 2017-03-09 TD : handle DG standard (and somehow passive..) accounts as well.
-        # Regular accounts
-        # 2019-03-21 TD : in some (rare?) test scenarios there might be more than one account
-        # 2019-03-26 TD : case decision - handle multiple, equal accs vs. single accs only
-        add_account = True
-        accounts = models.Account.pull_all_by_key("repository.bibid", bibid)
-        if len(accounts) > 1 and not app.config.get("DEEPGREEN_ALLOW_EQUAL_REPOS", False):
-            add_account = False
-        for acc1 in models.Account.pull_all_by_key("repository.bibid", bibid):
-            if add_account and acc1 is not None and acc1.has_role("repository") and not acc1.is_passive:
-                # extend this to hold all the license data may be?
-                unrouted.embargo = lic_data["embargo"]
-                al_repos.append((acc1.id, lic_data, bibid))
-        for acc2 in models.Account.pull_all_by_key("repository.bibid", "a" + bibid):
-            if add_account and acc2 is not None and acc2.has_role("repository") and not acc2.is_passive:
-                unrouted.embargo = lic_data["embargo"]
-                al_repos.append((acc2.id, lic_data, "a" + bibid))
-
-    # 2019-03-26 TD : continue from here on with all the collected 'al_repos'
-    if len(al_repos) > 0:
-        app.logger.debug("Routing - Notification:{y} al_repos:{x}".format(y=unrouted.id, x=al_repos))
-    else:
+        al_repos.append((bibids[bibid], lic_data, bibid))
+    if len(al_repos) == 0:
         routing_reason = "No (active!) qualified repositories."
         app.logger.debug("Routing - Notification {y} No (active!) qualified repositories currently found to receive this notification.  Notification will not be routed!".format(y=unrouted.id))
     # 2016-09-08 TD : end of checking alliance (and probably other!) license legitimation(s)
 
+    app.logger.debug("Starting matching repository to article")
     # iterate through all the repository configs, collecting match provenance and id information
     match_ids = []
     try:
@@ -186,14 +176,20 @@ def _route(unrouted):
                 "Routing - Notification:{y} matching against Repository:{x}".format(y=unrouted.id, x=repo))
             # NEW FEATURE
             # Does repository want articles for this license?
-            if not license_included(unrouted.id, lic_data, rc):
+            matched_license = None
+            for lic in lic_data:
+                if license_included(unrouted.id, lic, rc):
+                    matched_license = lic
+                    unrouted.embargo = lic.get("embargo", None)
+                    break
+            if not matched_license:
                 continue
             prov = models.MatchProvenance()
             prov.repository = repo
             # 2016-08-10 TD : fill additional field for origin of notification (publisher) with provider_id
             prov.publisher = unrouted.provider_id
             # 2016-10-13 TD : fill additional object of alliance license with data gathered from EZB
-            prov.alliance = lic_data
+            prov.alliance = matched_license
             prov.bibid = bibid
             prov.notification = unrouted.id
             match(match_data, rc, prov, repo)
@@ -221,6 +217,7 @@ def _route(unrouted):
 
     # if there are matches then the routing is successful, and we want to finalise the
     # notification for the routed index and its content for download
+    match_ids = list(set(match_ids)) # make them unique
     if len(match_ids) > 0:
         routing_reason = "Matched to {x} qualified repositories.".format(x=len(match_ids))
         # repackage the content that came with the unrouted notification (if necessary) into
@@ -238,7 +235,7 @@ def _route(unrouted):
             routed.issn_data = "None"
         for pl in pack_links:
             routed.add_link(pl.get("url"), pl.get("type"), pl.get("format"), pl.get("access"), pl.get("packaging"))
-        routed.repositories = list(set(match_ids)) # make them unique
+        routed.repositories = match_ids
         routed.analysis_date = dates.now()
         if metadata is not None:
             enhance(routed, metadata)
@@ -932,7 +929,6 @@ def _normalise(s):
 
 
 def _is_article_license_gold(metadata, provider_id):
-    # ToDo - read article license
     if metadata.license:
         license_typ = metadata.license.get('type', None)
         license_url = metadata.license.get('url', None)
