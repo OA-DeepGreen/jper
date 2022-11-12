@@ -1,46 +1,160 @@
 {% extends "search_objs/_base.html" %}
 
-{% block title %} Unrouted Notification {% endblock %}
+{% block title %} Unrouted Notification Search {% endblock %}
 
 {% block search_content %}
 <script>
+    let all_accounts = {{ all_accounts|safe }};
+
+    let countFormat = edges.numFormat({
+                thousandsSeparator: ","
+    });
+
+    function format_result_row_pre(val) {
+        return '<div class="search-result-label">' + val + '</div><div class="search-result-value">';
+    }
+
+    function format_result_row_post() {
+        return '</div>';
+    }
+
+    function format_date(val) {
+        let options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        let dt = new Date(parseInt(Date.parse(val)))
+        return dt.toLocaleString("en-GB", options);
+    }
+
+    let fieldRender = {
+        createdDateField: function (val, resultobj, renderer) {
+            if (resultobj.created_date) {
+                return format_date(resultobj.created_date);
+            } else {
+                return false;
+            }
+        },
+        updatedDateField: function (val, resultobj, renderer) {
+            if (resultobj.last_updated) {
+                return format_date(resultobj.last_updated);
+            } else {
+                return false;
+            }
+        },
+        providerIdField: function (val, resultobj, renderer) {
+            if (resultobj.provider.id in all_accounts) {
+                return all_accounts[resultobj.provider.id];
+            } else {
+                return resultobj.provider.id;
+            }
+        },
+        accountIdFacet: function (item) {
+            if (item in all_accounts) {
+                return all_accounts[item]
+            } else {
+                return item
+            }
+        }
+    }
+
     let searchSetting = {
         search_url: "{{ url_for('query-edges.query', path='UnroutedNotification') }}",
         result_display: edges.newResultsDisplay({
             id: "results",
             category: "results",
-            renderer: edges.bs3.newResultsDisplayRenderer({
-                fieldDisplayMap: [
-                    {field: "id", display: "ID"},
-                    {field: "content.packaging_format", display: "Packaging format"},
-                    {field: "provider.id", display: "Provider"},
-                    {field: "created_date", display: "Created date"},
+            renderer: edges.bs3.newResultsFieldsByRowRenderer({
+                rowDisplay: [
+                    [{
+                        "pre" : format_result_row_pre("Notification ID"),
+                        field: "id",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Provider"),
+                        valueFunction: fieldRender.providerIdField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Packaging format"),
+                        field: "content.packaging_format",
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date created"),
+                        valueFunction: fieldRender.createdDateField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date last updated"),
+                        valueFunction: fieldRender.updatedDateField,
+                        "post": format_result_row_post(),
+                    }]
                 ]
             })
         }),
 
         opt_components: [
-            edges.newRefiningANDTermSelector({
-                id: "content_packaging_format",
-                field: "content.packaging_format.exact",
-                display: "Packaging format",
-                size: 10,
-                category: "facet"
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [
+                    {field: "created_date", display: "Date created"},
+                    {field: "last_updated", display: "Date last updated"}
+                ],
+                fieldOptions: [
+                ]
             }),
             edges.newRefiningANDTermSelector({
                 id: "provider_id",
                 field: "provider.id.exact",
                 display: "Provider",
                 size: 10,
-                category: "facet"
+                category: "facet",
+                valueFunction: fieldRender.accountIdFacet
             }),
-            edges.newSelectedFilters({
-                id: "selected-filters",
-                category: "selected-filters",
-                fieldDisplays: {
-                    "content.packaging_format.exact": "Packaging format",
-                    "provider.id.exact": "Provider",
-                }
+            edges.newDateHistogramSelector({
+                id: "last_updated",
+                field: "last_updated",
+                interval:"month",
+                display: "Date last updated",
+                category: "facet",
+                displayFormatter : function(val) {
+                        let dt = new Date(parseInt(val));
+                        let ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(dt);
+                        let mo = new Intl.DateTimeFormat('en', { month: 'short' }).format(dt);
+                        return (mo + " " + ye);
+                    },
+                sortFunction: function(values) {
+                        values.reverse();
+                        return values;
+                },
+               renderer: edges.bs3.newDateHistogramSelectorRenderer({
+                        open: false,
+                        togglable: true,
+                        countFormat: countFormat,
+                        hideInactive: true
+                    })
+            }),
+            edges.newDateHistogramSelector({
+                id: "date_created",
+                field: "created_date",
+                interval:"month",
+                display: "Date created",
+                category: "facet",
+                displayFormatter : function(val) {
+                        let dt = new Date(parseInt(val));
+                        let ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(dt);
+                        let mo = new Intl.DateTimeFormat('en', { month: 'short' }).format(dt);
+                        return (mo + " " + ye);
+                    },
+                sortFunction: function(values) {
+                        values.reverse();
+                        return values;
+                },
+               renderer: edges.bs3.newDateHistogramSelectorRenderer({
+                        open: false,
+                        togglable: true,
+                        countFormat: countFormat,
+                        hideInactive: true
+                    })
             }),
 
         ],

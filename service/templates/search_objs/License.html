@@ -1,6 +1,6 @@
 {% extends "search_objs/_base.html" %}
 
-{% block title %} License {% endblock %}
+{% block title %} License Search {% endblock %}
 
 {% block search_content %}
 <script>
@@ -16,7 +16,8 @@
                     {field: "name", display: "Name"},
                     {field: "type", display: "Type"},
                     {field: "status", display: "Status"},
-                    {field: "last_updated", display: "Last updated"},
+                    {field: "identifier.id.exact", display: "License EZB id"},
+                    {field: "last_updated", display: "Date last updated"},
                 ]
             })
         }),
@@ -26,11 +27,14 @@
                 category: "controller",
                 sortOptions: [
                     {field: "name.exact", display: "Name"},
+                    {field: "identifier.id.exact", display: "License EZB id"},
                     {field: "created_date", display: "Created date"},
                     {field: "last_updated", display: "Last updated"},
                 ],
                 fieldOptions: [
                     {field: "name.exact", display: "Name"},
+                    {field: "identifier.id.exact", display: "License EZB id"},
+                    {field: "journal.identifier.id.exact", display: "Journal identifier "},
                 ]
             }),
             edges.newRefiningANDTermSelector({
@@ -44,6 +48,13 @@
                 id: "status",
                 field: "status.exact",
                 display: "Status",
+                size: 10,
+                category: "facet"
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "journal_id",
+                field: "journal.identifier.id.exact",
+                display: "Journal identifier",
                 size: 10,
                 category: "facet"
             }),

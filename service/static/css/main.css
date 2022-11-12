@@ -148,19 +148,18 @@ margin-bottom:0;
 /***/
 
 @media screen and (min-width: 757px) {
-    
-    
+
 /* .masthead__nav .submenu ul {
- border-top:2px solid #006633; 
+ border-top:2px solid #006633;
 } */
 
 /*(Masthead)Setting default padding on main */
 #main > .inner {
- padding-top:30px; 
+ padding-top:30px;
  padding-bottom:30px;
 }
 #main >  .inner > .l-centre-offset {
- padding-right:30px; 
+ padding-right:30px;
 }
 /* Setting background colour on a elements */
 .nav__item > a {
@@ -244,7 +243,6 @@ margin-bottom:0;
     white-space: nowrap;
   }
   .cms > .dl-horizontal dd {
-    margin-top: 9px;
     margin-top: .9rem;
     margin-left: 180px;
   }
@@ -330,4 +328,36 @@ margin-bottom:0;
 
 div.actions div {
    margin-bottom: 5px;
+}
+
+/* Result rows */
+.edges-bs3-results-fields-by-row-container-results {
+    padding-bottom: 5px;
+}
+
+.edges-bs3-results-fields-by-row-container-results .row {
+    margin-bottom: 10px;
+}
+
+.edges-bs3-results-fields-by-row-container-results .row:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.edges-bs3-results-fields-by-row-row-results {
+    line-height: 1.5em;
+}
+
+.search-result-label {
+    display: inline-block;
+    width: 25%;
+    vertical-align: top;
+    font-weight: bold;
+    text-align: right;
+    padding-right: 5px;
+}
+
+.search-result-value {
+    display: inline-block;
+    width: 75%;
+    vertical-align: top;
 }

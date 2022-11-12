@@ -1,24 +1,172 @@
 {% extends "search_objs/_base.html" %}
 
-{% block title %} Routed Notification {% endblock %}
+{% block title %} Routed Notification Search {% endblock %}
 
 {% block search_content %}
 <script>
+    let all_accounts = {{ all_accounts|safe }};
+
+    let countFormat = edges.numFormat({
+                thousandsSeparator: ","
+    });
+
+    function format_result_row_pre(val) {
+        return '<div class="search-result-label">' + val + '</div><div class="search-result-value">';
+    }
+
+    function format_result_row_post() {
+        return '</div>';
+    }
+
+    function format_date(val) {
+        let options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        let dt = new Date(parseInt(Date.parse(val)))
+        return dt.toLocaleString("en-GB", options);
+    }
+
+    let fieldRender = {
+        publicationDateField: function (val, resultobj, renderer) {
+            if (resultobj.metadata.publication_date) {
+                return format_date(resultobj.metadata.publication_date);
+            } else {
+                return false;
+            }
+        },
+        createdDateField: function (val, resultobj, renderer) {
+            if (resultobj.created_date) {
+                return format_date(resultobj.created_date);
+            } else {
+                return false;
+            }
+        },
+        updatedDateField: function (val, resultobj, renderer) {
+            if (resultobj.last_updated) {
+                return format_date(resultobj.last_updated);
+            } else {
+                return false;
+            }
+        },
+        analysisDateField: function (val, resultobj, renderer) {
+            if (resultobj.analysis_date) {
+                return format_date(resultobj.analysis_date);
+            } else {
+                return false;
+            }
+        },
+        metadataIdentifier: function (val, resultobj, renderer) {
+          if (resultobj.metadata.identifier) {
+            let display = "";
+            for (let i = 0; i < resultobj.metadata.identifier.length; i++) {
+                display += '<div class="edges-bs3-results-fields-by-row-row edges-bs3-results-fields-by-row-row-results">';
+                display += format_result_row_pre(resultobj.metadata.identifier[i]['type'].toUpperCase());
+                display += resultobj.metadata.identifier[i]['id'];
+                display += format_result_row_post();
+                display += "</div>";
+            }
+            return display;
+          } else {
+                return false;
+            }
+        },
+        providerIdField: function (val, resultobj, renderer) {
+            if (resultobj.provider.id in all_accounts) {
+                return all_accounts[resultobj.provider.id];
+            } else {
+                return resultobj.provider.id;
+            }
+        },
+        repositoriesField: function (val, resultobj, renderer) {
+            let display = []
+            for (const repo_id of resultobj.repositories) {
+
+                if (repo_id in all_accounts) {
+                    display.push(all_accounts[repo_id]);
+                } else {
+                    display.push(repo_id);
+                }
+            }
+            return display.join(', ')
+        },
+        accountIdFacet: function (item) {
+            if (item in all_accounts) {
+                return all_accounts[item]
+            } else {
+                return item
+            }
+        }
+    }
+
     let searchSetting = {
         search_url: "{{ url_for('query-edges.query', path='RoutedNotification') }}",
         result_display: edges.newResultsDisplay({
             id: "results",
             category: "results",
-            renderer: edges.bs3.newResultsDisplayRenderer({
-                fieldDisplayMap: [
-                    {field: "id", display: "ID"},
-                    {field: "content.packaging_format", display: "Packaging format"},
-                    {field: "provider.id", display: "Provider"},
-                    {field: "created_date", display: "Created date"},
-                    {field: "metadata.title", display: "Title"},
-                    {field: "metadata.journal", display: "Journal"},
-                    {field: "metadata.publisher", display: "Publisher"},
-                    {field: "reason", display: "Reason"},
+            renderer: edges.bs3.newResultsFieldsByRowRenderer({
+                rowDisplay: [
+                    [{
+                        "pre" : format_result_row_pre("Notification ID"),
+                        field: "id",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Title"),
+                        field: "metadata.title",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        valueFunction: fieldRender.metadataIdentifier
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Journal"),
+                        field: "metadata.journal",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Publisher"),
+                        field: "metadata.publisher",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Publication date"),
+                        valueFunction: fieldRender.publicationDateField,
+                        "post": format_result_row_post(),
+
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Embargo"),
+                        field: "embargo.duration",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Provider"),
+                        valueFunction: fieldRender.providerIdField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Repositories matched"),
+                        valueFunction: fieldRender.repositoriesField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Packaging format"),
+                        field: "links.packaging",
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date created"),
+                        valueFunction: fieldRender.createdDateField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date last updated"),
+                        valueFunction: fieldRender.updatedDateField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Analysis date"),
+                        valueFunction: fieldRender.analysisDateField,
+                        "post": format_result_row_post(),
+                    }],
                 ]
             })
         }),
@@ -28,19 +176,21 @@
                 id: "search-controller",
                 category: "controller",
                 sortOptions: [
-                    {field: "metadata.title.exact", display: "Title"},
-                    {field: "metadata.journal.exact", display: "Journal"},
-                    {field: "metadata.publisher.exact", display: "Publisher"},
-                    {field: "created_date", display: "Created date"},
-                    {field: "last_updated", display: "Last updated"},
+                    {field: "created_date", display: "Date created"},
+                    {field: "last_updated", display: "Date last updated"}
                 ],
                 fieldOptions: [
+                    {field: "metadata.identifier.id.exact", display: "DOI/ISSN"},
                     {field: "metadata.title.exact", display: "Title"},
                     {field: "metadata.journal.exact", display: "Journal"},
-                    {field: "metadata.publisher.exact", display: "Publisher"},
-                    {field: "reason.exact", display: "Reason"},
+                    {field: "metadata.publisher.exact", display: "Publisher"}
                 ]
             }),
+            /* edges.newMultiDateRangeEntry({
+                field: "last_updated",
+                autoLookupRange: true,
+                renderer: edges.bs3.newMultiDateRangeRenderer({}),
+            }),*/
             edges.newRefiningANDTermSelector({
                 id: "metadata_publisher",
                 field: "metadata.publisher.exact",
@@ -53,20 +203,82 @@
                 field: "provider.id.exact",
                 display: "Provider",
                 size: 10,
+                category: "facet",
+                valueFunction: fieldRender.accountIdFacet
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "repositories",
+                field: "repositories.exact",
+                display: "Repositories matched",
+                size: 10,
+                category: "facet",
+                valueFunction: fieldRender.accountIdFacet
+            }),
+            edges.newRefiningANDTermSelector({
+                id: "embargo",
+                field: "embargo.duration",
+                display: "Embargo",
+                size: 10,
                 category: "facet"
             }),
-            edges.newSelectedFilters({
+            edges.newDateHistogramSelector({
+                id: "last_updated",
+                field: "last_updated",
+                interval:"month",
+                display: "Date last updated",
+                category: "facet",
+                displayFormatter : function(val) {
+                        let dt = new Date(parseInt(val));
+                        let ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(dt);
+                        let mo = new Intl.DateTimeFormat('en', { month: 'short' }).format(dt);
+                        return (mo + " " + ye);
+                    },
+                sortFunction: function(values) {
+                        values.reverse();
+                        return values;
+                },
+               renderer: edges.bs3.newDateHistogramSelectorRenderer({
+                        open: false,
+                        togglable: true,
+                        countFormat: countFormat,
+                        hideInactive: true
+                    })
+            }),
+            edges.newDateHistogramSelector({
+                id: "date_created",
+                field: "created_date",
+                interval:"month",
+                display: "Date created",
+                category: "facet",
+                displayFormatter : function(val) {
+                        let dt = new Date(parseInt(val));
+                        let ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(dt);
+                        let mo = new Intl.DateTimeFormat('en', { month: 'short' }).format(dt);
+                        return (mo + " " + ye);
+                    },
+                sortFunction: function(values) {
+                        values.reverse();
+                        return values;
+                },
+               renderer: edges.bs3.newDateHistogramSelectorRenderer({
+                        open: false,
+                        togglable: true,
+                        countFormat: countFormat,
+                        hideInactive: true
+                    })
+            }),
+            /* edges.newSelectedFilters({
                 id: "selected-filters",
                 category: "selected-filters",
                 fieldDisplays: {
                     "metadata.publisher.exact": "Publisher",
                     "provider.id.exact": "Provider",
                 }
-            }),
+            }), */
+          /* InDOAJ - filter facet */
 
         ],
     }
-
 
     jQuery(document).ready(function ($) {
         dgcore.initCommonSearchUi(searchSetting);

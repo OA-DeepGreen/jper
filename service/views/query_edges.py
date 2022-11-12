@@ -59,7 +59,6 @@ def query(path=''):
             q = json.loads(urllib.parse.unquote(request.values['source']))
         except ValueError:
             abort(400)
-
     if model_class_name == 'RoutedNotification':
         res = models.RoutedNotification.query(q, types='routed20*')
     else:

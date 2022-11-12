@@ -1,22 +1,74 @@
 {% extends "search_objs/_base.html" %}
 
-{% block title %} Account {% endblock %}
+{% block title %} Account Search {% endblock %}
 
 {% block search_content %}
 <script>
+    function format_result_row_pre(val) {
+        return '<div class="search-result-label">' + val + '</div><div class="search-result-value">';
+    }
+
+    function format_result_row_post() {
+        return '</div>';
+    }
+
+    function format_date(val) {
+        let options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        let dt = new Date(parseInt(Date.parse(val)))
+        return dt.toLocaleString("en-GB", options);
+    }
+
+    let fieldRender = {
+        titleField: function (val, resultobj, renderer) {
+            var field = '<div><h3>';
+            if (resultobj.email) {
+                display = "<a href='/account/" + resultobj.id + "'>" + resultobj.email + "</a>";
+                return display;
+            } else {
+                return false;
+            }
+        },
+        updatedDateField: function (val, resultobj, renderer) {
+            if (resultobj.last_updated) {
+                return format_date(resultobj.last_updated);
+            } else {
+                return false;
+            }
+        },
+    }
 
     let searchSetting = {
         search_url: "{{ url_for('query-edges.query', path='Account') }}",
         result_display: edges.newResultsDisplay({
             id: "results",
             category: "results",
-            renderer: edges.bs3.newResultsDisplayRenderer({
-                fieldDisplayMap: [
-                    {field: "id", display: "ID"},
-                    {field: "email", display: "Email"},
-                    {field: "api_key", display: "Api key"},
-                    {field: "role", display: "Role"},
-                    {field: "last_updated", display: "Last updated"},
+            renderer: edges.bs3.newResultsFieldsByRowRenderer({
+                rowDisplay: [
+                    [{
+                        "pre" : format_result_row_pre("Email"),
+                        valueFunction: fieldRender.titleField,
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Role"),
+                        field: "role",
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Packaging format"),
+                        field: "packaging",
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Software"),
+                        field: "repository.software",
+                         "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date last updated"),
+                        valueFunction: fieldRender.updatedDateField,
+                         "post": format_result_row_post(),
+                    }],
                 ]
             })
         }),
@@ -27,9 +79,7 @@
                 sortOptions: [],
                 fieldOptions: [
                     {field: "email.exact", display: "Email"},
-                    {field: "id.exact", display: "Id"},
-                    {field: "api_key", display: "Api key"},
-                    {field: "role", display: "Role"},
+                    {field: "id.exact", display: "Id"}
                 ]
             }),
 
@@ -42,9 +92,9 @@
             }),
 
             edges.newRefiningANDTermSelector({
-                id: "packaging",
+                id: "packaging_format",
                 field: "packaging.exact",
-                display: "Packaging",
+                display: "Packaging format",
                 size: 10,
                 category: "facet"
             }),
@@ -58,8 +108,6 @@
             }),
         ],
     }
-
-
 
     jQuery(document).ready(function ($) {
         dgcore.initCommonSearchUi(searchSetting);
