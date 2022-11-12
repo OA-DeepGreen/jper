@@ -383,7 +383,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                 ],
                 "subject" : [ "<subject of journal>", ... ],
                 "keyword" : [ "<keyword of journal>", ... ]
-                "embargo" : { "duration" : int }
+                "embargo" : { "duration" : unicode }
                 "period" : [ 
                     {
                         "type" : "<kind of period of time, e.g. 'year','issue', ...>",
@@ -450,7 +450,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                     "structs": {
                         "embargo": {
                             "fields": {
-                                "duration": {"coerce": "integer"}
+                                "duration": {"coerce": "unicode"}
                             }
                         },
                         "identifier": {
@@ -600,7 +600,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                         "end" : "<last item of time period>"
                     }
                 ],
-                "embargo" : { "duration" : integer },
+                "embargo" : { "duration" : unicode },
                 "subject" : [ "subject1", ...],
                 # 2018-08-08 TD : added field 'keyword' to the database structure
                 "keyword" : [ "keyword1", ...]
@@ -637,7 +637,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                         "end" : "<last item of time period>"
                     }
                 ],
-                "embargo" : { "duration" : integer },
+                "embargo" : { "duration" : unicode },
                 "subject" : [ "subject1", ...],
                 # 2018-08-08 TD : added field 'keyword' to the database structure
                 "keyword" : [ "keyword1", ...]
@@ -689,7 +689,7 @@ class License(dataobj.DataObj, dao.LicenseDAO):
                         "end" : "<last item of time period>"
                     }
                 ],
-                "embargo" : { "duration" : integer },
+                "embargo" : { "duration" : unicode },
                 "subject" : [ "subject1", ...],
                 # 2018-08-08 TD : added field 'keyword' to the database structure
                 "keyword" : [ "keyword1", ...],

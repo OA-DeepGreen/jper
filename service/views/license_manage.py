@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 import re
+import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -98,6 +99,39 @@ def details():
                            new_ezbids=only_new_ezbids,
                            active_dates=active_dates,
                            archive_dates=archive_dates)
+
+
+@blueprint.route('/view-license')
+def view_license():
+    rec_id = request.values.get('record_id')
+    if rec_id:
+        rec = License.pull(rec_id)
+        if not rec:
+            data = {'Error': f"Record {rec_id} not found"}
+        else:
+            data = rec.data
+    else:
+        data = {'Error': f"Please specify a record_id"}
+    return render_template('license_manage/view_license.html', rec=data)
+
+
+@blueprint.route('/view-participant')
+def view_participant():
+    rec_id = request.values.get('record_id')
+    if rec_id:
+        rec = Alliance.pull(rec_id)
+        if not rec:
+            data = {'Error': f"Record {rec_id} not found"}
+        else:
+            data = rec.data
+    else:
+        data = {'Error': f"Please specify a record_id"}
+    return render_template('license_manage/view_participant.html', rec=data)
+
+
+@blueprint.app_template_filter()
+def pretty_json(value, indent=2):
+    return json.dumps(value, indent=indent, ensure_ascii=False)
 
 
 def _load_rows_by_csv_str(csv_str):
@@ -228,7 +262,7 @@ def _upload_new_lic_lrf(lic_type, file, license_name, admin_notes, ezb_id):
     # create license by csv file
     lic = License()
     lic.set_license_data(ezb_id, license_name,
-                         type=lic_type, csvfile=lic_file.table_str,
+                         type=lic_type, csvfile=io.StringIO(lic_file.table_str),
                          init_status=license_status)
 
     # save lic_related_file to db
@@ -385,12 +419,15 @@ def _validate_lic_lrf(rows):
     header_row = rows[header_row_idx]
 
     # check mandatory header
-    missing_headers = {'Titel', 'Verlag', 'E-ISSN', 'P-ISSN', 'Embargo'} - set(header_row)
+    missing_headers = {'Titel', 'Verlag', 'E-ISSN', 'P-ISSN', 'Embargo', 'erstes Jahr', 'letztes Jahr'} - set(header_row)
     if missing_headers:
         raise ValueError(f'missing header {missing_headers}')
 
+    # CHeck journal year start and year end are integers or empty.
+    # It is used during routing.
     validate_fn_list = [
         ValidEmptyOrInt('erstes Jahr', header_row),
+        ValidEmptyOrInt('letztes Jahr', header_row),
     ]
 
     row_validator_list = itertools.product(rows[header_row_idx + 1:], validate_fn_list)
@@ -544,6 +581,9 @@ def update_license():
         for participant_file in participant_files:
             participant_file.lic_related_file_id = new_lrf.id
             participant_file.save()
+            alliance = Alliance.pull(participant_file.record_id)
+            alliance.license_id = new_lrf.record_id 
+            alliance.save()
 
     # wait for completed
     active_checker()
@@ -608,7 +648,7 @@ def _upload_new_parti_lrf(lic_lrf_id, file):
 
     # save participant to db
     alliance = Alliance()
-    alliance.set_alliance_data(lic_lr_file.record_id, lic_ezb_id, csvfile=csv_str,
+    alliance.set_alliance_data(lic_lr_file.record_id, lic_ezb_id, csvfile=io.StringIO(csv_str),
                                init_status=participant_status)
 
     # save lic_related_file to db

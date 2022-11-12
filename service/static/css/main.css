@@ -318,10 +318,12 @@ margin-bottom:0;
     display: none;
 }
 
-.file_tbl dt {
+.file_tbl dt,
+.history_tbl dt {
     font-weight: bold;
 }
-.file_tbl dd {
+.file_tbl dd,
+.history_tbl dd {
   margin: 0;
   padding: 0 0 0.5em 0;
 }

@@ -89,8 +89,8 @@
                         <td>{{"<br>".join(notification['doi']) | safe }}</td>
                         <td>{{"<br>".join(notification['publisher']) | safe }}</td>
                         <td>{{"<br>".join(notification['publication_date']) | safe }}</td>
-                        {% if notification['embargo'][0] > 0 %}
-                            <td>{{notification['embargo'][0] }}</td>
+                         {% if notification['embargo'] and notification['embargo'][0] and notification['embargo'][0] != 0 and notification['embargo'][0] != '0' %}
+                            <td>{{notification['embargo'][0]}}</td>
                         {% else %}
                             <td></td>
                         {% endif %}

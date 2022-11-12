@@ -97,6 +97,7 @@ def _route(unrouted):
         doi = "unknown"
     else:
         doi = doi[0]
+    app.logger.debug("Article DOI is {x}".format(x=doi))
 
     bibids = models.Account.pull_all_active_repositories()
     # NEW FEATURE
@@ -124,7 +125,13 @@ def _route(unrouted):
             lic_data = get_current_license_data(lic, publ_year, issn, doi)
             if len(lic_data) == 0:
                 continue
+            app.logger.debug("license type : {x}".format(x=lic.type))
             if lic.type == "gold" or (lic.type == "hybrid" and gold_article_license):
+                if lic.type == "gold":
+                    app.logger.debug("Selecting license based on license type : {x}".format(x = lic.type))
+                else:
+                    app.logger.debug("Selecting license based on license type: {x} and is gold article license: {y}".format(x = lic.type, y=gold_article_license))
+                    
                 for bibid in bibids:
                     # All repositories except subject repositories get publications with gold license
                     if bibid not in subject_repo_bibids.keys():
@@ -135,6 +142,7 @@ def _route(unrouted):
                 al_list = models.Alliance.pull_all_by_status_and_license_id("active", lic.id)
                 if not al_list:
                     continue
+                app.logger.debug("Selecting license based on license type {x}".format(x = lic.type))
                 for al in al_list:
                     # collect all EZB-Ids of participating institutions of AL
                     for participant in al.participants:
@@ -146,11 +154,12 @@ def _route(unrouted):
                                     if bibid not in part_bibids:
                                         part_bibids[bibid] = []
                                     part_bibids[bibid].append(lic_data[0])
+    app.logger.debug("Found {x} repositories that can be matched, based on license".format(x=len(part_bibids)))
 
     # Get only active repository accounts
     # 2019-06-03 TD : yet a level more to differentiate between active and passive
     #                 accounts. A new requirement, at a /very/ early stage... gosh.
-    app.logger.debug("Starting get repo for all matched license")
+    app.logger.debug("Starting get active repositories for all matched license")
     al_repos = []
 
     for bibid, lic_data in part_bibids.items():
@@ -183,6 +192,7 @@ def _route(unrouted):
                     unrouted.embargo = lic.get("embargo", None)
                     break
             if not matched_license:
+                app.logger.debug("All matching license was excluded by repository")
                 continue
             prov = models.MatchProvenance()
             prov.repository = repo
@@ -321,6 +331,7 @@ def match(notification_data, repository_config, provenance, acc_id):
     match_affiliation = True
     for repo_property, sub in match_algorithms.items():
         for match_property, fn in sub.items():
+            # app.logger.debug("Matching against {x}".format(x=match_property))
             # NEW FEATURE
             # Check if repository has role match_all'
             # if yes, do not need to match affiliations
@@ -350,6 +361,7 @@ def match(notification_data, repository_config, provenance, acc_id):
                         provenance.add_provenance(repo_property, rval, match_property, mval, m)
 
     # if none of the required matches hit, then no need to look at the optional refinements
+    # app.logger.debug(" -- matched: {x}".format(x=matched))
     if not matched:
         return False
 
@@ -357,6 +369,7 @@ def match(notification_data, repository_config, provenance, acc_id):
     # if the configuration specifies a keyword, it must match the notification data, otherwise
     # the match fails
     if len(rc.keywords) > 0:
+        # app.logger.debug(" -- Refine with keywords")
         trip = False
         for rk in rc.keywords:
             for mk in md.keywords:
@@ -364,11 +377,13 @@ def match(notification_data, repository_config, provenance, acc_id):
                 if m is not False:  # then it is a string
                     trip = True
                     provenance.add_provenance("keywords", rk, "keywords", mk, m)
+        # app.logger.debug(" ---- matched: {x}".format(x=trip))
         if not trip:
             return False
 
     # as above, if the config requires a content type it must match the notification data or the match fails
     if len(rc.content_types) > 0:
+        # app.logger.debug(" -- Refine with content types")
         trip = False
         for rc in rc.content_types:
             for mc in md.content_types:
@@ -376,6 +391,7 @@ def match(notification_data, repository_config, provenance, acc_id):
                 if m is True:
                     trip = True
                     provenance.add_provenance("content_types", rc, "content_types", mc, m)
+        # app.logger.debug(" ---- matched: {x}".format(x=trip))
         if not trip:
             return False
 
@@ -666,6 +682,8 @@ def get_current_license_data(lic, publ_year, issn, doi):
                     'embargo': embargo
                 })
                 break
+        else:
+            app.logger.debug(f"publication year {publ_year} is not within start {ys} and end {yt} for ISSN {issn} in license {lic.name}")
     return lic_data
 
 
@@ -929,15 +947,20 @@ def _normalise(s):
 
 
 def _is_article_license_gold(metadata, provider_id):
+    app.logger.debug("Checking if license is gold")
     if metadata.license:
         license_typ = metadata.license.get('type', None)
         license_url = metadata.license.get('url', None)
+        app.logger.debug(" -- license typ: {x}".format(x=license_typ))
+        app.logger.debug(" -- license url: {x}".format(x=license_url))
         provider = models.Account.pull(provider_id)
         gold_license = []
         if provider.license and provider.license.get('gold_license', []):
             gold_license = provider.license.get('gold_license')
         if license_typ in gold_license or license_url in gold_license:
+            app.logger.debug(" -- license is gold")
             return True
+    app.logger.debug(" -- license is not gold")
     return False
 
 

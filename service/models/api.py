@@ -54,7 +54,7 @@ class IncomingNotification(NotificationMetadata):
                     "fields" : {
                         "end" : {"coerce" : "utcdatetime"},
                         "start" : {"coerce" : "utcdatetime"},
-                        "duration" : {"coerce" : "integer"}
+                        "duration" : {"coerce" : "unicode"}
                     },
                     "required" : []
                 },
@@ -130,7 +130,7 @@ class OutgoingNotification(NotificationMetadata):
                     "fields" : {
                         "end" : {"coerce" : "utcdatetime"},
                         "start" : {"coerce" : "utcdatetime"},
-                        "duration" : {"coerce" : "integer"}
+                        "duration" : {"coerce" : "unicode"}
                     }
                 },
                 "links" : {

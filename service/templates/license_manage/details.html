@@ -41,7 +41,7 @@
 
 {% if new_ezbids %}
 <h2>New license files</h2>
-<table id="file_tbl" class="file_tbl tablesorter-green">
+<table id="new_tbl" class="file_tbl tablesorter-green">
     <thead>
     <tr>
         <th>EZB Id</th>
@@ -72,8 +72,13 @@
                             <dd>{{ doc.get('upload_date', '') }}</dd>
                             <dt>Validation notes:</dt>
                             <dd>{{ doc.get('validation_notes', '') }}</dd>
-                            <dt>Admin notes:</dt>
+                            <dt>Admin notes</dt>
                             <dd>{{ doc.get('admin_notes', '') }}</dd>
+                            <dt>View license</dt>
+                            <dd>
+                                <a href="{{ url_for('license-manage.view_license') }}?record_id={{ doc.get('record_id', '') }}">
+                                    {{ doc.get('record_id', '') }}</a>
+                            </dd>
                         </dl>
                         <div class="actions">
                             <h3>Actions</h3>
@@ -141,6 +146,11 @@
                             <dd>{{ doc.get('last_updated', '') }}</dd>
                             <dt>date uploaded</dt>
                             <dd>{{ doc.get('upload_date', '') }}</dd>
+                            <dt>View license</dt>
+                            <dd>
+                                <a href="{{ url_for('license-manage.view_license') }}?record_id={{ doc.get('record_id', '') }}">
+                                    {{ doc.get('record_id', '') }}</a>
+                            </dd>
                             <dt>Download license file</dt>
                             <dd><a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=doc['id'] ) }}">
                                 {{ doc.get('file_name', 'license file') }}
@@ -186,6 +196,11 @@
                             <dd>{{ doc.get('last_updated', '') }}</dd>
                             <dt>date uploaded</dt>
                             <dd>{{ doc.get('upload_date', '') }}</dd>
+                            <dt>View participant</dt>
+                            <dd>
+                                <a href="{{ url_for('license-manage.view_participant') }}?record_id={{ doc.get('record_id', '') }}">
+                                    {{ doc.get('record_id', '') }}</a>
+                            </dd>
                             <dt>Download participant file</dt>
                             <dd><a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=doc['id'] ) }}">
                                 {{ doc.get('file_name', 'participant file') }}
@@ -248,9 +263,9 @@
                                 <dd>{{ doc.get('last_updated', '') }}</dd>
                                 <dt>date uploaded</dt>
                                 <dd>{{ doc.get('upload_date', '') }}</dd>
-                                <dt>Validation notes:</dt>
+                                <dt>Validation notes</dt>
                                 <dd>{{ doc.get('validation_notes', '') }}</dd>
-                                <dt>Admin notes:</dt>
+                                <dt>Admin notes</dt>
                                 <dd>{{ doc.get('admin_notes', '') }}</dd>
                             </dl>
                             <div class="actions">
@@ -288,7 +303,6 @@
         <th>EZB Id</th>
         <th>Name</th>
         <th>File type</th>
-        <th>Date last updated</th>
         <th>Details</th>
     </tr>
     </thead>
@@ -299,8 +313,9 @@
                     <td>{{ ezb_id }}</td>
                     <td>{{ doc.get('name', '') }}</td>
                     <td>{{ file_type }}</td>
-                    <td>{{ doc.get('last_updated', '') }}</td>
-                    <td>
+                    <td><dl>
+                        <dt>Date last updated</dt>
+                        <dd>{{ doc.get('last_updated', '') }}</dd>
                         <dt>File name</dt>
                         <dd><a href="{{ url_for('license-manage.download_lic_related_file', lrf_id=doc.get('id') ) }}">
                                 {{ doc.get('file_name') }}
@@ -310,10 +325,21 @@
                         <dt>Status</dt>
                         <dd>
                             {{ doc.get('status', '') }}<br/>
-                            <a class="toggle_detail_btn" toggle_detail="detail_row_{{doc.get('id')}}" href="#">
-                                show details
-                            </a>
                         </dd>
+                        {% if file_type == 'license' %}
+                            <dt>View license</dt>
+                            <dd>
+                                <a href="{{ url_for('license-manage.view_license') }}?record_id={{ doc.get('record_id', '') }}">
+                                    {{ doc.get('record_id', '') }}</a>
+                            </dd>
+                        {% endif %}
+                        {% if file_type == 'participant' %}
+                            <dt>View participant</dt>
+                            <dd>
+                                <a href="{{ url_for('license-manage.view_participant') }}?record_id={{ doc.get('record_id', '') }}">
+                                    {{ doc.get('record_id', '') }}</a>
+                            </dd>
+                        {% endif %}
                         <dt>Upload date</dt>
                         <dd>{{ doc.get('upload_date', '') }}</dd>
                         <dt>Actions</dt>
@@ -324,7 +350,7 @@
                                         <input type="hidden" name="lrf_id" value="{{ doc.get('id') }}">
                                         <input class="act_btn" type="submit" value="Activate"/>
                                     </form>
-                                </div>
+                                </div><br/>
                             {% endif %}
                             {% if doc.get('status') in allowed_del_status %}
                                 <div>
@@ -343,7 +369,7 @@
                             <dt>Admin notes</dt>
                             <dd>{{ doc.get('admin_notes', '') }}</dd>
                         {% endif %}
-                    </td>
+                    </dl></td>
                 </tr>
             {% endfor %}
         {%  endfor %}

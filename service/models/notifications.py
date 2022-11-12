@@ -804,7 +804,7 @@ class BaseNotification(NotificationMetadata):
                     "fields": {
                         "end": {"coerce": "utcdatetime"},
                         "start": {"coerce": "utcdatetime"},
-                        "duration": {"coerce": "integer"}
+                        "duration": {"coerce": "unicode"}
                     }
                 },
                 "links": {
@@ -831,7 +831,7 @@ class BaseNotification(NotificationMetadata):
 
         :return: the integer number of months of the publication's embargo
         """
-        return self._get_single("embargo.duration", coerce=dataobj.to_int())
+        return self._get_single("embargo.duration", coerce=dataobj.to_unicode())
 
     @embargo.setter
     def embargo(self, val):
@@ -840,7 +840,7 @@ class BaseNotification(NotificationMetadata):
 
         :param val: the integer number of the publication's embargo in months
         """
-        self._set_single("embargo.duration", val, coerce=dataobj.to_int())
+        self._set_single("embargo.duration", val, coerce=dataobj.to_unicode())
 
     # @property
     # def reason(self):

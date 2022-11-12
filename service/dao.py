@@ -247,7 +247,7 @@ class LicRelatedFileDAO(dao.ESDAO):
             archive_dates = {}
             for status_bucket in res.get('aggregations', {}).get('status', {}).get('buckets', []):
                 status = status_bucket['key']
-                if status in ['validation passed', 'validation_failed']:
+                if status in ['validation passed', 'validation failed']:
                     status = 'new'
                 grouped_files[status] = {}
                 for ezb_bucket in status_bucket.get('ezb_id', {}).get('buckets', []):
