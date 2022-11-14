@@ -4,18 +4,80 @@
 
 {% block search_content %}
 <script>
+    function format_result_row_pre(val) {
+        return '<div class="search-result-label">' + val + '</div><div class="search-result-value">';
+    }
+
+    function format_result_row_post() {
+        return '</div>';
+    }
+
+    function format_date(val) {
+        let options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        let dt = new Date(parseInt(Date.parse(val)))
+        return dt.toLocaleString("en-GB", options);
+    }
+
+    let fieldRender = {
+        idField: function (val, resultobj, renderer) {
+            var field = '<div><h3>';
+            if (resultobj.id) {
+                display = "<a href='/license-manage/view-participant?record_id=" + resultobj.id + "'>" + resultobj.id + "</a>";
+                return display;
+            } else {
+                return false;
+            }
+        },
+        licenseIdField: function (val, resultobj, renderer) {
+            var field = '<div><h3>';
+            if (resultobj.id) {
+                display = "<a href='/license-manage/view-license?record_id=" + resultobj.license_id + "'>" + resultobj.license_id + "</a>";
+                return display;
+            } else {
+                return false;
+            }
+        },
+        updatedDateField: function (val, resultobj, renderer) {
+            if (resultobj.last_updated) {
+                return format_date(resultobj.last_updated);
+            } else {
+                return false;
+            }
+        },
+    }
 
     let searchSetting = {
         search_url: "{{ url_for('query-edges.query', path='Alliance') }}",
         result_display: edges.newResultsDisplay({
             id: "results",
             category: "results",
-            renderer: edges.bs3.newResultsDisplayRenderer({
-                fieldDisplayMap: [
-                    {field: "id", display: "ID"},
-                    {field: "license_id", display: "License id"},
-                    {field: "status", display: "Status"},
-                    {field: "identifier*.type", display: "Identifier"},
+            renderer: edges.bs3.newResultsFieldsByRowRenderer({
+                rowDisplay: [
+                    [{
+                        "pre" : format_result_row_pre("ID"),
+                        valueFunction: fieldRender.idField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("License id"),
+                        valueFunction: fieldRender.licenseIdField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Identifier (EZB)"),
+                        field: "identifier.id.exact",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Status"),
+                        field: "status",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date last updated"),
+                        valueFunction: fieldRender.updatedDateField,
+                        "post": format_result_row_post(),
+                    }],
                 ]
             })
         }),
@@ -28,7 +90,8 @@
                     {field: "last_updated", display: "Last updated"},
                 ],
                 fieldOptions: [
-                    {field: "status.exact", display: "Status"},
+                    {field: "participant.name", display: "Participant name"},
+                    {field: "participant.identifier.id.exact", display: "Participant Id (EZB)"},
                     {field: "license_id", display: "License id"},
                 ]
             }),
@@ -39,14 +102,13 @@
                 size: 10,
                 category: "facet"
             }),
-            edges.newSelectedFilters({
-                id: "selected-filters",
-                category: "selected-filters",
-                fieldDisplays: {
-                    "status.exact": "Status",
-                }
-            }),
-
+            edges.newRefiningANDTermSelector({
+                id: "participant_id",
+                field: "participant.identifier.id.exact",
+                display: "Participant Id (EZB)",
+                size: 10,
+                category: "facet"
+            })
         ],
     }
 
