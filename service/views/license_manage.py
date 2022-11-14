@@ -390,15 +390,19 @@ def _validate_parti_lrf(rows):
     n_cols = 3
     if len(rows) < header_row_idx + 1:
         raise ValueError('header not found')
+    header_row = rows[header_row_idx]
 
-    if len(rows[0]) < n_cols:
+    filtered_header_row = list(filter(None, header_row))
+    if not filtered_header_row:
+        raise ValueError(f'Header row is missing. The header should be row {header_row_idx+1}.')
+
+    if len(header_row) < n_cols:
         raise ValueError(f'csv should have {n_cols} columns')
 
     # check mandatory header
-    header_row = rows[header_row_idx]
     missing_headers = {'Institution', 'EZB-Id', 'Sigel'} - set(header_row)
     if missing_headers:
-        raise ValueError(f'missing header {missing_headers}')
+        raise ValueError(f'missing header {missing_headers}.')
     return
 
 
@@ -412,11 +416,14 @@ def _validate_lic_lrf(rows):
 
     if len(rows) < header_row_idx + 1:
         raise ValueError('header not found')
-
-    if len(rows[header_row_idx]) < n_cols:
-        raise ValueError(f'csv should have {n_cols} columns')
-
     header_row = rows[header_row_idx]
+
+    filtered_header_row = list(filter(None, header_row))
+    if not filtered_header_row:
+        raise ValueError(f'Header row is missing. The header should be row {header_row_idx+1}.')
+
+    if len(header_row) < n_cols:
+        raise ValueError(f'csv should have {n_cols} columns')
 
     # check mandatory header
     missing_headers = {'Titel', 'Verlag', 'E-ISSN', 'P-ISSN', 'Embargo', 'erstes Jahr', 'letztes Jahr'} - set(header_row)
