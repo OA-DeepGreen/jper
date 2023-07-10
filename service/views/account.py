@@ -938,11 +938,10 @@ def logout():
 def register():
     if not current_user.is_super:
         abort(401)
-
     form = AdduserForm(request.form)
-    vals = request.json if request.json else request.values
-
+    vals = None
     if request.method == 'POST' and form.validate():
+        vals = request.values
         role = vals.get('radio', None)
         account = models.Account()
         account.add_account(vals)

@@ -1,7 +1,8 @@
 *.pyc
 *.egg-info/*
 .*.swp
-src*
+API/src/
+OAUTILS/src
 .Python
 build/*
 dist/*

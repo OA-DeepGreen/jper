@@ -2,17 +2,17 @@ from setuptools import setup, find_packages
 
 setup(
     name='jper',
-    version='1.0.0-p3',
+    version='1.0.1',
     packages=find_packages(),
     install_requires=[
         "beautifulsoup4==4.9.3",
         "openpyxl==3.0.9",
-        "werkzeug==1.0.1",
-        "Flask==1.1.2",
-        "Flask-Login==0.5.0",
+        "werkzeug==2.3.3",
+        "Flask==2.3.2",
+        "Flask-Login==0.6.2",
         "requests==2.25.1",
         "simplejson==3.17.2",
-        "lxml==4.6.2",
+        "lxml==4.6.3",
         "Flask-WTF==0.14.3",
         "nose==1.3.7",
         "Flask-Mail==0.9.1",
@@ -22,7 +22,7 @@ setup(
         "schedule==1.0.0",
         "jsonpath-rw-ext==1.2.2",
         "unicodecsv==0.14.1",
-        "Jinja2==3.0.3",
+        "Jinja2==3.1.2",
         "esprit",
         "octopus"
     ],

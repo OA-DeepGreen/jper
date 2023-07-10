@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'engine',
-    version = '1.0.0-p3',
+    version = '1.0.1',
     packages = find_packages(),
     install_requires = [
         "utils"
