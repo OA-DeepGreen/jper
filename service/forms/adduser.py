@@ -7,7 +7,8 @@ Form for webservice
 '''
 from engine.query.QueryInvoker import H_QueryInvoker
 from utils.config import MULTI_PAGE
-from wtforms import Form, TextField, PasswordField, validators, RadioField
+from wtforms import Form, PasswordField, validators, RadioField
+from wtforms import StringField as TextField
 from werkzeug.routing import ValidationError
 import re 
 import time
@@ -101,10 +102,10 @@ Create a form for WEBSERVICE
 '''
 class AdduserForm(Form):
 
-    password_verify = PasswordField('Password verify', [validators.Length(min=8, max=2035), validators.Required(), validate_password])
-    password = PasswordField('Password', [validators.Length(min=8, max=2035), validators.Required()])
-    email = TextField('Email address', [validators.Length(min=2, max=2035), validators.Required(), is_email])
-    email_verify = TextField('Confirm Email address', [validators.Length(min=2, max=2035), validators.Required(), valid_verify_email])
+    password_verify = PasswordField('Password verify', [validators.Length(min=8, max=2035), validators.DataRequired(), validate_password])
+    password = PasswordField('Password', [validators.Length(min=8, max=2035), validators.DataRequired()])
+    email = TextField('Email address', [validators.Length(min=2, max=2035), validators.DataRequired(), is_email])
+    email_verify = TextField('Confirm Email address', [validators.Length(min=2, max=2035), validators.DataRequired(), valid_verify_email])
     radio = RadioField('Account type', choices=[('publisher','Publisher account'),('repository','Repository account'),('admin','Admin')])
     repository_sigel = TextField('Repository sigel (comma separated)')
     repository_bibid = TextField('Repository bibid (EZB)')
