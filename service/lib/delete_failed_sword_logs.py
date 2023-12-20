@@ -6,6 +6,7 @@ import csv
 
 def query_for_deposit_records_count_by_repository_and_notification():
     q = {
+        "query": {"match_all": {}},
         "size": 0,
         "aggs": {
             "repository": {
@@ -29,6 +30,7 @@ def query_for_deposit_records_count_by_repository_and_notification():
 
 def query_for_deposit_records_count_by_repository_notification_and_status():
     q = {
+        "query": {"match_all": {}},
         "size": 0,
         "aggs": {
             "repository": {
@@ -94,8 +96,8 @@ def get_record_by_ids_and_status(notification, repo, status_type, status_value):
     elif status_type == "completed_status":
         dr_response = dr.pull_by_ids_and_status_raw(notification, repo, size=1,
                                                     completed_status=status_value)
-    if dr_response.get("hits", []).get("total", 0) > 0:
-        record_id = dr.get("hits", []).get("hits", [])[0]['id']
+    if dr_response.get("hits", {}).get("total", {}).get("value", 0) > 0:
+        record_id = dr_response.get("hits", {}).get("hits", [])[0]['_id']
     return record_id
 
 def get_deposit_records_to_keep(json_filename):
@@ -109,10 +111,10 @@ def get_deposit_records_to_keep(json_filename):
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
     writer.writeheader()
     # iterate over the data
-    repository_buckets = grouped_records.get('aggregations', []).get('repository', {}).get('buckets',[])
+    repository_buckets = grouped_records.get('aggregations', {}).get('repository', {}).get('buckets',[])
     for repository_bucket in repository_buckets:
         repo = repository_bucket['key']
-        for notifications_by_count in repository_bucket.get('buckets', []):
+        for notifications_by_count in repository_bucket.get('notifications', {}).get('buckets'):
             notification = notifications_by_count['key']
             total = notifications_by_count['doc_count']
             n_data = {
@@ -121,7 +123,7 @@ def get_deposit_records_to_keep(json_filename):
                 'Total': total
             }
             for status_type in ['metadata_status', 'content_status', 'completed_status']:
-                for status_data in notifications_by_count.get(status_type, []).get('buckets', []):
+                for status_data in notifications_by_count.get(status_type, {}).get('buckets', []):
                     status = status_data['key']
                     status_count = status_data['doc_count']
                     record_id = get_record_by_ids_and_status(notification, repo, status_type, status)
@@ -129,10 +131,9 @@ def get_deposit_records_to_keep(json_filename):
                         continue
                     deposit_records_to_copy.append(record_id)
                     data = n_data.copy()
-                    data["Status"] = f"metadata {status}"
+                    data["Status"] = f"{status_type} {status}"
                     data["Count"] = status_count
                     data['Record id'] = record_id
                     writer.writerow(data)
     return deposit_records_to_copy
 
-if __name__ == '__main__':

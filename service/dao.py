@@ -596,13 +596,13 @@ class DepositRecordQuery(object):
             q['size'] = self.size
         if self.metadata_status:
             q['query']['bool']['must'].append(
-                {"term": {"metadata_status.exact": self.metadata_status}},)
+                {"term": {"metadata_status.exact": self.metadata_status}})
         if self.content_status:
             q['query']['bool']['must'].append(
-                {"term": {"content_status.exact": self.content_status}},)
+                {"term": {"content_status.exact": self.content_status}})
         if self.completed_status:
             q['query']['bool']['must'].append(
-                {"term": {"completed_status.exact": self.completed_status}},)
+                {"term": {"completed_status.exact": self.completed_status}})
         return q
 
 
