@@ -517,16 +517,38 @@ class DepositRecordDAO(dao.ESDAO):
         obs = cls.query(q=q.query())
         return obs
 
+    @classmethod
+    def pull_by_ids_and_status_raw(cls, notification_id, repository_id, size=None,
+                                   metadata_status=None, content_status=None, completed_status=None):
+        """
+        Get exactly one deposit record back associated with the notification_id and the repository_id
+
+        :param notification_id:
+        :param repository_id:
+        :param size:
+        :param metadata_status:
+        :param content_status:
+        :param completed_status:
+        :return:
+        """
+        q = DepositRecordQuery(notification_id, repository_id, size, metadata_status,
+                               content_status, completed_status)
+        obs = cls.query(q=q.query_by_ids_and_status())
+        return obs
 
 class DepositRecordQuery(object):
     """
     Query generator for retrieving deposit records by notification id and repository id
     """
 
-    def __init__(self, notification_id, repository_id, size=None):
+    def __init__(self, notification_id, repository_id, size=None,
+                 metadata_status=None, content_status=None, completed_status=None):
         self.notification_id = notification_id
         self.repository_id = repository_id
         self.size = size
+        self.metadata_status = metadata_status
+        self.content_status = content_status
+        self.completed_status = completed_status
 
     def query(self):
         """
@@ -553,6 +575,36 @@ class DepositRecordQuery(object):
             q['size'] = self.size
         return q
 
+    def query_by_ids_and_status(self):
+        """
+        Return the query as a python dict suitable for json serialisation
+
+        :return: elasticsearch query
+        """
+        q = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"repo.exact": self.repository_id}},
+                        {"term": {"notification.exact": self.notification_id}}
+                    ]
+                }
+            },
+            "sort": {"last_updated": {"order": "desc"}}
+        }
+        if self.size:
+            q['size'] = self.size
+        if self.metadata_status:
+            q['query']['bool']['must'].append(
+                {"term": {"metadata_status.exact": self.metadata_status}},)
+        if self.content_status:
+            q['query']['bool']['must'].append(
+                {"term": {"content_status.exact": self.content_status}},)
+        if self.completed_status:
+            q['query']['bool']['must'].append(
+                {"term": {"completed_status.exact": self.completed_status}},)
+        return q
+
 
 class RequestNotification(dao.ESDAO):
     """
@@ -565,7 +617,8 @@ class RequestNotification(dao.ESDAO):
     @classmethod
     def pull_by_ids(cls, notification_id, repository_id, status=None, size=None):
         """
-        Get exactly one deposit record back associated with the notification_id and the repository_id, with a particular status
+        Get exactly one deposit record back associated with the
+        notification_id and the repository_id, with a particular status
 
         :param notification_id:
         :param repository_id:
@@ -581,7 +634,8 @@ class RequestNotification(dao.ESDAO):
     @classmethod
     def pull_by_status(cls, status, size=None):
         """
-        Get exactly one deposit record back associated with the notification_id and the repository_id
+        Get exactly one deposit record back associated with the
+        notification_id and the repository_id
 
         :param status:
         :param size:
@@ -716,7 +770,8 @@ class RepositoryDepositLogDAO(dao.ESDAO):
     @classmethod
     def get_pagination_records(cls, repository_id, page=1, records_per_page=10):
         """
-        Get repository logs for the page - a list, with each containing id and last_updated date of the repository log
+        Get repository logs for the page - a list, with each containing id and last_updated
+        date of the repository log
 
         :param repository_id:
         :param page
