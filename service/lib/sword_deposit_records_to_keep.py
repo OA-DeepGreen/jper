@@ -19,7 +19,7 @@ def query_for_deposit_records_count_by_repository_and_notification():
                         "terms": {
                             "field": "notification.exact",
                             "size": 10000,
-                            "min_doc_count": 2
+                            "min_doc_count": 1
                         }
                     }
                 }
@@ -105,7 +105,7 @@ def get_deposit_records_to_keep(json_filename):
     with open(json_filename) as jsonfile:
         grouped_records = json.load(jsonfile)
     # initialize
-    deposit_records_to_copy = []
+    deposit_records_to_keep = []
     csvfile = open('grouped_deposit_records.csv', 'w', newline='')
     fieldnames = ['Repository', 'Notification', 'Total', 'Status', 'Count', 'Record id']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -129,11 +129,43 @@ def get_deposit_records_to_keep(json_filename):
                     record_id = get_record_by_ids_and_status(notification, repo, status_type, status)
                     if not record_id:
                         continue
-                    deposit_records_to_copy.append(record_id)
+                    deposit_records_to_keep.append(record_id)
                     data = n_data.copy()
                     data["Status"] = f"{status_type} {status}"
                     data["Count"] = status_count
                     data['Record id'] = record_id
                     writer.writerow(data)
-    return deposit_records_to_copy
+    csvfile.close()
+    return deposit_records_to_keep
+
+def get_unique_deposit_record_to_keep(csv_filename):
+    csvfile = open(csv_filename, 'r')
+    reader = csv.DictReader(csvfile)
+    # deposit records grouped by repository and notification
+    deposit_records_to_keep = {}
+    for row in reader:
+        repository = row['Repository']
+        notification = row['Notification']
+        deposit_record = row['Record id']
+        key = f'{repository}/{notification}'
+        if key not in deposit_records_to_keep:
+            deposit_records_to_keep[key] = []
+        deposit_records_to_keep[key].append(deposit_record)
+    csvfile.close()
+    # unique deposit records grouped by repository and notification
+    unique_deposit_records_to_keep = {}
+    for key, deposit_records in deposit_records_to_keep.items():
+        unique_deposit_records_to_keep[key] = list(set(deposit_records))
+    # write to csv file
+    csvfile = open('unique_deposit_records_to_keep.csv', 'w', newline='')
+    fieldnames = ['Repository', 'Notification', 'Record id']
+    writer = csv.writer(csvfile)
+    writer.writerow(fieldnames)
+    for key, deposit_records in unique_deposit_records_to_keep.items():
+        repository = key.split('/')[0]
+        notification = key.split('/')[1]
+        for deposit_record in deposit_records:
+            writer.writerow([repository, notification, deposit_record])
+    csvfile.close()
+
 
