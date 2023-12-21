@@ -216,6 +216,7 @@ class DepositRecord(dataobj.DataObj, dao.DepositRecordDAO):
             "metadata_status" : "<deposited|failed>",
             "content_status" : "<deposited|none|failed>",
             "completed_status" : "<deposited|none|failed>"
+            "keep_record": "<true|false>"
         }
     """
 
@@ -241,6 +242,7 @@ class DepositRecord(dataobj.DataObj, dao.DepositRecordDAO):
                                     "allowed_values": ["deposited", "failed", "invalidxml", "payloadtoolarge"]},
                 "content_status": {"coerce": "unicode", "allowed_values": ["deposited", "failed", "none"]},
                 "completed_status": {"coerce": "unicode", "allowed_values": ["deposited", "failed", "none"]},
+                "keep_record": {"coerce": "unicode", "allowed_values": ["true", "false"]},
             },
             "lists": {
                 "messages": {"contains": "object"}
@@ -417,6 +419,26 @@ class DepositRecord(dataobj.DataObj, dao.DepositRecordDAO):
         """
         self._set_single("completed_status", val, coerce=dataobj.to_unicode(),
                          allowed_values=["deposited", "none", "failed"])
+
+    @property
+    def keep_record(self):
+        """
+        Get the status of the content deposit.  deposited, none or failed
+
+        :return: content deposit status
+        """
+        return self._get_single("keep_record", coerce=dataobj.to_unicode())
+
+    @keep_record.setter
+    def keep_record(self, val):
+        """
+        Set if we want to keep the record.  Must be one of "true", or "false"
+
+        :param val: "true"|"false"
+        :return:
+        """
+        self._set_single("keep_record", val, coerce=dataobj.to_unicode(),
+                         allowed_values=["true", "false"])
 
     @property
     def messages(self):

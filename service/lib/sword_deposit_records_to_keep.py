@@ -8,10 +8,13 @@ import json
 class RecordsToKeep:
     def __init__(self, json_output_filename='records_by_repository_notification_and_status.json',
                  csv_output_filename='grouped_deposit_records.csv',
-                 final_csv_output_filename='unique_deposit_records_to_keep.csv'):
+                 final_csv_output_filename='unique_deposit_records_to_keep.csv',
+                 keeping_csv_output_filename='deposit_records_marked_keeping.csv'
+                 ):
         self.json_output_filename = json_output_filename
         self.csv_output_filename = csv_output_filename
         self.final_csv_output_filename = final_csv_output_filename
+        self.keeping_csv_output_filename = keeping_csv_output_filename
 
     def get_records_to_keep(self):
         get_records_by_repository_notification_and_status()
@@ -109,6 +112,25 @@ class RecordsToKeep:
                 writer.writerow([repository, notification, deposit_record])
         csvfile.close()
         return self.final_csv_output_filename
+
+    def modify_sword_deposit_records(self):
+        csvfile = open(self.final_csv_output_filename, 'r')
+        outcsvfile = open(self.keeping_csv_output_filename, 'w')
+        fieldnames = ['Repository', 'Notification', 'Record id', 'Keeping']
+        reader = csv.DictReader(csvfile)
+        writer = csv.writer(outcsvfile)
+        writer.writerow(fieldnames)
+        for row in reader:
+            repository = row['Repository']
+            notification = row['Notification']
+            deposit_record = row['Record id']
+            dr = DepositRecord.pull(deposit_record)
+            if dr is not None:
+                dr.keep_record = "true"
+                dr.save()
+                writer.writerow([repository, notification, deposit_record, "true"])
+        csvfile.close()
+        outcsvfile.close()
 
     def _query_for_deposit_records_count_by_repository_and_notification(self):
         q = {
