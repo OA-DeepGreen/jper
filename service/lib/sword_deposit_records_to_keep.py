@@ -68,7 +68,7 @@ class RecordsToKeep:
                     for status_data in notifications_by_count.get(status_type, {}).get('buckets', []):
                         status = status_data['key']
                         status_count = status_data['doc_count']
-                        record_id = get_record_by_ids_and_status(notification, repo, status_type, status)
+                        record_id = self.get_record_by_ids_and_status(notification, repo, status_type, status)
                         if not record_id:
                             continue
                         data = n_data.copy()
@@ -182,7 +182,7 @@ class RecordsToKeep:
         return q
 
 if __name__ == '__main__':
-    rk = ReconciliationKeeper()
+    rk = RecordsToKeep()
     rk.get_records_to_keep()
     print(rk.json_output_filename)
     print(rk.csv_output_filename)
