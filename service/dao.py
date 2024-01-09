@@ -519,20 +519,18 @@ class DepositRecordDAO(dao.ESDAO):
 
     @classmethod
     def pull_by_ids_and_status_raw(cls, notification_id, repository_id, size=None,
-                                   metadata_status=None, content_status=None, completed_status=None):
+                                   status_type=None, status_value=None):
         """
         Get exactly one deposit record back associated with the notification_id and the repository_id
 
         :param notification_id:
         :param repository_id:
         :param size:
-        :param metadata_status:
-        :param content_status:
-        :param completed_status:
+        :param status_type:
+        :param status_value:
         :return:
         """
-        q = DepositRecordQuery(notification_id, repository_id, size, metadata_status,
-                               content_status, completed_status)
+        q = DepositRecordQuery(notification_id, repository_id, size, status_type, status_value)
         obs = cls.query(q=q.query_by_ids_and_status())
         return obs
 
@@ -542,13 +540,12 @@ class DepositRecordQuery(object):
     """
 
     def __init__(self, notification_id, repository_id, size=None,
-                 metadata_status=None, content_status=None, completed_status=None):
+                 status_type=None, status_value=None):
         self.notification_id = notification_id
         self.repository_id = repository_id
         self.size = size
-        self.metadata_status = metadata_status
-        self.content_status = content_status
-        self.completed_status = completed_status
+        self.status_type = status_type
+        self.status_value = status_value
 
     def query(self):
         """
@@ -594,15 +591,11 @@ class DepositRecordQuery(object):
         }
         if self.size:
             q['size'] = self.size
-        if self.metadata_status:
+        if self.status_type and self.status_value == "missing":
+            q['query']['bool']["must_not"] = {"exists": {"field": f"{self.status_type}.exact"}}
+        elif self.status_type and self.status_value:
             q['query']['bool']['must'].append(
-                {"term": {"metadata_status.exact": self.metadata_status}})
-        if self.content_status:
-            q['query']['bool']['must'].append(
-                {"term": {"content_status.exact": self.content_status}})
-        if self.completed_status:
-            q['query']['bool']['must'].append(
-                {"term": {"completed_status.exact": self.completed_status}})
+                    {"term": {f"{self.status_type}.exact": self.status_value}})
         return q
 
 
