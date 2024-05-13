@@ -12,7 +12,7 @@ from octopus.lib import dates
 from service.api import JPER, ParameterException
 from service.views.webapi import _bad_request
 from service.repository_licenses import get_matching_licenses
-from service.lib import csv_helper, email_helper
+from service.lib import csv_helper, email_helper, request_deposit_helper
 import math
 import csv
 import sys
@@ -921,19 +921,7 @@ def resend_notification(username):
     # 2. Get the url to return the user to
     # 3. If all notifications to be resent, get from and to date and redo the query?
     notification_ids = json.loads(request.form.get('notification_ids'))
-    count = 0
-    duplicate = 0
-    for n_id in list(notification_ids):
-        rec = models.RequestNotification.pull_by_ids(n_id, username, status='queued', size=1)
-        if not rec:
-            rec = models.RequestNotification()
-            rec.account_id = username
-            rec.notification_id = n_id
-            rec.status = 'queued'
-            rec.save()
-            count += 1
-        else:
-            duplicate += 1
+    count, duplicate = request_deposit_helper.request_deposit(notification_ids, username)
     msg = "Queued {n} notifications for deposit".format(n=count)
     if duplicate > 0:
         msg = msg + '<br>' + '{n} notifications are already waiting in queue'.format(n=duplicate)
