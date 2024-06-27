@@ -79,7 +79,7 @@ ctable = {
 }
 
 
-def _list_failrequest(provider_id=None, bulk=False):
+def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     """
     Process a list request, either against the full dataset or the specific provider_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -89,22 +89,25 @@ def _list_failrequest(provider_id=None, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
+
+
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
     try:
         if bulk is True:
-            flist = JPER.bulk_failed(current_user, since, provider_id=provider_id)
+            flist = JPER.bulk_failed(current_user, since, upto=upto, provider_id=provider_id)
         else:
-            flist = JPER.list_failed(current_user, since, page=page, page_size=page_size, provider_id=provider_id)
+            flist = JPER.list_failed(current_user, since, upto=upto, page=page, page_size=page_size, provider_id=provider_id)
     except ParameterException as e:
         return _bad_request(str(e))
 
     return flist.json()
 
 
-def _list_matchrequest(repo_id=None, provider=False, bulk=False):
+def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk=False):
     """
     Process a list request, either against the full dataset or the specific repo_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -115,7 +118,8 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
@@ -123,10 +127,10 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
         # 2016-11-24 TD : bulk switch to decrease the number of different calls
         if bulk:
-            mlist = JPER.bulk_matches(current_user, since, repository_id=repo_id, provider=provider)
+            mlist = JPER.bulk_matches(current_user, since, upto=upto, repository_id=repo_id, provider=provider)
         else:
             # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            mlist = JPER.list_matches(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
+            mlist = JPER.list_matches(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                       provider=provider)
     except ParameterException as e:
         return _bad_request(str(e))
@@ -134,7 +138,7 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
     return mlist.json()
 
 
-def _list_request(repo_id=None, provider=False, bulk=False):
+def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=False):
     """
     Process a list request, either against the full dataset or the specific repo_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -145,8 +149,8 @@ def _list_request(repo_id=None, provider=False, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
-    upto = _validate_date(param='upto')
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
@@ -224,17 +228,16 @@ def _sword_logs(repo_id, from_date, to_date):
     return logs, deposit_record_logs
 
 
-def _validate_date(param='since'):
-    since = request.values.get(param, None)
-    if since is None or since == "":
-        return _bad_request("Missing required parameter 'since'")
+def _validate_date(dt, param='since'):
+    if dt is None or dt == "":
+        return _bad_request("Missing required parameter {param}".format(param=param))
 
     try:
-        since = dates.reformat(since)
+        dt = dates.reformat(dt)
     except ValueError:
-        return _bad_request("Unable to understand since date '{x}'".format(x=since))
+        return _bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
 
-    return since
+    return dt
 
 
 def _validate_page():
@@ -353,19 +356,26 @@ def download(account_id):
     provider = acc.has_role('publisher')
     data = None
 
+    since = request.args.get('since')
+    if since == '' or since is None:
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+
     if provider:
         if request.args.get('rejected', False):
             fprefix = "failed"
             xtable = ftable
-            html = _list_failrequest(provider_id=account_id, bulk=True)
+            html = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
         else:
             fprefix = "matched"
             xtable = mtable
-            html = _list_matchrequest(repo_id=account_id, provider=provider, bulk=True)
+            html = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
     else:
         fprefix = "routed"
         xtable = ntable
-        html = _list_request(repo_id=account_id, provider=provider, bulk=True)
+        html = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
 
     res = json.loads(html)
 
@@ -394,18 +404,19 @@ def details(repo_id):
     if acc is None:
         abort(404)
     provider = acc.has_role('publisher')
-    if provider:
-        data = _list_matchrequest(repo_id=repo_id, provider=provider)
-    else:
-        data = _list_request(repo_id=repo_id, provider=provider)
-
-    link = '/account/details'
     since = request.args.get('since')
-    upto = request.args.get('upto')
-    if since == '':
+    if since == '' or since is None:
         since = '01/06/2019'
+    upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+    if provider:
+        data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
+    else:
+        data = _list_request(repo_id=repo_id, since=since, upto=upto, provider=provider)
+
+    link = '/account/details'
+
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
@@ -436,15 +447,17 @@ def matching(repo_id):
         abort(404)
     #
     provider = acc.has_role('publisher')
-    data = _list_matchrequest(repo_id=repo_id, provider=provider)
-    #
-    link = '/account/matching'
     since = request.args.get('since')
-    if since == '':
+    if since == '' or since is None:
         since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
+    data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
+    #
+    link = '/account/matching'
+
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
@@ -464,18 +477,18 @@ def failing(provider_id):
     acc = models.Account.pull(provider_id)
     if acc is None:
         abort(404)
-    #
-    # provider = acc.has_role('publisher')
-    # 2016-10-19 TD : not needed here for the time being
-    data = _list_failrequest(provider_id=provider_id)
-    #
-    link = '/account/failing'
     since = request.args.get('since')
-    if since == '':
+    if since == '' or since is None:
         since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
+    # 2016-10-19 TD : not needed here for the time being
+    data = _list_failrequest(provider_id=provider_id, since=since, upto=upto)
+    #
+    link = '/account/failing'
+
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
