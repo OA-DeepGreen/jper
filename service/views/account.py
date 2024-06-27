@@ -935,7 +935,6 @@ def resend_notification(username):
     # 3. If all notifications to be resent, get from and to date and redo the query?
     notification_ids = json.loads(request.form.get('notification_ids'))
     count = 0
-    count = 0
     duplicate = 0
     for n_id in list(notification_ids):
         rec = models.RequestNotification.pull_by_ids(n_id, username, status='queued', size=1)
