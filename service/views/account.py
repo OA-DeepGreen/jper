@@ -20,7 +20,7 @@ from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
 from io import StringIO, TextIOWrapper, BytesIO
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 blueprint = Blueprint('account', __name__)
 
@@ -404,8 +404,8 @@ def details(repo_id):
     upto = request.args.get('upto')
     if since == '':
         since = '01/06/2019'
-    if upto == '':
-        upto = dates.now().strftime("%d/%m/%Y")
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
@@ -443,8 +443,8 @@ def matching(repo_id):
     if since == '':
         since = '01/06/2019'
     upto = request.args.get('upto')
-    if upto == '':
-        upto = dates.now().strftime("%d/%m/%Y")
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
@@ -474,8 +474,8 @@ def failing(provider_id):
     if since == '':
         since = '01/06/2019'
     upto = request.args.get('upto')
-    if upto == '':
-        upto = dates.now().strftime("%d/%m/%Y")
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']

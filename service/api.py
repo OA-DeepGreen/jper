@@ -405,6 +405,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
@@ -489,6 +491,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
@@ -564,6 +568,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
@@ -636,6 +642,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
@@ -708,6 +716,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
@@ -772,6 +782,8 @@ class JPER(object):
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
 
+        if upto == '':
+            upto = None
         if upto is not None:
             try:
                 upto = dates.parse(upto)
