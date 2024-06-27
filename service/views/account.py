@@ -146,6 +146,7 @@ def _list_request(repo_id=None, provider=False, bulk=False):
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
     since = _validate_date(param='since')
+    upto = _validate_date(param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
@@ -153,10 +154,10 @@ def _list_request(repo_id=None, provider=False, bulk=False):
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
         # 2016-11-24 TD : bulk switch to decrease the number of different calls
         if bulk is True:
-            nlist = JPER.bulk_notifications(current_user, since, repository_id=repo_id, provider=provider)
+            nlist = JPER.bulk_notifications(current_user, since, upto=upto, repository_id=repo_id, provider=provider)
         else:
             # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
+            nlist = JPER.list_notifications(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                             provider=provider)
     except ParameterException as e:
         return _bad_request(str(e))
@@ -397,15 +398,18 @@ def details(repo_id):
         data = _list_matchrequest(repo_id=repo_id, provider=provider)
     else:
         data = _list_request(repo_id=repo_id, provider=provider)
-    #
+
     link = '/account/details'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
+    since = request.args.get('since')
+    upto = request.args.get('upto')
+    if since == '':
+        since = '01/06/2019'
+    if upto == '':
+        upto = dates.now().strftime("%d/%m/%Y")
+    api_key = acc.data['api_key']
     if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
@@ -417,9 +421,11 @@ def details(repo_id):
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
         return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
-                               page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
+                               page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                               since=since, upto=upto)
     return render_template('account/details.html', repo=data, results=data_to_display, total=results['total'],
-                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link, date=date, repo_id=repo_id)
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, repo_id=repo_id)
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -433,20 +439,24 @@ def matching(repo_id):
     data = _list_matchrequest(repo_id=repo_id, provider=provider)
     #
     link = '/account/matching'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
+    since = request.args.get('since')
+    if since == '':
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '':
+        upto = dates.now().strftime("%d/%m/%Y")
+    api_key = acc.data['api_key']
     if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
+                           num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto)
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
@@ -460,20 +470,23 @@ def failing(provider_id):
     data = _list_failrequest(provider_id=provider_id)
     #
     link = '/account/failing'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
+    since = request.args.get('since')
+    if since == '':
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '':
+        upto = dates.now().strftime("%d/%m/%Y")
+    api_key = acc.data['api_key']
     if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)], num_of_pages=num_of_pages,
-                           page_num=page_num, link=link, date=date)
+    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)],
+                           num_of_pages=num_of_pages, page_num=page_num, link=link, since=since, upto=upto)
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
@@ -921,6 +934,7 @@ def resend_notification(username):
     # 2. Get the url to return the user to
     # 3. If all notifications to be resent, get from and to date and redo the query?
     notification_ids = json.loads(request.form.get('notification_ids'))
+    count = 0
     count = 0
     duplicate = 0
     for n_id in list(notification_ids):

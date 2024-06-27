@@ -11,15 +11,22 @@
                 <div class="col span-6">
 
                     <ul class="form-fields">
-                        <li class="form-fields__item--text"><label> <span
-                                class="form-fields__label-text">Show notification until:</span> <input type="text"
-                                name="since" value="{{date}}">
-                        </label>
-                        <button class="btn btn--3d btn--primary move-up" type="submit">Send</button>
+                        <li class="form-fields__item--text">
+                            <label>
+                                <span class="form-fields__label-text">Show notification from:</span>
+                                <input type="text" name="since" value="{{since}}"/>
+                            </label>
+                        </li>
+                        <li class="form-fields__item--text">
+                            <label>
+                                <span class="form-fields__label-text">Show notification to:</span>
+                                <input type="text" name="upto" value="{{upto}}"/>
+                            </label>
+                        </li>
+                        <li class="form-fields__item--text">
+                            <button class="btn btn--3d btn--primary move-up" type="submit">Send</button>
                         </li>
                     </ul>
-
-
                 </div>
                 <div class="col span-5">
                 </div>
