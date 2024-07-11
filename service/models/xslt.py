@@ -221,78 +221,71 @@ class XSLT(object):
       </abstracts>
       </xsl:if>
 
-      <!-- Author Information -->
+      <!-- Author Information, only editors and authors due to value constraints in OPUS-xml-->
       <persons>
           <xsl:for-each select="//article-meta/contrib-group/contrib">
-            <person>
-              <xsl:attribute name="role">
-                <xsl:choose>
-                  <xsl:when test="@contrib-type='guest-editor'">
-                     <xsl:text>editor</xsl:text>
-                  </xsl:when>
-                  <xsl:otherwise>
-                     <xsl:value-of select="@contrib-type"/>
-                  </xsl:otherwise>
-                </xsl:choose>
-              </xsl:attribute>
-              <xsl:choose>
-                  <xsl:when test="collab">
-                    <xsl:attribute name="firstName">-</xsl:attribute>
-                    <xsl:choose>
-                      <xsl:when test="collab/institution">
-                      <xsl:attribute name="lastName"><xsl:value-of select="collab/institution/text()"/></xsl:attribute>
-                      </xsl:when>
-                      <xsl:otherwise>
-                      <xsl:attribute name="lastName"><xsl:value-of select="collab/text()"/></xsl:attribute>
-                      </xsl:otherwise>
-                    </xsl:choose>
-                  </xsl:when>
-                  <xsl:otherwise>
-                      <xsl:attribute name="firstName"><xsl:value-of select=".//given-names"/></xsl:attribute>
-                      <xsl:attribute name="lastName"><xsl:value-of select=".//surname"/></xsl:attribute>
-                  </xsl:otherwise>
-              </xsl:choose>
-              <!--
-              role="advisor|author|contributor|editor|referee|translator|submitter|other"
-              academicTitle=""
-              allowEmailContact="true|false"
-              placeOfBirth=""
-              dateOfBirth="1999-12-31"
-              -->
-              <!--
-              <identifiers>
-                <identifier type="gnd|intern">?????</identifier>
-              </identifiers>
-              -->
-              <xsl:if test=".//email">
-                <xsl:attribute name="email"><xsl:value-of select=".//email"/></xsl:attribute>
-              </xsl:if>
-              <xsl:if test="contains(contrib-id/@contrib-id-type,'orcid')">
-              <identifiers>
-                <identifier>
-                  <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
-                  <xsl:variable name='orcid' select="contrib-id[@contrib-id-type='orcid']/text()"/>
-
+            <xsl:if test="@contrib-type='guest-editor' or
+                          @contrib-type='editor' or
+                          @contrib-type='author'">
+              <person>
+                <xsl:attribute name="role">
                   <xsl:choose>
-                  <xsl:when test="substring($orcid, string-length($orcid))='/'">
-                    <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
-                    <xsl:call-template name="cut-orcid">
-                      <xsl:with-param name="orcid" select="$orcid2"/>
-                    </xsl:call-template>
-                    <!--xsl:message>Last slash was cut.</xsl:message>
-                    <xsl:message>Parameter given to template is <xsl:value-of select="$orcid2"/></xsl:message-->
-                  </xsl:when>
-                  <xsl:otherwise>
-                    <xsl:call-template name="cut-orcid">
-                      <xsl:with-param name="orcid" select="$orcid"/>
-                    </xsl:call-template>
-                    <!--xsl:message>Template called on: <xsl:value-of select="$orcid"/> </xsl:message-->
-                  </xsl:otherwise>
+                      <xsl:when test="@contrib-type='author'">
+                      <xsl:value-of select="@contrib-type"/>
+                    </xsl:when>
+                    <xsl:when test="@contrib-type='guest-editor' or
+                                    @contrib-type='editor'">
+                      <xsl:text>editor</xsl:text>
+                    </xsl:when>
                   </xsl:choose>
-                </identifier>
-              </identifiers>
-              </xsl:if>
-            </person>
+                </xsl:attribute>
+
+                <xsl:choose>
+                    <xsl:when test="collab">
+                      <xsl:attribute name="firstName">-</xsl:attribute>
+                      <xsl:choose>
+                        <xsl:when test="collab/institution">
+                        <xsl:attribute name="lastName"><xsl:value-of select="collab/institution/text()"/></xsl:attribute>
+                        </xsl:when>
+                        <xsl:otherwise>
+                        <xsl:attribute name="lastName"><xsl:value-of select="collab/text()"/></xsl:attribute>
+                        </xsl:otherwise>
+                      </xsl:choose>
+                    </xsl:when>
+                    <xsl:otherwise>
+                        <xsl:attribute name="firstName"><xsl:value-of select=".//given-names"/></xsl:attribute>
+                        <xsl:attribute name="lastName"><xsl:value-of select=".//surname"/></xsl:attribute>
+                    </xsl:otherwise>
+                </xsl:choose>
+
+                <xsl:if test=".//email">
+                  <xsl:attribute name="email"><xsl:value-of select=".//email"/></xsl:attribute>
+                </xsl:if>
+
+                <xsl:if test="contains(contrib-id/@contrib-id-type,'orcid')">
+                <identifiers>
+                  <identifier>
+                    <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
+                    <xsl:variable name='orcid' select="contrib-id[@contrib-id-type='orcid']/text()"/>
+
+                    <xsl:choose>
+                    <xsl:when test="substring($orcid, string-length($orcid))='/'">
+                      <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
+                      <xsl:call-template name="cut-orcid">
+                        <xsl:with-param name="orcid" select="$orcid2"/>
+                      </xsl:call-template>
+                    </xsl:when>
+                    <xsl:otherwise>
+                      <xsl:call-template name="cut-orcid">
+                        <xsl:with-param name="orcid" select="$orcid"/>
+                      </xsl:call-template>
+                    </xsl:otherwise>
+                    </xsl:choose>
+                  </identifier>
+                </identifiers>
+                </xsl:if>
+              </person>
+            </xsl:if>
           </xsl:for-each>
       </persons>
 
@@ -351,7 +344,7 @@ class XSLT(object):
 
       <!-- Identifiers, ISSN, DOI, PMID -->
       <identifiers>
-        <xsl:for-each select="//journal-meta/issn[@pub-type='ppub' or @pub-type='epub' or @publication-format='ppub' or @publication-format='epub' or @publication-format='print' or @publication-format='electronic']">
+        <xsl:for-each select="//journal-meta/issn">
           <identifier>
             <xsl:attribute name="type"><xsl:text>issn</xsl:text></xsl:attribute>
             <xsl:value-of select="normalize-space(text())"/>
@@ -694,7 +687,7 @@ class XSLT(object):
                 </mods:titleInfo>
             </xsl:for-each>
 
-            <!-- Appearance -->
+            <!-- Appearance (journal title, issn, volume, issue, pages) -->
             <mods:relatedItem type="host">
                 <mods:titleInfo>
                     <xsl:for-each select="//journal-meta//journal-title">
@@ -704,8 +697,9 @@ class XSLT(object):
                         </mods:title>
                     </xsl:for-each>
                 </mods:titleInfo>
+                  
                 <xsl:for-each select="//journal-meta//abbrev-journal-title">
-                  <mods:titleInfo>
+                  <mods:titleInfo> 
                     <xsl:attribute name="type">abbreviated</xsl:attribute>
                     <mods:title>
                       <xsl:call-template name="insert-lang-attribute"/>
@@ -713,35 +707,27 @@ class XSLT(object):
                     </mods:title>
                   </mods:titleInfo>
                 </xsl:for-each>
-                <xsl:if test="//journal-meta/issn[@pub-type='ppub']">
-                    <mods:identifier type="issn"><xsl:value-of select="//journal-meta/issn[@pub-type='ppub']"/></mods:identifier>
-                </xsl:if>
-                <xsl:if test="//journal-meta/issn[@pub-type='epub']">
-                    <mods:identifier type="eIssn"><xsl:value-of select="//journal-meta/issn[@pub-type='epub']"/></mods:identifier>
-                </xsl:if>
-                <xsl:if test="//journal-meta/issn[@publication-format='print']">
-                    <mods:identifier type="issn"><xsl:value-of select="//journal-meta/issn[@publication-format='print']"/></mods:identifier>
-                </xsl:if>
-                <xsl:if test="//journal-meta/issn[@publication-format='electronic']">
-                    <mods:identifier type="eIssn"><xsl:value-of select="//journal-meta/issn[@publication-format='electronic']"/></mods:identifier>
-                </xsl:if>
-                <xsl:if test="//journal-meta/issn[@publication-format='ppub']">
-                    <mods:identifier type="issn"><xsl:value-of select="//journal-meta/issn[@publication-format='ppub']"/></mods:identifier>
-                </xsl:if>
-                <xsl:if test="//journal-meta/issn[@publication-format='epub']">
-                    <mods:identifier type="issn"><xsl:value-of select="//journal-meta/issn[@publication-format='epub']"/></mods:identifier>
-                </xsl:if>
-                <xsl:for-each select="//journal-meta/issn[not(@pub-type) and not(@publication-format)]">
-                  <mods:identifier type="issn">
-                    <xsl:value-of select="."/>
-                  </mods:identifier>
+
+                <xsl:for-each select="//journal-meta/issn">
+                    <xsl:choose>
+                        <xsl:when test="@pub-type='epub' or @publication-format='electronic' or @publication-format='epub'">
+                            <mods:identifier type="eIssn"><xsl:value-of select="."/></mods:identifier>
+                        </xsl:when>
+                        <xsl:otherwise>
+                        <mods:identifier type="issn">
+                            <xsl:value-of select="."/>
+                        </mods:identifier>
+                        </xsl:otherwise>
+                    </xsl:choose>
                 </xsl:for-each>
+
                 <xsl:for-each select="//journal-meta/journal-id">
                     <mods:identifier>
                         <xsl:attribute name="type"><xsl:value-of select="@journal-id-type"/></xsl:attribute>
                         <xsl:value-of select="."/>
                     </mods:identifier>
                 </xsl:for-each>
+                
                 <mods:part>
                     <xsl:if test="//article-meta/volume">
                         <mods:detail type="volume">
@@ -961,9 +947,14 @@ class XSLT(object):
             <!-- License / Copyright -->
             <xsl:for-each select="//article-meta/permissions/license">
                 <mods:accessCondition type="use and reproduction">
-                    <xsl:if test=".//@xlink:href">
-                        <xsl:attribute name="xlink:href"><xsl:value-of select=".//@xlink:href"/></xsl:attribute>
-                    </xsl:if>
+                    <xsl:choose>
+                        <xsl:when test=".//@xlink:href">
+                            <xsl:attribute name="xlink:href"><xsl:value-of select=".//@xlink:href"/></xsl:attribute>
+                        </xsl:when>
+                        <xsl:when test=".//ali:license_ref">
+                            <xsl:attribute name="xlink:href"><xsl:value-of select=".//ali:license_ref"/></xsl:attribute>
+                        </xsl:when>
+                    </xsl:choose>
                     <xsl:value-of select="normalize-space(license-p|p)"/>
                 </mods:accessCondition>
             </xsl:for-each>
