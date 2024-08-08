@@ -46,6 +46,8 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 "content_types": {"contains": "field", "coerce": "unicode"},
                 "strings": {"contains": "field", "coerce": "unicode"},
                 "excluded_license": {"contains": "field", "coerce": "unicode"},
+                "institutional_identifiers_ror": {"contains": "field", "coerce": "unicode"},
+                "institutional_identifiers_ringgold": {"contains": "field", "coerce": "unicode"},
             },
             "structs": {
                 "author_ids": {
@@ -216,6 +218,26 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         return self._get_single("institutional_identifier", coerce=dataobj.to_unicode())
 
     @property
+    def institutional_identifiers_ror(self):
+        """
+        List of institutional identifiers of type ror which may be
+        used to match against this repository
+
+        :return: list of institutional identifiers of type ror
+        """
+        return self._get_list("institutional_identifiers_ror", coerce=dataobj.to_unicode())
+
+    @property
+    def institutional_identifiers_ringgold(self):
+        """
+        List of institutional identifiers of type ror which may be
+        used to match against this repository
+
+        :return: list of institutional identifiers of type ror
+        """
+        return self._get_list("institutional_identifiers_ringgold", coerce=dataobj.to_unicode())
+
+    @property
     def excluded_license(self):
         """
         List of licenses not associated with this repository
@@ -300,7 +322,8 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         # 2019-03-27 TD : Due to data privacy issues, Author Emails and ORCIDs will not be read until further notice (see also the comment below)
         #
         fields = ['domains', 'name_variants', 'author_ids', 'postcodes', 'grants', 'keywords',
-                  'content_types', 'strings', 'institutional_identifier']
+                  'content_types', 'strings', 'institutional_identifier', 'institutional_identifiers_ringgold',
+                  'institutional_identifiers_ror']
         for f in fields:
             if f in self.data: del self.data[f]
         if csvfile is not None:
@@ -320,6 +343,10 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                             self.data['domains'] = self.data.get('domains', []) + [val]
                         elif fld == 'institutionalidentifier':
                             self.data['institutional_identifier'] = val
+                        elif fld == 'ror':
+                            self.data['institutional_identifiers_ror'] = self.data.get('institutional_identifiers_ror', []) + [val]
+                        elif fld == 'ringgold':
+                            self.data['institutional_identifiers_ringgold'] = self.data.get('institutional_identifiers_ringgold', []) + [val]
                         # 2019-02-25 TD : Instead of 'postcode' we will support 'keywords' here!
                         # elif fld == 'postcode':
                         #    self.data['postcodes'] = self.data.get('postcodes',[]) + [val]

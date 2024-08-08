@@ -84,6 +84,8 @@ print_table(obj.keywords,'keywords', 'Keywords');
 var a = []
 a.push(obj.institutional_identifier)
 print_table(a,'institutional_identifier', 'Institutional identifier');
+print_table(obj.institutional_identifiers_ror,'ror', 'ROR');
+print_table(obj.institutional_identifiers_ringgold,'ringgold', 'Ringgold');
 
 $('#updated').append(obj.last_updated);
 $('#created').append(obj.created_date);

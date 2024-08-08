@@ -1222,6 +1222,15 @@ class FilesAndJATS(PackageHandler):
             if orcid is not None and orcid != "":
                 obj["identifier"] = []
                 obj["identifier"].append({"type" : "orcid", "id" : orcid})
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                if ringgold is not None and ringgold != "":
+                    obj["identifier"] = []
+                    obj["identifier"].append({"type": "ringgold", "id": ringgold})
+            ror = author.get("ror", "")
+            if ror is not None and ror != "":
+                obj["identifier"] = []
+                obj["identifier"].append({"type": "ror", "id": ror})
             # 2018-10-17 TD
             md.add_author(obj)
 
