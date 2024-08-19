@@ -74,6 +74,7 @@ print_table(obj.name_variants,'name_variants','Name Variants');
 print_table(obj.domains,'domains', 'Domains');
 // 2016-09-26 TD : Additional listing of grant numbers if provided
 print_table(obj.grants,'grants', 'Grants');
+
 //print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
 // 2016-09-26 TD : Response time for this field _really_ unacceptable if 20000+ 
 //                 IDs are about to be listed...
@@ -81,12 +82,22 @@ print_table(obj.grants,'grants', 'Grants');
 // // 2019-02-25 TD : give it a new try; together with the keyword field!
 // print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
 print_table(obj.keywords,'keywords', 'Keywords');
-var a = []
-a.push(obj.institutional_identifier)
-print_table(a,'institutional_identifier', 'Institutional identifier');
-print_table(obj.institutional_identifiers_ror,'ror', 'ROR');
-print_table(obj.institutional_identifiers_ringgold,'ringgold', 'Ringgold');
-
+if (!(typeof obj.institutional_identifier === "undefined")) {
+    var a = []
+    a.push(obj.institutional_identifier)
+    print_table(a, 'institutional_identifier', 'Institutional identifier');
+}
+var a = obj.get_author_ids('ringgold')
+if(a.length > 0) {
+    print_table(a, 'institutional_identifier_ringgold', 'Ringgold');
+}
+var a = obj.get_author_ids('ror')
+if(a.length > 0) {
+    print_table(a, 'institutional_identifier_ror', 'ROR');
+}
+print_table(obj.excluded_name_variants,'excluded_name_variants', 'Excluded Name Variants');
+print_table(obj.excluded_keywords,'excluded_keywords', 'Excluded Keywords');
+print_table(obj.excluded_domains,'excluded_domains', 'Excluded Domains');
 $('#updated').append(obj.last_updated);
 $('#created').append(obj.created_date);
 $('#repository').append(obj.repo);
