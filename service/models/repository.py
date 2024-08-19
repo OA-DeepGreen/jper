@@ -33,8 +33,6 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 "last_updated": {"coerce": "unicode"},
                 "repo": {"coerce": "unicode"},
                 "institutional_identifier": {"coerce": "unicode"},
-                # "repository" : {"coerce" : "unicode"}
-                # 2016-06-29 TD : index mapping exception fix for ES 2.3.3
             },
             "lists": {
                 "domains": {"contains": "field", "coerce": "unicode"},
@@ -361,10 +359,10 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                         elif fld == 'institutionalidentifier':
                             self.data['institutional_identifier'] = val
                         elif fld == 'ror':
-                            id_hash = {'type': 'ror', id: val}
+                            id_hash = {'type': 'ror', 'id': val}
                             self.data['author_ids'] = self.data.get('author_ids', []) + [id_hash]
                         elif fld == 'ringgold':
-                            id_hash = {'type': 'ringgold', id: val}
+                            id_hash = {'type': 'ringgold', 'id': val}
                             self.data['author_ids'] = self.data.get('author_ids', []) + [id_hash]
                         # 2019-02-25 TD : Instead of 'postcode' we will support 'keywords' here!
                         # elif fld == 'postcode':
