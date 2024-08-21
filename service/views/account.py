@@ -540,7 +540,7 @@ def configView(repoid=None):
         # this route may not actually be needed, but is convenient during development
         # also it should be more than just the strings data once complex configs are accepted
         json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo_json=json_data, repo=repo)
+        return render_template('account/configview.html', repo_json=json_data, repo=rec)
     elif request.method == 'POST':
         if request.json:
             saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
