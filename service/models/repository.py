@@ -180,6 +180,30 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 aids.append(aid.get("id"))
         return aids
 
+    def rors(self):
+        """
+        List of author identifiers of type ror
+
+        :return: list of author identifiers as plain strings
+        """
+        rors = []
+        for aid in self.author_ids:
+            if aid.get("type") == 'ror':
+                rors.append(aid.get("id"))
+        return rors
+
+    def ringgolds(self):
+        """
+        List of author identifiers of type ringgold
+
+        :return: list of author identifiers as plain strings
+        """
+        ringgolds = []
+        for aid in self.author_ids:
+            if aid.get("type") == 'ringgold':
+                ringgolds.append(aid.get("id"))
+        return ringgolds
+
     @property
     def postcodes(self):
         """
