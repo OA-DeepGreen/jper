@@ -309,6 +309,16 @@ def match(notification_data, repository_config, provenance, acc_id):
             "grants": exact
         }
     }
+
+    match_exclusion_algorithms = {
+        "excluded_domains" : {
+            "urls" : domain_url,
+            "emails" : domain_email
+        },
+        "excluded_name_variants" : {
+            "affiliations" : exact_substring
+        }
+    }
     # 2016-08-18 and 2018-08-18 TD : take out postcodes. In Germany, these are not as geo-local as in the UK, sigh.
     # AR: Rather than comment out postcodes from models,
     # I have added a config option and set the default to false, as tests were failing
@@ -366,34 +376,71 @@ def match(notification_data, repository_config, provenance, acc_id):
     if not matched:
         return False
 
-    # do the match refinements
-    # if the configuration specifies a keyword, it must match the notification data, otherwise
-    # the match fails
+    # Before matching keyword and content type, check if it matches the exclusions
+    exclusion_matched = False
+    for repo_property, sub in match_exclusion_algorithms.items():
+        for match_property, fn in sub.items():
+            for rprop in getattr(rc, repo_property):
+                for mprop in getattr(md, match_property):
+                    m = fn(rprop, mprop)
+                    if m is not False:  # it will be a string then
+                        exclusion_matched = True
+
+                        # convert the values that have matched the exclusion to string values suitable for provenance
+                        rval = repo_property_values.get(repo_property)(
+                            rprop) if repo_property in repo_property_values else rprop
+                        mval = match_property_values.get(match_property)(
+                            mprop) if match_property in match_property_values else mprop
+                        m = "Excluding this match: " + m
+                        # record the provenance
+                        provenance.add_provenance(repo_property, rval, match_property, mval, m)
+
+    # if it matches an exclusion, then no need to look at the optional refinements
+    if exclusion_matched:
+        return False
+
+    # do further match refinements
+    # if the configuration specifies a keyword,
+    #     it must match the notification data, otherwise the match fails
     if len(rc.keywords) > 0:
         # app.logger.debug(" -- Refine with keywords")
-        trip = False
+        keyword_matched = False
         for rk in rc.keywords:
             for mk in md.keywords:
                 m = exact(rk, mk)
-                if m is not False:  # then it is a string
-                    trip = True
+                if m is not False: # then it is a string
+                    keyword_matched = True
                     provenance.add_provenance("keywords", rk, "keywords", mk, m)
-        # app.logger.debug(" ---- matched: {x}".format(x=trip))
-        if not trip:
+        # app.logger.debug(" ---- matched: {x}".format(x=keyword_matched))
+        if not keyword_matched:
+            return False
+
+    # if the configuration specifies an excluded keyword,
+    #     it must not match the notification data
+    if len(rc.excluded_keywords) > 0:
+        excluded_keyword_matched = False
+        for rk in rc.excluded_keywords:
+            for mk in md.keywords:
+                m = exact(rk, mk)
+                if m is not False: # then it is a string
+                    excluded_keyword_matched = True
+                    m = "Excluding this match: " + m
+                    provenance.add_provenance("keywords", rk, "keywords", mk, m)
+        if excluded_keyword_matched:
             return False
 
     # as above, if the config requires a content type it must match the notification data or the match fails
     if len(rc.content_types) > 0:
         # app.logger.debug(" -- Refine with content types")
-        trip = False
+        content_type_matched = False
         for rc in rc.content_types:
             for mc in md.content_types:
                 m = exact(rc, mc)
                 if m is True:
-                    trip = True
+                    content_type_matched = True
                     provenance.add_provenance("content_types", rc, "content_types", mc, m)
-        # app.logger.debug(" ---- matched: {x}".format(x=trip))
-        if not trip:
+        # app.logger.debug(" ---- matched: {x}".format(x=content_type_matched))
+        if not content_type_matched:
             return False
 
     return len(provenance.provenance) > 0
