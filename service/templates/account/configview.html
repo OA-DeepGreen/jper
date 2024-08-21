@@ -33,8 +33,6 @@
 <script>
 var obj = JSON.parse({{ repo_json|tojson|safe }});
 
-
-
 print_table = function(data,id,title){
 	if(typeof data === "undefined"){
 		return 0;
@@ -61,42 +59,42 @@ print_table = function(data,id,title){
 			</tr>');	
 	}
 }
-if(obj.strings.length > 0) {
+if(obj.strings && obj.strings.length > 0) {
     print_table(obj.strings, 'strings', 'Strings');
 }
-if(obj.name_variants.length > 0) {
+if(obj.name_variants && obj.name_variants.length > 0) {
     print_table(obj.name_variants, 'name_variants', 'Name Variants');
 }
 // 2016-09-26 TD : 'postcodes' are taken out as match critria; esp. for Germany
 // if(obj.postcodes.length > 0) {
 // print_table(obj.postcodes,'postcodes', 'Postcodes');
 // }
-if(obj.domains.length > 0) {
+if(obj.domains && obj.domains.length > 0) {
     print_table(obj.domains, 'domains', 'Domains');
 }
 // 2016-09-26 TD : Additional listing of grant numbers if provided
-if(obj.grants.length > 0) {
+if(obj.grants && obj.grants.length > 0) {
     print_table(obj.grants, 'grants', 'Grants');
 }
-if(obj.keywords.length > 0) {
+if(obj.keywords && obj.keywords.length > 0) {
     print_table(obj.keywords, 'keywords', 'Keywords');
 }
-if(obj.institutional_identifier.length > 0) {
+if(obj.institutional_identifier && obj.institutional_identifier.length > 0) {
     print_table(a, 'institutional_identifier', 'Institutional identifier');
 }
-if(obj.ringgolds.length > 0) {
+if(obj.ringgolds && obj.ringgolds.length > 0) {
     print_table(a, 'ringgold', 'Ringgold');
 }
-if(obj.rors.length > 0) {
+if(obj.rors && obj.rors.length > 0) {
     print_table(a, 'ror', 'ROR');
 }
-if(obj.excluded_name_variants.length > 0) {
+if(obj.excluded_name_variants && obj.excluded_name_variants.length > 0) {
     print_table(obj.excluded_name_variants,'excluded_name_variants', 'Excluded Name Variants');
 }
-if(obj.excluded_keywords.length > 0) {
+if(obj.excluded_keywords && obj.excluded_keywords.length > 0) {
     print_table(obj.excluded_keywords,'excluded_keywords', 'Excluded Keywords');
 }
-if(obj.excluded_domains.length > 0) {
+if(obj.excluded_domains && obj.excluded_domains.length > 0) {
     print_table(obj.excluded_domains,'excluded_domains', 'Excluded Domains');
 }
 </script>
