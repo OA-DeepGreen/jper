@@ -86,7 +86,7 @@ class XSLT(object):
   #                 (i.e. Frontiers) apparently is not using it
   #
   jats2opus4 = '''
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:mml="http://www.w3.org/1998/Math/MathML">
 
   <!-- <xsl:import href="outputTokens.xsl"/> -->
   <xsl:output method="xml" omit-xml-declaration="yes" indent="yes" encoding="utf-8"/>
@@ -574,7 +574,7 @@ class XSLT(object):
   #                 (i.e. Frontiers) apparently is not using it
   #
   jats2metsmods = '''
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:ali="http://www.niso.org/schemas/ali/1.0/" xmlns:mml="http://www.w3.org/1998/Math/MathML">
 
     <!-- <xsl:import href="jats2mods.xsl"/> -->
     <xsl:output method="xml" omit-xml-declaration="no" standalone="no" indent="yes" encoding="utf-8"/>
