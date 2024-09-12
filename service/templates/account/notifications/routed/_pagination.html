@@ -1,0 +1,19 @@
+<div class="row">
+    <h2>Displaying Notifications from {{ since }} to {{ upto }}</h2>
+    {% if total > 9999 %}
+        {% set msg="( only the latest 10000 notifications are displayed )" %}
+    {%  else %}
+         {% set msg="" %}
+    {% endif %}
+    <div class="col span-6">
+        <b>Total number of notifications: {{total}} {{ msg }}</b>
+    </div>
+    <div class="col span-6">notifications per page: {{page_size}}</div>
+</div>
+
+<div class="row">
+    <div class="col span-12">
+        {% from "harvester/helpers/pagination.html" import render_pagination %}
+        {{ render_pagination(num_of_pages,page_num,link) }}
+    </div>
+</div>

@@ -1,0 +1,72 @@
+<div class="row">
+    <div class="col span-12">
+        <table id="dataAOTable" class="tablesorter-green">
+            <thead>
+                <tr>
+                    <th>Select to deposit</th>
+                    <th class="sorter-iso8601date">Send Date</th>
+                    <th>DOI</th>
+                    <th>Publisher</th>
+                    <th class="sorter-iso8601date">Publication date</th>
+                    <th>Embargo</th>
+                    <th>Title</th>
+                    <th class="sorter-iso8601date">Analysis Date</th>
+                    <th>Deposit details</th>
+                </tr>
+            </thead>
+            {%  for notification in results[1:] %}
+                {#  First row of results is header. So getting notifications from 2nd row #}
+                {#  First column is id #}
+                {% set n_id = notification['id'] %}
+                <tr class="tablesorter-hasChildRow">
+                    <td>
+                        <input type="checkbox" id="request_{{notification['id']}}" value="{{notification['id']}}" name='request_notification' class="request_notification_checkbox">
+                    </td>
+                    <td><a href="#" class="toggle">
+                        {{ notification['send_date'] | safe }}
+                        </a></td>
+                    <td>{{ notification['doi'] | safe }}</td>
+                    <td>{{ notification['publisher'] | safe }}</td>
+                    <td>{{ notification['publication_date'] | safe }}</td>
+                     {% if notification['embargo'] and notification['embargo'] != 0 and notification['embargo'] != '0' %}
+                        <td>{{notification['embargo']}}</td>
+                    {% else %}
+                        <td></td>
+                    {% endif %}
+                    <td>{{ notification['title'] | safe }}</td>
+                    <td>{{ notification['analysis_date'] | safe }}</td>
+                    <td>
+                        {% if notification['deposit_count'] > 0 %}
+                            {% if notification['deposit_count'] > 1 %}
+                                Number of deposit attempts: {{ notification['deposit_count'] | safe }} <br>
+                            {%  endif %}
+                            Date of deposit: {{ notification['deposit_date'] | safe }} <br>
+                            Status: {{ notification['deposit_status'] | safe }} <br>
+                        {% endif %}
+                        {%  if (not notification.get('request_status')) or (notification['request_status'] and notification['deposit_status'] != 'queued') %}
+                            <br>
+                            <form method="POST" action="/account/{{repo_id}}/request_deposit" class="form_request_a_deposit">
+                                <input type="hidden" value="" name='notification_ids' data-nid="{{notification['id']}}">
+                                <button class="btn btn--3d btn--primary move-up" type="submit">Request deposit</button>
+                            </form>
+                        {%  endif %}
+                    </td>
+                </tr>
+                <tr class="tablesorter-childRow collapse" >
+                    <td colspan="9">
+                        <div class="col span-1 expand" data="{{ n_id }}">
+                            <span class="down-arrow"></span>
+                        </div>
+                        <div class="col span-1 collapse" data="{{ n_id }}">
+                            <span class="up-arrow"></span>
+                        </div>
+                        <div class="col span-14" id="{{ n_id }}"></div>
+                </td></tr>
+            {% endfor %}
+        </table>
+    {% from "harvester/helpers/pagination.html" import render_pagination%}
+    {{ render_pagination(num_of_pages,page_num,link) }}
+
+    <div id='elem'></div>
+</div>
+</div>
