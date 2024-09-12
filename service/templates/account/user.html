@@ -12,17 +12,13 @@
                     {% include 'account/user/publisher/_matching_history.html' %}
                     {% include 'account/user/publisher/_default_license_form.html' %}
                     {% include 'account/user/publisher/_connection_details.html' %}
+                    {% include 'account/user/_update_login.html' %}
                 {% endif %}
-                {% if account.has_role('repository') %}
-                    {% include 'account/user/repository/_matching_details_form.html' %}
-                    {% include 'account/user/repository/_matching_details_link.html' %}
-                    {% include 'account/user/repository/_routing_history_link.html' %}
-                    {% include 'account/user/repository/_select_licenses.html' %}
-                    {% include 'account/user/repository/_profile_settings_form.html' %}
-                    {% include 'account/user/repository/_sword_settings_form.html' %}
-                    {% include 'account/user/repository/_sword_status.html' %}
+                {% elif account.has_role('repository') %}
+                    {% include 'account/user/_repository.html' %}
+                {% else %}
+                    {% include 'account/user/_update_login.html' %}
                 {% endif %}
-                {% include 'account/user/_update_login.html' %}
             </div>
             {% if current_user.is_super %}
                 <div class="col span-3 push-1 cms">
@@ -37,23 +33,23 @@
     {% endif %}
 {% endblock %} 
 {% block extra_js_bottom %}
-    <script>    	
+    <script>
         var deleteaccount = function(event) {
             var conf = confirm("This action will remove the user forever. Are you sure you want to do this?");
             if (!conf) event.preventDefault();
         }
         $('#delete').bind('click',deleteaccount);
 
-    	function submit_form_active() {
-			document.getElementById("active_no").checked = true;
-			document.getElementById("active_yes").checked = false;
-	     	document.getElementById("form_active").submit();
-    	}
-		function submit_form_passive() {
-			document.getElementById("passive_no").checked = true;
-			document.getElementById("passive_yes").checked = false;
-	     	document.getElementById("form_passive").submit();
-		}
+        function submit_form_active() {
+            document.getElementById("active_no").checked = true;
+            document.getElementById("active_yes").checked = false;
+             document.getElementById("form_active").submit();
+        }
+        function submit_form_passive() {
+            document.getElementById("passive_no").checked = true;
+            document.getElementById("passive_yes").checked = false;
+             document.getElementById("form_passive").submit();
+        }
         {#% include 'account/user/repository/_search_js.html' %#}
 
         function show_form(form_id) {
@@ -63,6 +59,31 @@
           } else {
             x.style.display = "none";
           }
+        }
+
+        var acc = document.getElementsByClassName("accordion-section");
+        for (let i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function() {
+                var cls_name = this.dataset.panel;
+                var cls = "." + cls_name;
+                var panel = document.querySelector(cls);
+                for (let j = 0; j < acc.length; j++) {
+                    acc[j].classList.remove("accordion-row-active");
+                }
+                if (panel.style.display === "block") {
+                    panel.style.display = "none";
+                    this.classList.remove("accordion-row-active");
+                } else {
+                    panel.style.display = "block";
+                    this.classList.add("accordion-row-active");
+                }
+                var panels = document.querySelectorAll('.panel');
+                for (let n = 0; n < panels.length; n++) {
+                    if (!panels[n].classList.contains(cls_name)) {
+                        panels[n].style.display = "none";
+                    }
+                }
+            });
         }
 
     </script>

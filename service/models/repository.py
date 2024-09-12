@@ -180,6 +180,7 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 aids.append(aid.get("id"))
         return aids
 
+    @property
     def rors(self):
         """
         List of author identifiers of type ror
@@ -192,6 +193,7 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 rors.append(aid.get("id"))
         return rors
 
+    @property
     def ringgolds(self):
         """
         List of author identifiers of type ringgold

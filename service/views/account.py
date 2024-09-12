@@ -289,7 +289,7 @@ def _get_notification_value(header, notification):
     return ''
 
 
-def _notifications_for_display(results, table):
+def _notifications_for_display(results, table, include_deposit_details=True):
     notifications = []
     # header
     header_row = ['id']
@@ -299,25 +299,26 @@ def _notifications_for_display(results, table):
         else:
             header_row.append(header)
     # I've appended columns to display sword deposit details
-    header_row.append('deposit_date')
-    header_row.append('deposit_count')
-    header_row.append('deposit_status')
-    header_row.append('request_status')
+    if include_deposit_details:
+        header_row.append('deposit_date')
+        header_row.append('deposit_count')
+        header_row.append('deposit_status')
+        header_row.append('request_status')
     notifications.append(header_row)
     # results
     for result in results.get('notifications', []):
         row = {
             'id': _get_notification_value('id', result)
         }
-        for header in table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']:
-            cell = []
+        fields = table['header']
+        if include_deposit_details:
+            fields = table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']
+        for header in fields:
             val = _get_notification_value(header, result)
-            cell.append(val)
             key = header.lower().replace(' ', '_')
-            row[key] = cell
+            row[key] = val
         notifications.append(row)
     return notifications
-
 
 @blueprint.before_request
 def restrict():
@@ -367,36 +368,34 @@ def download(account_id):
         if request.args.get('rejected', False):
             fprefix = "failed"
             xtable = ftable
-            html = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
+            json_results = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
         else:
             fprefix = "matched"
             xtable = mtable
-            html = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
+            json_results = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
     else:
         fprefix = "routed"
         xtable = ntable
-        html = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
+        json_results = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
 
-    res = json.loads(html)
-
-    rows = []
-    for hdr in xtable["header"]:
-        rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
-
-    rows = list(zip_longest(*rows, fillvalue=''))
-    #
-    # Python 3 you need to use StringIO with csv.write. send_file requires BytesIO, so you have to do both.
+    results = json.loads(json_results)
+    data_to_display = _notifications_for_display(results, ntable, include_deposit_details=False)
+    fieldnames = ["id"]
+    for val in xtable["header"]:
+        fieldnames.append(val.lower().replace(' ', '_'))
     strm = StringIO()
-    writer = csv.writer(strm, delimiter=',', quoting=csv.QUOTE_ALL)
-    writer.writerow(xtable["header"])
-    writer.writerows(rows)
+    writer = csv.DictWriter(strm, fieldnames=fieldnames)
+    writer.writeheader()
+    for notification in data_to_display:
+        if isinstance(notification, list):
+            continue
+        writer.writerow(notification)
     mem = BytesIO()
     mem.write(strm.getvalue().encode('utf-8-sig'))
     mem.seek(0)
     strm.close()
     fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
     return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
-
 
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
@@ -426,7 +425,7 @@ def details(repo_id):
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results, ntable)
+    data_to_display = _notifications_for_display(results, ntable, include_deposit_details=True)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
@@ -562,11 +561,7 @@ def configView(repoid=None):
         # 2016-09-16 TD : The field 'repository' has changed to 'repo' due to
         #                 a bug fix coming with a updated version ES 2.3.3 
     if request.method == 'GET':
-        # get the config for the current user and return it
-        # this route may not actually be needed, but is convenient during development
-        # also it should be more than just the strings data once complex configs are accepted
-        json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo_json=json_data, repo=rec)
+        return render_template('account/configview.html', repo=rec)
     elif request.method == 'POST':
         if request.json:
             saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
