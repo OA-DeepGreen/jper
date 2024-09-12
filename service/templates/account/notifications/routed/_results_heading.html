@@ -1,0 +1,11 @@
+<div class="row">
+    <h2>Displaying Notifications from {{ since }} to {{ upto }}</h2>
+    {% if total > 9999 %}
+        {% set msg="( only the latest 10000 notifications are displayed )" %}
+    {%  else %}
+         {% set msg="" %}
+    {% endif %}
+    <div class="col span-9">
+        <b>Total number of notifications: {{total}} {{ msg }}</b>
+    </div>
+</div>

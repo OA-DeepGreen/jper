@@ -1,26 +1,17 @@
 <div class="row">
      <div class="col span-12">
          <div class="box box--padding-large box--brd-mgreyblue">
-            <h3>Deposit select notifications</h3>
             <div class="row">
-                <div class="col span-6">
-{#                    <ul class="form-fields">#}
-{#                        <li class="form-fields__item--text">#}
-                            <button class="btn btn--3d btn--primary move-up" id="select_all_notifications">Select all on this page</button>
-{#                        </li>#}
-{#                    </ul>#}
+                <div class="col span-4">
+                    <h3>Deposit select notifications</h3>
                 </div>
-                <div class="col span-6">
+                <div class="col span-3">
+                    <button class="btn btn--3d move-up" id="select_all_notifications">Select all on this page</button>
+                </div>
+                <div class="col span-3">
                     <form class="form" action="/account/{{repo_id}}/request_deposit" method="POST" id="form_request_deposits">
                         <input type="hidden" name="notification_ids" value=""/>
-    {#                    <ul class="form-fields">#}
-    {#                        <li class="form-fields__item--text">#}
-    {#                            <label>#}
-    {#                                <span>Deposit selected notifications:</span>#}
-    {#                            </label>#}
-                                <button class="btn btn--3d btn--primary move-up" type="submit">Deposit selected notifications</button>
-    {#                        </li>#}
-    {#                    </ul>#}
+                        <button class="btn btn--3d btn--primary move-up" type="submit">Deposit selected notifications</button>
                     </form>
                 </div>
             </div>
