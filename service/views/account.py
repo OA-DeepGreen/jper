@@ -63,19 +63,19 @@ ftable = {
 
 # Config table/csv for repositories
 ctable = {
-        # "screen" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        # "header" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        "screen" : ["Name Variants", "Domains", "Grant Numbers", "Keywords"],
-        "header" : ["Name Variants", "Domains", "Grant Numbers", "Dummy1", "Dummy2", "Keywords"],
- "Name Variants" : "repoconfig[0].name_variants[*]",
-       "Domains" : "repoconfig[0].domains[*]",
-#     "Postcodes" : "repoconfig[0].postcodes[*]",
- "Grant Numbers" : "repoconfig[0].grants[*]",
-        "Dummy1" : "repoconfig[0].author_ids[?(@.type=='xyz1')].id",
-        "Dummy2" : "repoconfig[0].author_ids[?(@.type=='xyz2')].id",
-#        "ORCIDs" : "repoconfig[0].author_ids[?(@.type=='orcid')].id",
-# "Author Emails" : "repoconfig[0].author_ids[?(@.type=='email')].id",
-      "Keywords" : "repoconfig[0].keywords[*]",
+        "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
+                    "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+        "header": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
+                   "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+ "Name Variants": "repoconfig[0].name_variants[*]",
+       "Domains": "repoconfig[0].domains[*]",
+ "Grant Numbers": "repoconfig[0].grants[*]",
+      "Keywords": "repoconfig[0].keywords[*]",
+           "RoR": "repoconfig[0].author_ids[?(@.type=='ror')].id",
+      "Ringgold": "repoconfig[0].author_ids[?(@.type=='ringgold')].id",
+"Excluded Name Variants": "repoconfig[0].excluded_name_variants[*]",
+"Excluded Domains": "repoconfig[0].excluded_domains[*]",
+    "Excluded Keywords": "repoconfig[0].excluded_keywords[*]",
 }
 
 
@@ -566,7 +566,7 @@ def configView(repoid=None):
         # this route may not actually be needed, but is convenient during development
         # also it should be more than just the strings data once complex configs are accepted
         json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo=json_data)
+        return render_template('account/configview.html', repo_json=json_data, repo=rec)
     elif request.method == 'POST':
         if request.json:
             saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)

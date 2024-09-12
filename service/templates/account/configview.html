@@ -9,36 +9,29 @@
 				<strong>Last updated:</strong>
 			</div>
 			<div id="updated"></div>
-			<p></p>
+			<p>{{ repo.last_updated }}</p>
 			<div>
 				<strong>Repository:</strong>
 			</div>
 			<div id="repository"></div>
-			<p></p>
+			<p>{{ repo.repository }}</p>
 			<div>
 				<strong>Created date:</strong>
 			</div>
 			<div id="created"></div>
-			<p></p>
+			<p>{{ repo.created_date }}</p>
 			<div>
 				<strong>Config-Id:</strong>
 			</div>
-			<div id="id"></div>
+			<div id="id">{{ repo.id }}</div>
 		</aside>
 	</div>
 </div>
-
-
-
-
-
 <div class="row">
 	<div class="span col-12" id="container"></div>
 </div>
 <script>
-var obj = JSON.parse({{ repo|tojson|safe }});
-
-
+var obj = JSON.parse({{ repo_json|tojson|safe }});
 
 print_table = function(data,id,title){
 	if(typeof data === "undefined"){
@@ -66,31 +59,43 @@ print_table = function(data,id,title){
 			</tr>');	
 	}
 }
-
-print_table(obj.strings,'strings','Strings');
-print_table(obj.name_variants,'name_variants','Name Variants');
-// print_table(obj.postcodes,'postcodes', 'Postcodes');
+if(obj.strings && obj.strings.length > 0) {
+    print_table(obj.strings, 'strings', 'Strings');
+}
+if(obj.name_variants && obj.name_variants.length > 0) {
+    print_table(obj.name_variants, 'name_variants', 'Name Variants');
+}
 // 2016-09-26 TD : 'postcodes' are taken out as match critria; esp. for Germany
-print_table(obj.domains,'domains', 'Domains');
+// if(obj.postcodes.length > 0) {
+// print_table(obj.postcodes,'postcodes', 'Postcodes');
+// }
+if(obj.domains && obj.domains.length > 0) {
+    print_table(obj.domains, 'domains', 'Domains');
+}
 // 2016-09-26 TD : Additional listing of grant numbers if provided
-print_table(obj.grants,'grants', 'Grants');
-//print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-// 2016-09-26 TD : Response time for this field _really_ unacceptable if 20000+ 
-//                 IDs are about to be listed...
-// 2019-04-23 TD : These field are switched off for now due to DSGVO (Thank you EU!)
-// // 2019-02-25 TD : give it a new try; together with the keyword field!
-// print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-print_table(obj.keywords,'keywords', 'Keywords');
-var a = []
-a.push(obj.institutional_identifier)
-print_table(a,'institutional_identifier', 'Institutional identifier');
-
-$('#updated').append(obj.last_updated);
-$('#created').append(obj.created_date);
-$('#repository').append(obj.repo);
-// $('#repository').append(obj.repository);
-// 2016-09-26 TD : Field 'repository' changed to 'repo' due to ES 2.3.3 (and higher)
-$('#id').append(obj.id);
-
+if(obj.grants && obj.grants.length > 0) {
+    print_table(obj.grants, 'grants', 'Grants');
+}
+if(obj.keywords && obj.keywords.length > 0) {
+    print_table(obj.keywords, 'keywords', 'Keywords');
+}
+if(obj.institutional_identifier && obj.institutional_identifier.length > 0) {
+    print_table(a, 'institutional_identifier', 'Institutional identifier');
+}
+if(obj.ringgolds && obj.ringgolds.length > 0) {
+    print_table(a, 'ringgold', 'Ringgold');
+}
+if(obj.rors && obj.rors.length > 0) {
+    print_table(a, 'ror', 'ROR');
+}
+if(obj.excluded_name_variants && obj.excluded_name_variants.length > 0) {
+    print_table(obj.excluded_name_variants,'excluded_name_variants', 'Excluded Name Variants');
+}
+if(obj.excluded_keywords && obj.excluded_keywords.length > 0) {
+    print_table(obj.excluded_keywords,'excluded_keywords', 'Excluded Keywords');
+}
+if(obj.excluded_domains && obj.excluded_domains.length > 0) {
+    print_table(obj.excluded_domains,'excluded_domains', 'Excluded Domains');
+}
 </script>
 {% endblock %}
