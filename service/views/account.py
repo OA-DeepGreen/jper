@@ -433,7 +433,7 @@ def details(repo_id):
         return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
                                since=since, upto=upto)
-    return render_template('account/routed.html', repo=data, results=data_to_display, total=results['total'],
+    return render_template('account/notifications/routed.html', repo=data, results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
                            since=since, upto=upto, repo_id=repo_id, api_key=api_key)
 
