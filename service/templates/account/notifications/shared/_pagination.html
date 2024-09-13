@@ -3,5 +3,7 @@
         {% from "harvester/helpers/pagination.html" import render_pagination %}
         {{ render_pagination(num_of_pages,page_num,link) }}
     </div>
-    <div class="col span-3">notifications per page: {{page_size}}</div>
+    <div class="col span-3">
+        <div class="per-page">Per page: {{page_size}}</div>
+    </div>
 </div>

@@ -510,3 +510,8 @@ dl.dl-details dd {
   font-weight: normal;
 }
 
+.per-page {
+    padding-top: 25px;
+    float: right;
+}
+
