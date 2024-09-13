@@ -519,4 +519,6 @@ dl.dl-details dd {
     float: right;
 }
 
-
+.line-space {
+    margin-bottom: 15px;
+}
