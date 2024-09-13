@@ -250,6 +250,25 @@ class NotificationList(dataobj.DataObj):
         self._set_single("since", val, coerce=self._date_str())
 
     @property
+    def upto(self):
+        """
+        The requested "upto" date of the request
+
+        :return: The requested "upto" date of the request
+        """
+        return self._get_single("upto", coerce=self._date_str())
+
+    @upto.setter
+    def upto(self, val):
+        """
+        Set the requested upto date of the request
+
+        :param val: the requested upto date of the request
+        :return:
+        """
+        self._set_single("upto", val, coerce=self._date_str())
+
+    @property
     def page(self):
         """
         The requested page of the response
@@ -387,6 +406,25 @@ class MatchProvenanceList(dataobj.DataObj):
         self._set_single("since", val, coerce=self._date_str())
 
     @property
+    def upto(self):
+        """
+        The requested "upto" date of the request
+
+        :return: The requested "upto" date of the request
+        """
+        return self._get_single("upto", coerce=self._date_str())
+
+    @upto.setter
+    def upto(self, val):
+        """
+        Set the requested upto date of the request
+
+        :param val: the requested upto date of the request
+        :return:
+        """
+        self._set_single("upto", val, coerce=self._date_str())
+
+    @property
     def page(self):
         """
         The requested page of the response
@@ -522,6 +560,25 @@ class FailedNotificationList(dataobj.DataObj):
         :return:
         """
         self._set_single("since", val, coerce=self._date_str())
+
+    @property
+    def upto(self):
+        """
+        The requested "upto" date of the request
+
+        :return: The requested "upto" date of the request
+        """
+        return self._get_single("upto", coerce=self._date_str())
+
+    @upto.setter
+    def upto(self, val):
+        """
+        Set the requested upto date of the request
+
+        :param val: the requested upto date of the request
+        :return:
+        """
+        self._set_single("upto", val, coerce=self._date_str())
 
     @property
     def page(self):

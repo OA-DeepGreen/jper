@@ -1,96 +1,97 @@
-{% extends "base.html" %} {% block content %}
-
-<div class="row cms">
-	<div class="col span-12">
-		<aside class="article-full__callout">
-			<h3>Details</h3>
-			<p></p>
-			<div>
-				<strong>Last updated:</strong>
-			</div>
-			<div id="updated"></div>
-			<p></p>
-			<div>
-				<strong>Repository:</strong>
-			</div>
-			<div id="repository"></div>
-			<p></p>
-			<div>
-				<strong>Created date:</strong>
-			</div>
-			<div id="created"></div>
-			<p></p>
-			<div>
-				<strong>Config-Id:</strong>
-			</div>
-			<div id="id"></div>
-		</aside>
-	</div>
-</div>
-
-
-
-
-
+{% extends "base.html" %} 
+{% block content %}
+{% include 'account/user/repository/config_view/_heading.html' %}
+<!-- Details -->
+{% include 'account/user/repository/config_view/_details.html' %}
 <div class="row">
-	<div class="span col-12" id="container"></div>
+	<div class="span col-12" id="container">
+        <!-- strings -->
+        {% if repo.strings|length > 0 %}
+            {% with data=repo.strings, id='strings', title='Strings' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- name_variants -->
+        {% if repo.name_variants|length > 0 %}
+            {% with data=repo.name_variants, id='name_variants', title='Name Variants' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- Not doing postcodes -->
+        <!-- domains -->
+        {% if repo.domains|length > 0 %}
+            {% with data=repo.domains, id='domains', title='Domains' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- grants -->
+        {% if repo.grants|length > 0 %}
+            {% with data=repo.grants, id='grants', title='Grants' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- keywords -->
+        {% if repo.keywords|length > 0 %}
+            {% with data=repo.keywords, id='keywords', title='Keywords' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- institutional_identifier -->
+        {% if repo.institutional_identifier %}
+            {% with data=[institutional_identifier], id='institutional_identifier', title='Institutional identifier' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- ringgolds -->
+        {% if repo.ringgolds|length > 0 %}
+            {% with data=repo.ringgolds, id='ringgold', title='Ringgold' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- rors -->
+        {% if repo.rors|length > 0 %}
+            {% with data=repo.rors, id='ror', title='ROR' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- excluded_name_variants -->
+        {% if repo.excluded_name_variants|length > 0 %}
+            {% with data=repo.excluded_name_variants, id='excluded_name_variants', title='Excluded Name Variants' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- excluded_keywords -->
+        {% if repo.excluded_keywords|length > 0 %}
+            {% with data=repo.excluded_keywords, id='excluded_keywords', title='Excluded Keywords' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}
+        <!-- excluded_domains -->
+        {% if repo.excluded_domains|length > 0 %}
+            {% with data=repo.excluded_domains, id='excluded_domains', title='Excluded Domains' %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
+            {% endwith %}
+        {% endif %}`
+    </div>
 </div>
-<script>
-var obj = JSON.parse({{ repo|tojson|safe }});
-
-
-
-print_table = function(data,id,title){
-	if(typeof data === "undefined"){
-		return 0;
-	}
-	$('#container').append('<section\
-			class="is-collapsible show_hide__container is-collapsible--button"\
-			data-collapsible>\
-			<h2 class="show_hide__trigger">'+title+'</h2>\
-			<div class="show_hide__target">\
-				<div class="cms">\
-				<table id="'+id+'">\
-						<tr>\
-							<th>'+title+'</th>\
-						</tr>\
-				</table>\
-				</div>\
-			</div>\
-		</section>\
-		');
-	
-	for (variable in data) {
-	$('#'+id+' tr:last').after('<tr>\
-			<td>'+data[variable]+'</td> \
-			</tr>');	
-	}
-}
-
-print_table(obj.strings,'strings','Strings');
-print_table(obj.name_variants,'name_variants','Name Variants');
-// print_table(obj.postcodes,'postcodes', 'Postcodes');
-// 2016-09-26 TD : 'postcodes' are taken out as match critria; esp. for Germany
-print_table(obj.domains,'domains', 'Domains');
-// 2016-09-26 TD : Additional listing of grant numbers if provided
-print_table(obj.grants,'grants', 'Grants');
-//print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-// 2016-09-26 TD : Response time for this field _really_ unacceptable if 20000+ 
-//                 IDs are about to be listed...
-// 2019-04-23 TD : These field are switched off for now due to DSGVO (Thank you EU!)
-// // 2019-02-25 TD : give it a new try; together with the keyword field!
-// print_table(obj.author_ids,'author_ids', 'Author IDs (email,ORCID,...)');
-print_table(obj.keywords,'keywords', 'Keywords');
-var a = []
-a.push(obj.institutional_identifier)
-print_table(a,'institutional_identifier', 'Institutional identifier');
-
-$('#updated').append(obj.last_updated);
-$('#created').append(obj.created_date);
-$('#repository').append(obj.repo);
-// $('#repository').append(obj.repository);
-// 2016-09-26 TD : Field 'repository' changed to 'repo' due to ES 2.3.3 (and higher)
-$('#id').append(obj.id);
-
-</script>
 {% endblock %}
+{% block extra_js_bottom %}
+  <script>
+    var acc2 = document.getElementsByClassName("accordion");
+    for (let i = 0; i < acc2.length; i++) {
+      acc2[i].addEventListener("click", function() {
+        /* Toggle between adding and removing the "active" class,
+        to highlight the button that controls the panel */
+        this.classList.toggle("accordion-active");
+
+        /* Toggle between hiding and showing the active panel */
+        var panel = this.nextElementSibling;
+        if (panel.style.display === "block") {
+          panel.style.display = "none";
+        } else {
+          panel.style.display = "block";
+        }
+      });
+    }
+  </script>
+{% endblock extra_js_bottom %}
