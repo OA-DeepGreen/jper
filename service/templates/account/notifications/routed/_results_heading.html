@@ -5,12 +5,12 @@
     {%  else %}
          {% set msg="" %}
     {% endif %}
-    <div class="col span-6">
+    <div class="col span-9">
         <b>Total number of notifications: {{total}} {{ msg }}</b>
     </div>
-    <div class="col span-6">
-        <form method="POST" action="/account/download/{{account.id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}" class="form">
-            <button class="btn btn--3d btnright" id="download_routed_log" type="submit">Download routed log</button>
+    <div class="col span-3">
+        <form method="POST" action="/account/download/{{repo_id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}" class="form">
+            <button class="btn btn--3d btn--rounded btn--primary right" type="submit">Download routed notifications</button>
         </form>
     </div>
 </div>
