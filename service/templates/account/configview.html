@@ -1,74 +1,75 @@
 {% extends "base.html" %} 
 {% block content %}
+{% include 'account/user/repository/config_view/_heading.html' %}
 <!-- Details -->
-{% include 'account/user/repository/_config_view_details.html' %}
+{% include 'account/user/repository/config_view/_details.html' %}
 <div class="row">
 	<div class="span col-12" id="container">
         <!-- strings -->
         {% if repo.strings|length > 0 %}
             {% with data=repo.strings, id='strings', title='Strings' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- name_variants -->
         {% if repo.name_variants|length > 0 %}
             {% with data=repo.name_variants, id='name_variants', title='Name Variants' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- Not doing postcodes -->
         <!-- domains -->
         {% if repo.domains|length > 0 %}
             {% with data=repo.domains, id='domains', title='Domains' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- grants -->
         {% if repo.grants|length > 0 %}
             {% with data=repo.grants, id='grants', title='Grants' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- keywords -->
         {% if repo.keywords|length > 0 %}
             {% with data=repo.keywords, id='keywords', title='Keywords' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- institutional_identifier -->
         {% if repo.institutional_identifier %}
             {% with data=[institutional_identifier], id='institutional_identifier', title='Institutional identifier' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- ringgolds -->
         {% if repo.ringgolds|length > 0 %}
             {% with data=repo.ringgolds, id='ringgold', title='Ringgold' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- rors -->
         {% if repo.rors|length > 0 %}
             {% with data=repo.rors, id='ror', title='ROR' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- excluded_name_variants -->
         {% if repo.excluded_name_variants|length > 0 %}
             {% with data=repo.excluded_name_variants, id='excluded_name_variants', title='Excluded Name Variants' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- excluded_keywords -->
         {% if repo.excluded_keywords|length > 0 %}
             {% with data=repo.excluded_keywords, id='excluded_keywords', title='Excluded Keywords' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
         <!-- excluded_domains -->
         {% if repo.excluded_domains|length > 0 %}
             {% with data=repo.excluded_domains, id='excluded_domains', title='Excluded Domains' %}
-                {% include "account/user/repository/_config_view_section_details.html" %}
+                {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}`
     </div>

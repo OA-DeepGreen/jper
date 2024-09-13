@@ -420,7 +420,7 @@ def details(repo_id):
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
-
+    email = acc.email
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
@@ -435,7 +435,7 @@ def details(repo_id):
                                since=since, upto=upto)
     return render_template('account/notifications/routed.html', repo=data, results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -542,37 +542,40 @@ def sword_logs(repo_id):
 
 @blueprint.route("/configview", methods=["GET", "POST"])
 @blueprint.route("/configview/<repoid>", methods=["GET", "POST"])
-def configView(repoid=None):
+def configView(repo_id=None):
     app.logger.debug(current_user.id + " " + request.method + " to config route")
-    if repoid is None:
+    if repo_id is None:
         if current_user.has_role('repository'):
-            repoid = current_user.id
+            repo_id = current_user.id
         elif current_user.has_role('admin'):
             return ''  # the admin cannot do anything at /config, but gets a 200 so it is clear they are allowed
         else:
             abort(400)
     elif not current_user.has_role('admin'):  # only the superuser can set a repo id directly
         abort(401)
-    rec = models.RepositoryConfig().pull_by_repo(repoid)
+    acc = models.Account.pull(repo_id)
+    if acc is None:
+        abort(404)
+    rec = models.RepositoryConfig().pull_by_repo(repo_id)
     if rec is None:
         rec = models.RepositoryConfig()
-        rec.repo = repoid
+        rec.repo = repo_id
         # rec.repository = repoid
         # 2016-09-16 TD : The field 'repository' has changed to 'repo' due to
         #                 a bug fix coming with a updated version ES 2.3.3 
     if request.method == 'GET':
-        return render_template('account/configview.html', repo=rec)
+        return render_template('account/configview.html', repo=rec, email=acc.email, repo_id=repo_id)
     elif request.method == 'POST':
         if request.json:
-            saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
+            saved = rec.set_repo_config(jsoncontent=request.json, repository=repo_id)
         else:
             try:
                 if request.files['file'].filename.endswith('.csv'):
                     saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
                 elif request.files['file'].filename.endswith('.txt'):
                     saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
             except:
                 saved = False
         if saved:
