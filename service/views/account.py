@@ -541,7 +541,7 @@ def sword_logs(repo_id):
 
 
 @blueprint.route("/configview", methods=["GET", "POST"])
-@blueprint.route("/configview/<repoid>", methods=["GET", "POST"])
+@blueprint.route("/configview/<repo_id>", methods=["GET", "POST"])
 def configView(repo_id=None):
     app.logger.debug(current_user.id + " " + request.method + " to config route")
     if repo_id is None:
