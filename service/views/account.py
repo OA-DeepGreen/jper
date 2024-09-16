@@ -330,7 +330,6 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         header_row.append('request_status')
     notifications.append(header_row)
     # results
-    # for result in results.get('notifications', []):
     for result in results:
         row = {}
         fields = table['header']

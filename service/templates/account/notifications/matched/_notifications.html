@@ -17,14 +17,12 @@
         {#  First row of results is header. So getting notifications from 2nd row #}
         {#  First column is id #}
         <tr class="tablesorter">
-          <td><a href="#" class="toggle">
-            {{ notification['analysis_date'] | safe }}
-            </a></td>
-          <td>{{ notification['iss_or_eissn'] | safe }}</td>
+          <td>{{ notification['analysis_date'] | safe }}</td>
+          <td>{{ notification['issn_or_eissn'] | safe }}</td>
           <td>{{ notification['doi'] | safe }}</td>
           <td>{{ notification['license'] | safe }}</td>
           <td>{{notification['forwarded_to']}}</td>
-          <td>{{ notification['terms'] | safe }}</td>
+          <td>{{ notification['term'] | safe }}</td>
           <td>{{ notification['appears_in'] | safe }}</td>
         </tr>
       {% endfor %}
