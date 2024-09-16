@@ -11,7 +11,7 @@
     {% set routing_action = "deactivate" %}
     {% set action_label = "Set routing status to inactive" %}
   {% endif %}
-  <form class="form" method="POST" action="{{request.path}}/routing_{{routing_action}}"
+  <form class="inline" method="POST" action="{{request.path}}/routing_{{routing_action}}"
                       id="routing_{{routing_action}}">
     <span>
       <input type="submit" class="accordion-button" value="{{ action_label }}">
