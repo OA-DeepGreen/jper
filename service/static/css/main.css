@@ -419,6 +419,10 @@ div.actions div {
     margin-bottom: 10px;
 }
 
+.table .row:last-child {
+    border-bottom: none;
+}
+
 .details {
     margin-bottom: 20px;
 }
@@ -440,6 +444,10 @@ div.actions div {
   outline: none;
   font-weight: bold;
   transition: 0.4s;
+}
+
+.inline {
+  display: inline-block;
 }
 
 .accordion-section, .accordion-button {
