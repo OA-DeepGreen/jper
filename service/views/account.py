@@ -464,10 +464,10 @@ def details(repo_id):
     if provider:
         return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
+                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='matched')
     return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='routed')
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -503,7 +503,7 @@ def matching(repo_id):
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type="matched")
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
@@ -536,7 +536,7 @@ def failing(provider_id):
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     return render_template('account/notifications/rejected.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=provider_id, api_key=api_key, type="failed")
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])

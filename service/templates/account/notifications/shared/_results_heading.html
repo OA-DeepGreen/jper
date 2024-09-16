@@ -10,7 +10,11 @@
   </div>
   {%  if total > 0 %}
     <div class="col span-3">
-      <form method="POST" action="/account/download/{{repo_id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}" class="form">
+      {% set rejected_str = "" %}
+      {% if type == "failed" %}
+        {% set rejected_str = "&rejected=1" %}
+      {% endif %}
+      <form method="POST" action="/account/download/{{repo_id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}{{ rejected_str }}" class="form">
         <button class="btn btn--3d btn--rounded btn--primary right" type="submit">Download notifications</button>
       </form>
     </div>
