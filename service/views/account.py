@@ -437,8 +437,14 @@ def details(repo_id):
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     if provider:
+        notification_prefix = "matches"
+        xtable = mtable
+        include_deposit_details = False
         data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     else:
+        notification_prefix = "notifications"
+        xtable = ntable
+        include_deposit_details = True
         data = _list_request(repo_id=repo_id, since=since, upto=upto, provider=provider)
 
     link = '/account/details'
@@ -452,15 +458,19 @@ def details(repo_id):
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results.get('notifications', []), ntable, include_deposit_details=True)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
-        return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
+        # return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
+        #                        page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+        #                        since=since, upto=upto)
+        return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                               since=since, upto=upto)
-    return render_template('account/notifications/routed.html', repo=data, results=data_to_display, total=results['total'],
+                               since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
+    return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
                            since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
 
@@ -471,7 +481,7 @@ def matching(repo_id):
     acc = models.Account.pull(repo_id)
     if acc is None:
         abort(404)
-    #
+
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
@@ -481,21 +491,27 @@ def matching(repo_id):
         upto = datetime.today().strftime("%d/%m/%Y")
 
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
-    #
+    notification_prefix = "matches"
+    xtable = mtable
+    include_deposit_details = False
     link = '/account/matching'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto)
+    # return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
+    #                        num_of_pages=num_of_pages, page_num=page_num, link=link,
+    #                        since=since, upto=upto)
+    return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
