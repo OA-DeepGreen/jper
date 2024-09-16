@@ -7,20 +7,24 @@
   <button class="accordion-section" data-panel="section-add-key">Add SSH key</button>
   {% if current_user.is_super %}
     <button class="accordion-section" data-panel="section-edit-sftp">Edit SFTP details</button>
+    {# <button class="accordion-section" data-panel="section-delete-sftp">Delete SFTP details</button> #}
   {% endif %}
   <div class="panel section-view-sftp">
-   {% include 'account/user/publisher/_connection_details_sftp.html' %}
+   {% include 'account/user/publisher/_sftp_details.html' %}
   </div>
   <div class="panel section-view-keys">
-   {% include 'account/user/publisher/_list_ssh_keys.html' %}
+   {% include 'account/user/publisher/_sftp_list_ssh_keys.html' %}
   </div>
   <div class="panel section-add-key">
-   {% include 'account/user/publisher/_add_ssh_key.html' %}
+   {% include 'account/user/publisher/_sftp_add_ssh_key.html' %}
   </div>
   {% if current_user.is_super %}
     <div class="panel section-edit-sftp">
-      {% include 'account/user/publisher/_sftp_server_settings_form.html' %}
+      {% include 'account/user/publisher/_sftp_form.html' %}
     </div>
+    {# <div class="panel section-delete-sftp">#}
+    {#   {% include 'account/user/publisher/_sftp_delete.html' %} #}
+    {# </div>#}
   {% endif %}
   </div>
 </div>
