@@ -261,17 +261,41 @@ def _validate_page_size():
 def _get_notification_value(header, notification):
     if header == 'id':
         return notification.get('id', '')
-    elif header == 'Analysis Date':
-        return notification.get('analysis_date', '')
+    if header == 'Analysis Date':
+        value = notification.get('analysis_date', '')# ntable
+        if value == '': #mtable, ftable
+            value = notification.get('created_date', 'ERROR')
+        return value
+    elif header == "ISSN or EISSN":
+        value = notification.get('alliance',{}).get('issn','') # mtable
+        if value == "":
+            value = notification.get('issn_data', '')#ftable
+        return value
     elif header == 'Send Date':
         return notification.get('created_date', '')
     elif header == 'Embargo':
         return notification.get('embargo', {}).get('duration', '')
     elif header == 'DOI':
+        # ntable, ftable
+        doi_value = ''
         identifiers = notification.get('metadata', {}).get('identifier', [])
         for identifier in identifiers:
             if identifier.get('type', '') == 'doi':
-                return identifier.get('id', '')
+                doi_value = identifier.get('id', '')
+        # mtable
+        if doi_value == '':
+            doi_value = notification.get('alliance', {}).get('doi', '')
+        return doi_value
+    elif header == "License": # mtable only
+        return notification.get('alliance', {}).get('link', '')
+    elif header == "Forwarded to": # mtable only
+        return notification.get("bibid",'')
+    elif header == "Term": # mtable only
+        return notification.get('provenance', [])[0].get('term', '')
+    elif header == "Appears in": # mtable only
+        return notification.get('provenance', [])[0].get('notification_field', '')
+    elif header == "Reason": # ftable only
+        return notification.get('reason', '')
     elif header == 'Publisher':
         return notification.get('metadata', {}).get('publisher', '')
     elif header == 'Title':
@@ -292,7 +316,7 @@ def _get_notification_value(header, notification):
 def _notifications_for_display(results, table, include_deposit_details=True):
     notifications = []
     # header
-    header_row = ['id']
+    header_row = []
     for header in table['header']:
         if isinstance(header, list):
             header_row.append(' / '.join(header))
@@ -306,10 +330,9 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         header_row.append('request_status')
     notifications.append(header_row)
     # results
-    for result in results.get('notifications', []):
-        row = {
-            'id': _get_notification_value('id', result)
-        }
+    # for result in results.get('notifications', []):
+    for result in results:
+        row = {}
         fields = table['header']
         if include_deposit_details:
             fields = table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']
@@ -367,24 +390,28 @@ def download(account_id):
     if provider:
         if request.args.get('rejected', False):
             fprefix = "failed"
+            notification_prefix = "failed"
             xtable = ftable
             json_results = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
         else:
             fprefix = "matched"
+            notification_prefix = "matches"
             xtable = mtable
             json_results = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
     else:
         fprefix = "routed"
+        notification_prefix = "notifications"
         xtable = ntable
         json_results = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
 
     results = json.loads(json_results)
-    data_to_display = _notifications_for_display(results, ntable, include_deposit_details=False)
-    fieldnames = ["id"]
+    notifications = results.get(notification_prefix, [])
+    data_to_display = _notifications_for_display(notifications, xtable, include_deposit_details=False)
+    fieldnames = []
     for val in xtable["header"]:
         fieldnames.append(val.lower().replace(' ', '_'))
     strm = StringIO()
-    writer = csv.DictWriter(strm, fieldnames=fieldnames)
+    writer = csv.DictWriter(strm, fieldnames=fieldnames, extrasaction='ignore')
     writer.writeheader()
     for notification in data_to_display:
         if isinstance(notification, list):
