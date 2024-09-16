@@ -462,9 +462,6 @@ def details(repo_id):
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
-        # return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
-        #                        page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-        #                        since=since, upto=upto)
         return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
                                since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
@@ -504,9 +501,6 @@ def matching(repo_id):
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    # return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-    #                        num_of_pages=num_of_pages, page_num=page_num, link=link,
-    #                        since=since, upto=upto)
     return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
                            since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
@@ -526,20 +520,23 @@ def failing(provider_id):
 
     # 2016-10-19 TD : not needed here for the time being
     data = _list_failrequest(provider_id=provider_id, since=since, upto=upto)
-    #
+    notification_prefix = "failed"
+    xtable = ftable
+    include_deposit_details = False
     link = '/account/failing'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
-
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, since=since, upto=upto)
+    return render_template('account/notifications/rejected.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
