@@ -453,7 +453,6 @@ def details(repo_id):
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
-    email = acc.email
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
@@ -469,10 +468,10 @@ def details(repo_id):
         #                        since=since, upto=upto)
         return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                               since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
+                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
     return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -511,7 +510,7 @@ def matching(repo_id):
     #                        since=since, upto=upto)
     return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key)
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
