@@ -1,0 +1,23 @@
+<!-- start of next accordion -->
+<div class="accordion-row">Transferring files to Deepgreen using SFTP
+  <button class="accordion-section" data-panel="section-view-sftp">View SFTP details</button>
+  <button class="accordion-section" data-panel="section-view-keys">View SSH keys</button>
+  <button class="accordion-section" data-panel="section-add-key">Add SSH key</button>
+  {% if current_user.is_super %}
+    <button class="accordion-section" data-panel="section-edit-sftp">Edit SFTP details</button>
+  {% endif %}
+  <div class="panel section-view-sftp">
+   {% include 'account/user/publisher/_connection_details_sftp.html' %}
+  </div>
+  <div class="panel section-view-keys">
+   {% include 'account/user/publisher/_list_ssh_keys.html' %}
+  </div>
+  <div class="panel section-add-key">
+   {% include 'account/user/publisher/_add_ssh_key.html' %}
+  </div>
+  {% if current_user.is_super %}
+    <div class="panel section-edit-sftp">
+      {% include 'account/user/publisher/_sftp_server_settings_form.html' %}
+    </div>
+  {% endif %}
+</div>
