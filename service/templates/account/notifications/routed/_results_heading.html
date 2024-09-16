@@ -1,16 +1,18 @@
 <div class="row line-space">
-    <h2>Displaying Notifications from {{ since }} to {{ upto }}</h2>
-    {% if total > 9999 %}
-        {% set msg="( only the latest 10000 notifications are displayed )" %}
-    {%  else %}
-         {% set msg="" %}
-    {% endif %}
-    <div class="col span-9">
-        <b>Total number of notifications: {{total}} {{ msg }}</b>
-    </div>
+  <h2>Displaying Notifications from {{ since }} to {{ upto }}</h2>
+  {% if total > 9999 %}
+    {% set msg="( only the latest 10000 notifications are displayed )" %}
+  {%  else %}
+     {% set msg="" %}
+  {% endif %}
+  <div class="col span-9">
+    <b>Total number of notifications: {{total}} {{ msg }}</b>
+  </div>
+  {%  if total > 0 %}
     <div class="col span-3">
-        <form method="POST" action="/account/download/{{repo_id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}" class="form">
-            <button class="btn btn--3d btn--rounded btn--primary right" type="submit">Download routed notifications</button>
-        </form>
+      <form method="POST" action="/account/download/{{repo_id}}?since={{ since }}&upto={{ upto }}&api_key={{api_key}}" class="form">
+        <button class="btn btn--3d btn--rounded btn--primary right" type="submit">Download routed notifications</button>
+      </form>
     </div>
+  {% endif %}
 </div>
