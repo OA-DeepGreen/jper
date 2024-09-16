@@ -454,7 +454,7 @@ div.actions div {
   background-color: #04AA6D;
   color: #fff;
   cursor: pointer;
-  float: center;
+  float: left;
   padding: 5px;
   margin: 0px 0px 5px 5px;
   border: 1px #ccc;

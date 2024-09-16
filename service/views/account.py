@@ -452,7 +452,7 @@ def details(repo_id):
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results, ntable, include_deposit_details=True)
+    data_to_display = _notifications_for_display(results.get('notifications', []), ntable, include_deposit_details=True)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
