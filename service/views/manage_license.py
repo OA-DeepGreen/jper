@@ -84,7 +84,7 @@ def download_license_file(manager_id):
             mimetype = _get_mime_type(file_path)
 
             return send_file(io.BytesIO(file_path.read_bytes()),
-                             as_attachment=True, attachment_filename=lic['file_name'],
+                             as_attachment=True, download_name=lic['file_name'],
                              mimetype=mimetype)
     abort(404)
 
@@ -219,7 +219,7 @@ def download_participant_file(manager_id):
             mimetype = _get_mime_type(file_path)
 
             return send_file(io.BytesIO(file_path.read_bytes()),
-                             as_attachment=True, attachment_filename=par['file_name'],
+                             as_attachment=True, download_name=par['file_name'],
                              mimetype=mimetype)
     abort(404)
 
