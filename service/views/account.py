@@ -27,7 +27,7 @@ blueprint = Blueprint('account', __name__)
 # Notification table/csv for repositories
 ntable = {
             "screen" : ["Send Date", ["DOI","Publisher"], ["Publication Date", "Embargo"], "Title", "Analysis Date"],
-            "header" : ["Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
+            "header" : ["ID", "Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
      "Analysis Date" : "notifications[*].analysis_date",
          "Send Date" : "notifications[*].created_date",
            "Embargo" : "notifications[*].embargo.duration",
@@ -40,7 +40,7 @@ ntable = {
 # Matching table/csv for providers (with detailed reasoning)
 mtable = {
          "screen" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to {EZB-Id}", "Term", "Appears in {notification_field}"],
-         "header" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
+         "header" : ["ID", "Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
   "Analysis Date" : "matches[*].created_date",
   "ISSN or EISSN" : "matches[*].alliance.issn",
             "DOI" : "matches[*].alliance.doi",
@@ -53,7 +53,7 @@ mtable = {
 # Rejected table/csv for providers
 ftable = {
          "screen" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
-         "header" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
+         "header" : ["ID", "Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
       "Send Date" : "failed[*].created_date",
   "Analysis Date" : "failed[*].analysis_date",
   "ISSN or EISSN" : "failed[*].issn_data",
@@ -259,7 +259,7 @@ def _validate_page_size():
 
 
 def _get_notification_value(header, notification):
-    if header == 'id':
+    if header == 'ID':
         return notification.get('id', '')
     if header == 'Analysis Date':
         value = notification.get('analysis_date', '')# ntable

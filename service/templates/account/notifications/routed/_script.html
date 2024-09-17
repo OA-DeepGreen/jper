@@ -1,38 +1,6 @@
 <script>
-// obj to render.
-var obj = JSON.parse({{ repo|tojson|safe }});
-var ids = jsonpath.query(obj, 'notifications[*].id');
-var node = [];
-
-for (variable in ids) {
-    var id = ids[variable];
-    node[id] = new PrettyJSON.view.Node({
-        el : $('#'+id),
-        data : obj.notifications[variable]
-    });
-}
-
-$('.expand').on('click', function() {
-    node[$(this).attr('data')].expandAll();
-});
-
-$('.collapse').on('click', function() {
-    node[$(this).attr('data')].collapseAll();
-});
 
 $("#dataAOTable").tablesorter();
-$('.tablesorter-childRow td').hide();
-$('.tablesorter').delegate('.toggle', 'click' ,function() {
-
-    // use "nextUntil" to toggle multiple child rows
-    // toggle table cells instead of the row
-    // $(this).closest('tr').nextUntil('tr:not(.tablesorter-childRow)').find('td').toggle();
-    // in v2.5.12, the parent row now has the class tablesorter-hasChildRow
-    // so you can use this code as well
-    $(this).closest('tr').nextUntil('tr.tablesorter-hasChildRow').find('td').toggle();
-
-    return false;
-});
 
 // on page load, ensure button text reflects checkbox state
 function toggle_button_text() {
@@ -66,7 +34,7 @@ function _submit_notifications_for_deposit(formobj, ids) {
         data: formobj.serialize(), // serializes the form's elements.
         success: function(data)
         {
-            let msg = '<article class="box box--padding-large box--success fade in" data-alert="alert">' + data + '</article>';
+            let msg = '<div class="alert info"><span class="closebtn">&times;</span>' + data + '</div>';
             console.log(msg);
             $('#form_alert').append(msg);
         }
@@ -75,25 +43,34 @@ function _submit_notifications_for_deposit(formobj, ids) {
 
 $('#form_request_deposits').on('submit', function(event) {
     event.preventDefault();
-    // gather all of the ids
+    // gather all ids
     let ids = [];
     $(".request_notification_checkbox:checked").each(function(){
         ids.push($(this).val());
     });
     let formobj = $(this);
-    _submit_notifications_for_deposit(formobj, ids)
+    _submit_notifications_for_deposit(formobj, ids);
+    // uncheck all
+    $(".request_notification_checkbox").prop('checked', false);
+    $('#select_all_notifications').text("Select all on this page");
 });
 
 $('.form_request_a_deposit').on('submit', function(event) {
     event.preventDefault();
-    // gather all of the ids
+    // gather ids
     let ids = [];
     let formobj = $(this);
     let ele = formobj.find("input[name='notification_ids']")
     let data = ele.data( "nid" );
+    $("#request_"+data).prop('checked', false);
     ids.push(data);
     _submit_notifications_for_deposit(formobj, ids)
 });
 
+$(document).on("click", ".closebtn", function(){
+    var div = this.parentElement;
+    div.style.opacity = "0";
+    setTimeout(function(){ div.style.display = "none"; }, 600);
+});
 
 </script>
