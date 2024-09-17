@@ -1,0 +1,32 @@
+{%  if total > 0 %}
+<div class="row line-space">
+  <div class="col span-12">
+    <table id="publisherTable" class="tablesorter-green">
+      <thead>
+        <tr>
+          <th class="sorter-iso8601date">Analysis Date</th>
+          <th>ISSN or E-ISSN</th>
+          <th>DOI</th>
+          <th>License</th>
+          <th>Forwarded to</th>
+          <th>Term</th>
+          <th>Appears in</th>
+        </tr>
+      </thead>
+      {%  for notification in results[1:] %}
+        {#  First row of results is header. So getting notifications from 2nd row #}
+        {#  First column is id #}
+        <tr class="tablesorter">
+          <td>{{ notification['analysis_date'] | safe }}</td>
+          <td>{{ notification['issn_or_eissn'] | safe }}</td>
+          <td>{{ notification['doi'] | safe }}</td>
+          <td>{{ notification['license'] | safe }}</td>
+          <td>{{notification['forwarded_to']}}</td>
+          <td>{{ notification['term'] | safe }}</td>
+          <td>{{ notification['appears_in'] | safe }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}

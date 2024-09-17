@@ -330,7 +330,6 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         header_row.append('request_status')
     notifications.append(header_row)
     # results
-    # for result in results.get('notifications', []):
     for result in results:
         row = {}
         fields = table['header']
@@ -437,8 +436,14 @@ def details(repo_id):
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     if provider:
+        notification_prefix = "matches"
+        xtable = mtable
+        include_deposit_details = False
         data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     else:
+        notification_prefix = "notifications"
+        xtable = ntable
+        include_deposit_details = True
         data = _list_request(repo_id=repo_id, since=since, upto=upto, provider=provider)
 
     link = '/account/details'
@@ -447,22 +452,22 @@ def details(repo_id):
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
-    email = acc.email
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results.get('notifications', []), ntable, include_deposit_details=True)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
-        return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
+        return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                               since=since, upto=upto)
-    return render_template('account/notifications/routed.html', repo=data, results=data_to_display, total=results['total'],
+                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='matched')
+    return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, email=email, repo_id=repo_id, api_key=api_key)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='routed')
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -471,7 +476,7 @@ def matching(repo_id):
     acc = models.Account.pull(repo_id)
     if acc is None:
         abort(404)
-    #
+
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
@@ -481,21 +486,24 @@ def matching(repo_id):
         upto = datetime.today().strftime("%d/%m/%Y")
 
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
-    #
+    notification_prefix = "matches"
+    xtable = mtable
+    include_deposit_details = False
     link = '/account/matching'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto)
+    return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type="matched")
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
@@ -512,20 +520,23 @@ def failing(provider_id):
 
     # 2016-10-19 TD : not needed here for the time being
     data = _list_failrequest(provider_id=provider_id, since=since, upto=upto)
-    #
+    notification_prefix = "failed"
+    xtable = ftable
+    include_deposit_details = False
     link = '/account/failing'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
-
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, since=since, upto=upto)
+    return render_template('account/notifications/rejected.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=provider_id, api_key=api_key, type="failed")
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
