@@ -1,0 +1,18 @@
+<div class="accordion-row">Routing Status
+  {% if account.publisher_routing_status == 'active' %}
+    <span class="status box--info" >{{ account.publisher_routing_status }}</span>
+  {% else %}
+    <span class="status box--warning" >{{ account.publisher_routing_status }}</span>
+  {% endif %}
+
+  {% set routing_action = "activate" %}
+  {% set action_label = "Set routing status to active" %}
+  {% if account.publisher_routing_status == 'active' %}
+    {% set routing_action = "deactivate" %}
+    {% set action_label = "Set routing status to inactive" %}
+  {% endif %}
+  <form class="inline" method="POST" action="{{request.path}}/routing_{{routing_action}}"
+                      id="routing_{{routing_action}}">
+    <input type="submit" class="accordion-button" value="{{ action_label }}">
+  </form>
+</div>

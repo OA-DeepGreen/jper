@@ -27,7 +27,7 @@ blueprint = Blueprint('account', __name__)
 # Notification table/csv for repositories
 ntable = {
             "screen" : ["Send Date", ["DOI","Publisher"], ["Publication Date", "Embargo"], "Title", "Analysis Date"],
-            "header" : ["Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
+            "header" : ["ID", "Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
      "Analysis Date" : "notifications[*].analysis_date",
          "Send Date" : "notifications[*].created_date",
            "Embargo" : "notifications[*].embargo.duration",
@@ -40,7 +40,7 @@ ntable = {
 # Matching table/csv for providers (with detailed reasoning)
 mtable = {
          "screen" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to {EZB-Id}", "Term", "Appears in {notification_field}"],
-         "header" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
+         "header" : ["ID", "Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
   "Analysis Date" : "matches[*].created_date",
   "ISSN or EISSN" : "matches[*].alliance.issn",
             "DOI" : "matches[*].alliance.doi",
@@ -53,7 +53,7 @@ mtable = {
 # Rejected table/csv for providers
 ftable = {
          "screen" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
-         "header" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
+         "header" : ["ID", "Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
       "Send Date" : "failed[*].created_date",
   "Analysis Date" : "failed[*].analysis_date",
   "ISSN or EISSN" : "failed[*].issn_data",
@@ -259,19 +259,43 @@ def _validate_page_size():
 
 
 def _get_notification_value(header, notification):
-    if header == 'id':
+    if header == 'ID':
         return notification.get('id', '')
-    elif header == 'Analysis Date':
-        return notification.get('analysis_date', '')
+    if header == 'Analysis Date':
+        value = notification.get('analysis_date', '')# ntable
+        if value == '': #mtable, ftable
+            value = notification.get('created_date', 'ERROR')
+        return value
+    elif header == "ISSN or EISSN":
+        value = notification.get('alliance',{}).get('issn','') # mtable
+        if value == "":
+            value = notification.get('issn_data', '')#ftable
+        return value
     elif header == 'Send Date':
         return notification.get('created_date', '')
     elif header == 'Embargo':
         return notification.get('embargo', {}).get('duration', '')
     elif header == 'DOI':
+        # ntable, ftable
+        doi_value = ''
         identifiers = notification.get('metadata', {}).get('identifier', [])
         for identifier in identifiers:
             if identifier.get('type', '') == 'doi':
-                return identifier.get('id', '')
+                doi_value = identifier.get('id', '')
+        # mtable
+        if doi_value == '':
+            doi_value = notification.get('alliance', {}).get('doi', '')
+        return doi_value
+    elif header == "License": # mtable only
+        return notification.get('alliance', {}).get('link', '')
+    elif header == "Forwarded to": # mtable only
+        return notification.get("bibid",'')
+    elif header == "Term": # mtable only
+        return notification.get('provenance', [])[0].get('term', '')
+    elif header == "Appears in": # mtable only
+        return notification.get('provenance', [])[0].get('notification_field', '')
+    elif header == "Reason": # ftable only
+        return notification.get('reason', '')
     elif header == 'Publisher':
         return notification.get('metadata', {}).get('publisher', '')
     elif header == 'Title':
@@ -289,35 +313,34 @@ def _get_notification_value(header, notification):
     return ''
 
 
-def _notifications_for_display(results, table):
+def _notifications_for_display(results, table, include_deposit_details=True):
     notifications = []
     # header
-    header_row = ['id']
+    header_row = []
     for header in table['header']:
         if isinstance(header, list):
             header_row.append(' / '.join(header))
         else:
             header_row.append(header)
     # I've appended columns to display sword deposit details
-    header_row.append('deposit_date')
-    header_row.append('deposit_count')
-    header_row.append('deposit_status')
-    header_row.append('request_status')
+    if include_deposit_details:
+        header_row.append('deposit_date')
+        header_row.append('deposit_count')
+        header_row.append('deposit_status')
+        header_row.append('request_status')
     notifications.append(header_row)
     # results
-    for result in results.get('notifications', []):
-        row = {
-            'id': _get_notification_value('id', result)
-        }
-        for header in table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']:
-            cell = []
+    for result in results:
+        row = {}
+        fields = table['header']
+        if include_deposit_details:
+            fields = table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']
+        for header in fields:
             val = _get_notification_value(header, result)
-            cell.append(val)
             key = header.lower().replace(' ', '_')
-            row[key] = cell
+            row[key] = val
         notifications.append(row)
     return notifications
-
 
 @blueprint.before_request
 def restrict():
@@ -366,37 +389,39 @@ def download(account_id):
     if provider:
         if request.args.get('rejected', False):
             fprefix = "failed"
+            notification_prefix = "failed"
             xtable = ftable
-            html = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
+            json_results = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
         else:
             fprefix = "matched"
+            notification_prefix = "matches"
             xtable = mtable
-            html = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
+            json_results = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
     else:
         fprefix = "routed"
+        notification_prefix = "notifications"
         xtable = ntable
-        html = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
+        json_results = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
 
-    res = json.loads(html)
-
-    rows = []
-    for hdr in xtable["header"]:
-        rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
-
-    rows = list(zip_longest(*rows, fillvalue=''))
-    #
-    # Python 3 you need to use StringIO with csv.write. send_file requires BytesIO, so you have to do both.
+    results = json.loads(json_results)
+    notifications = results.get(notification_prefix, [])
+    data_to_display = _notifications_for_display(notifications, xtable, include_deposit_details=False)
+    fieldnames = []
+    for val in xtable["header"]:
+        fieldnames.append(val.lower().replace(' ', '_'))
     strm = StringIO()
-    writer = csv.writer(strm, delimiter=',', quoting=csv.QUOTE_ALL)
-    writer.writerow(xtable["header"])
-    writer.writerows(rows)
+    writer = csv.DictWriter(strm, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    for notification in data_to_display:
+        if isinstance(notification, list):
+            continue
+        writer.writerow(notification)
     mem = BytesIO()
     mem.write(strm.getvalue().encode('utf-8-sig'))
     mem.seek(0)
     strm.close()
     fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
     return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
-
 
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
@@ -411,8 +436,14 @@ def details(repo_id):
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     if provider:
+        notification_prefix = "matches"
+        xtable = mtable
+        include_deposit_details = False
         data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     else:
+        notification_prefix = "notifications"
+        xtable = ntable
+        include_deposit_details = True
         data = _list_request(repo_id=repo_id, since=since, upto=upto, provider=provider)
 
     link = '/account/details'
@@ -421,22 +452,22 @@ def details(repo_id):
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
-
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results, ntable)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
-        return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
+        return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
                                page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                               since=since, upto=upto)
-    return render_template('account/details.html', repo=data, results=data_to_display, total=results['total'],
+                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='matched')
+    return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
                            page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto, repo_id=repo_id)
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='routed')
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -445,7 +476,7 @@ def matching(repo_id):
     acc = models.Account.pull(repo_id)
     if acc is None:
         abort(404)
-    #
+
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
@@ -455,21 +486,24 @@ def matching(repo_id):
         upto = datetime.today().strftime("%d/%m/%Y")
 
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
-    #
+    notification_prefix = "matches"
+    xtable = mtable
+    include_deposit_details = False
     link = '/account/matching'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link,
-                           since=since, upto=upto)
+    return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type="matched")
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
@@ -486,20 +520,23 @@ def failing(provider_id):
 
     # 2016-10-19 TD : not needed here for the time being
     data = _list_failrequest(provider_id=provider_id, since=since, upto=upto)
-    #
+    notification_prefix = "failed"
+    xtable = ftable
+    include_deposit_details = False
     link = '/account/failing'
-
     api_key = acc.data['api_key']
     if current_user.has_role('admin'):
         api_key = current_user.data['api_key']
     link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
-
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, since=since, upto=upto)
+    return render_template('account/notifications/rejected.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=provider_id, api_key=api_key, type="failed")
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
@@ -542,42 +579,41 @@ def sword_logs(repo_id):
 
 
 @blueprint.route("/configview", methods=["GET", "POST"])
-@blueprint.route("/configview/<repoid>", methods=["GET", "POST"])
-def configView(repoid=None):
+@blueprint.route("/configview/<repo_id>", methods=["GET", "POST"])
+def configView(repo_id=None):
     app.logger.debug(current_user.id + " " + request.method + " to config route")
-    if repoid is None:
+    if repo_id is None:
         if current_user.has_role('repository'):
-            repoid = current_user.id
+            repo_id = current_user.id
         elif current_user.has_role('admin'):
             return ''  # the admin cannot do anything at /config, but gets a 200 so it is clear they are allowed
         else:
             abort(400)
     elif not current_user.has_role('admin'):  # only the superuser can set a repo id directly
         abort(401)
-    rec = models.RepositoryConfig().pull_by_repo(repoid)
+    acc = models.Account.pull(repo_id)
+    if acc is None:
+        abort(404)
+    rec = models.RepositoryConfig().pull_by_repo(repo_id)
     if rec is None:
         rec = models.RepositoryConfig()
-        rec.repo = repoid
+        rec.repo = repo_id
         # rec.repository = repoid
         # 2016-09-16 TD : The field 'repository' has changed to 'repo' due to
         #                 a bug fix coming with a updated version ES 2.3.3 
     if request.method == 'GET':
-        # get the config for the current user and return it
-        # this route may not actually be needed, but is convenient during development
-        # also it should be more than just the strings data once complex configs are accepted
-        json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo_json=json_data, repo=rec)
+        return render_template('account/configview.html', repo=rec, email=acc.email, repo_id=repo_id)
     elif request.method == 'POST':
         if request.json:
-            saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
+            saved = rec.set_repo_config(jsoncontent=request.json, repository=repo_id)
         else:
             try:
                 if request.files['file'].filename.endswith('.csv'):
                     saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
                 elif request.files['file'].filename.endswith('.txt'):
                     saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
             except:
                 saved = False
         if saved:
