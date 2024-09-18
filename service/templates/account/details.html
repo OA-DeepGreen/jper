@@ -106,27 +106,27 @@
                             <input type="checkbox" id="request_{{notification['id']}}" value="{{notification['id']}}" name='request_notification' class="request_notification_checkbox">
                         </td>
                         <td><a href="#" class="toggle">
-                            {{"<br>".join(notification['send_date']) | safe }}
+                            {{ notification['send_date'] | safe }}
                             </a></td>
-                        <td>{{"<br>".join(notification['doi']) | safe }}</td>
-                        <td>{{"<br>".join(notification['publisher']) | safe }}</td>
-                        <td>{{"<br>".join(notification['publication_date']) | safe }}</td>
-                         {% if notification['embargo'] and notification['embargo'][0] and notification['embargo'][0] != 0 and notification['embargo'][0] != '0' %}
-                            <td>{{notification['embargo'][0]}}</td>
+                        <td>{{ notification['doi'] | safe }}</td>
+                        <td>{{ notification['publisher'] | safe }}</td>
+                        <td>{{ notification['publication_date'] | safe }}</td>
+                         {% if notification['embargo'] and notification['embargo'] != 0 and notification['embargo'] != '0' %}
+                            <td>{{notification['embargo']}}</td>
                         {% else %}
                             <td></td>
                         {% endif %}
-                        <td>{{"<br>".join(notification['title']) | safe }}</td>
-                        <td>{{"<br>".join(notification['analysis_date']) | safe }}</td>
+                        <td>{{ notification['title'] | safe }}</td>
+                        <td>{{ notification['analysis_date'] | safe }}</td>
                         <td>
-                            {% if notification['deposit_count'][0] > 0 %}
-                                {% if notification['deposit_count'][0] > 1 %}
-                                    Number of deposit attempts: {{ notification['deposit_count'][0] | safe }} <br>
+                            {% if notification['deposit_count'] > 0 %}
+                                {% if notification['deposit_count'] > 1 %}
+                                    Number of deposit attempts: {{ notification['deposit_count'] | safe }} <br>
                                 {%  endif %}
-                                Date of deposit: {{ notification['deposit_date'][0] | safe }} <br>
-                                Status: {{ notification['deposit_status'][0] | safe }} <br>
+                                Date of deposit: {{ notification['deposit_date'] | safe }} <br>
+                                Status: {{ notification['deposit_status'] | safe }} <br>
                             {% endif %}
-                            {%  if (not notification.get('request_status')[0]) or (notification['request_status'][0] and notification['deposit_status'][0] != 'queued') %}
+                            {%  if (not notification.get('request_status')) or (notification['request_status'] and notification['deposit_status'] != 'queued') %}
                                 <br>
                                 <form method="POST" action="/account/{{repo_id}}/request_deposit" class="form_request_a_deposit">
                                     <input type="hidden" value="" name='notification_ids' data-nid="{{notification['id']}}">

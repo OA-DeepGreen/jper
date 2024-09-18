@@ -1,0 +1,16 @@
+<div class="box box--padding-large box--brd-mgreyblue">
+    <dl class="dl-details">
+        <dt>Email address</dt>
+        <dd>{{account.data['email']}}</dd>
+        <dt>Repository bibid (EZB)</dt>
+        <dd>{{account.data.get('repository',{}).get('bibid','')}}</dd>
+        <dt>Repository sigel</dt>
+        <dd>{{','.join(account.data.get('repository',{}).get('sigel',[]))}}</dd>
+        <dt>Repository name</dt>
+        <dd>{{account.data.get('repository',{}).get('name','')}}</dd>
+        <dt>Repository URL</dt>
+        <dd>{{account.data.get('repository',{}).get('url','')}}</dd>
+        <dt>Repository software</dt>
+        <dd>{{account.data.get('repository',{}).get('software','')}}</dd>
+    </dl>
+</div>

@@ -1,4 +1,4 @@
-from service.models import DepositRecord, RepositoryDepositLog
+from service import models
 from octopus.lib import dates
 import os, csv, sys
 def request_deposit(notification_ids, repo_account_id):
