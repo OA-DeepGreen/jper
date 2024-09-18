@@ -7,9 +7,9 @@ setup(
     install_requires=[
         "beautifulsoup4==4.9.3",
         "openpyxl==3.0.9",
-        "werkzeug==1.0.1",
-        "Flask==1.1.2",
-        "Flask-Login==0.5.0",
+        "werkzeug==2.3.3",
+        "Flask==2.3.2",
+        "Flask-Login==0.6.2",
         "itsdangerous==2.0.1",
         "requests==2.25.1",
         "simplejson==3.17.2",
@@ -23,7 +23,7 @@ setup(
         "schedule==1.0.0",
         "jsonpath-rw-ext==1.2.2",
         "unicodecsv==0.14.1",
-        "Jinja2==3.0.3",
+        "Jinja2==3.1.2",
         "esprit",
         "octopus"
     ],
