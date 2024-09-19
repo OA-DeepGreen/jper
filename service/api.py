@@ -429,21 +429,21 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
 
         if upto is not None:
             nl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = nl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -515,21 +515,21 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": mpl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
 
         if upto is not None:
             mpl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -592,14 +592,14 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             ## "sort": [{"analysis_date":{"order":"desc"}}],
             ## 2018-03-07 TD : change of sort key to 'created_date', but still newest first
             # 2016-09-06 TD : change of sort order newest first
@@ -609,7 +609,7 @@ class JPER(object):
 
         if upto is not None:
             fnl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = fnl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
@@ -659,19 +659,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
 
         if upto is not None:
             nl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = nl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -733,19 +733,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": mpl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
 
         if upto is not None:
             mpl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -799,19 +799,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
 
         if upto is not None:
             fnl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = fnl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
