@@ -39,7 +39,7 @@
           <tbody>
           {%  for dt in deposit_dates %}
             <tr>
-              <td>{{ dt['key_as_string'][:10] }}</td>
+              <td><a href="/account/sword_logs/{{account.id}}?from={{ dt['key_as_string'].split('T')[0] }}">{{ dt['key_as_string'][:10] }}</a></td>
               <td>{{ dt['doc_count'] }}</td>
             </tr>
           {%  endfor %}
