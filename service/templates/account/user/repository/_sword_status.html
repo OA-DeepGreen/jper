@@ -4,6 +4,7 @@
     <div class="row dl-table">
       <dl>
         <dt>Sword status</dt>
+        <dd>{{ sword_status.status }}</dd>
         {% if sword_status.status == "problem" %}
           <dt>Number of retires</dt>
           <dd>{{ sword_status.retries }}</dd>
