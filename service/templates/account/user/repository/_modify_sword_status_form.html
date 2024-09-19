@@ -1,0 +1,11 @@
+{% set sword_action = "deactivate" %}
+{% set action_label = "Set sword connection to inactive" %}
+{% if sword_status.status == 'failing' %}
+  {% set sword_action = "activate" %}
+  {% set action_label = "Set sword connection to active" %}
+{% endif %}
+<div class="inline">
+  <form method="POST" action="{{request.path}}/sword_{{sword_action}}" id="sword_{{sword_action}}">
+    <input type="submit" class="accordion-button" value="{{ action_label }}">
+  </form>
+</div>

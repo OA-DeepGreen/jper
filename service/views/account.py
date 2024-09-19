@@ -555,17 +555,18 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = _validate_date(param='to')
+        to_date = _validate_date(request.args.get('to', None), param='to')
         to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = _validate_date(param='from')
+        from_date = _validate_date(request.args.get('from', None), param='from')
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = _validate_date(param='date')
+        from_date = _validate_date(request.args.get('date', None), param='date')
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
     # Default from and to dates
+
     if not from_date:
         from_date = deposit_dates[0].get('key_as_string').split('T')[0]
     from_date_display = str(dates.parse(from_date).strftime("%d/%m/%Y"))
