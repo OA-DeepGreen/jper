@@ -1,166 +1,163 @@
 {% extends "base.html" %}
 {% block content %}
-    <div class="row cms">
-        <div class="col span-9">
-            <h2><b>Repository account details</b></h2>
-            <div class="col span-4 cms">
-                <dl>
-                    <dt class="visuallyhidden">Email address</dt>
-                    <dd>{{account.email}}</dd>
-                </dl>
-            </div>
-            <div class="col span-8 cms">
-                <dl class="dl-horizontal dl-horizontal--account-details">
-                    {% if current_user.is_super %}
-                        <dt>Created</dt>
-                        <dd>{{account.created_date}}</dd>
-                    {% endif %}
-                    <dt>Account <abbr title="Identifier">ID</abbr></dt>
-                    <dd>{{account.id}}</dd>
-                    <dt><abbr title="Application Programming Interface">API</abbr> key</dt>
-                    <dd>{{account.api_key}}</dd>
-                </dl>
-            </div>
-        </div>
+<div class="row line-space">
+  <div class="col span-8">
+    <div class="move-up">
+      <h1>Sword logs</h1>
     </div>
-    <div class="row cms">
-        <div class="col span-9">
-            <h2><b>Sword logs</b></h2>
-            <h3>Last updated: {{last_updated}}</h3>
-
-            <h3>Status: {{status}}</h3>
-
-            <button type="button" class="collapsible">Sword log deposit dates</button>
-            <div class="collapsible_content">
-                <table class="tablesorter-green" id="logs_date">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Number of deposit runs</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {%  for dt in deposit_dates %}
-                        <tr>
-                            <td>{{ dt['key_as_string'][:10] }}</td>
-                            <td>{{ dt['doc_count'] }}</td>
-                        </tr>
-                    {%  endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <br/><br/>
-        </div>
+  </div>
+  <div class="col span-4">
+    <div class="right">
+      <h2>{{ email }}</h2>
+      <a href="/account/{{ repo_id }}">Account home</a>
     </div>
-    <div>
-        <h3>Select logs to be displayed</h3>
-        <form class="form" action="" method="GET">
-            <div style="display:inline">
-                <label> Show deposit logs for:</label>
-                <input type="text" name="from" value="{{ from_date }}">
-                to
-                {%  if to_date %}
-                    <input type="text" name="to" value="{{ to_date }}">
-                {%  else %}
-                    <input type="text" name="to" value="">
-                {%  endif %}
-                <button class="btn btn--3d btn--primary move-up" type="submit">Send</button>
-            </div>
-        </form>
-    <br/><br/>
+  </div>
+</div>
+
+<div class="row line-space">
+  <div class="col span-6">
+    <dl class="dl-details">
+      <dt>Status:</dt>
+      <dd>{{ status }}</dd>
+      <dt>Last updated:</dt>
+      <dd>{{ last_updated }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row cms">
+    <div class="col span-12">
+      <button type="button" class="collapsible">Sword log deposit dates</button>
+      <div class="collapsible_content">
+        <table class="tablesorter-green" id="logs_date">
+          <thead>
+          <tr>
+            <th>Date</th>
+            <th>Number of deposit runs</th>
+          </tr>
+          </thead>
+          <tbody>
+          {%  for dt in deposit_dates %}
+            <tr>
+              <td>{{ dt['key_as_string'][:10] }}</td>
+              <td>{{ dt['doc_count'] }}</td>
+            </tr>
+          {%  endfor %}
+          </tbody>
+        </table>
+      </div>
+      <br/><br/>
     </div>
+  </div>
+  <div>
+    <h3>Select logs to be displayed</h3>
+    <form class="form" action="" method="GET">
+      <div style="display:inline">
+        <label> Show deposit logs for:</label>
+        <input type="text" name="from" value="{{ from_date }}">
+        to
+        {%  if to_date %}
+          <input type="text" name="to" value="{{ to_date }}">
+        {%  else %}
+          <input type="text" name="to" value="">
+        {%  endif %}
+        <button class="btn btn--3d btn--primary move-up" type="submit">Send</button>
+      </div>
+    </form>
+  <br/><br/>
+  </div>
 
 
-    <div class="row cms">
-        <div class="col span-9">
-            <h3>Showing sword deposit logs for : {{ from_date }}
-                {%  if to_date %}
-                    to {{ to_date }}
-                {% endif %}
-            </h3>
-            {%  if logs_data|length == 0 %}
-                <h3>No logs for chosen date</h3>
-            {% else %}
-                <table class="tablesorter-green" id="logs_data">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Level</th>
-                        <th>Message</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {%  for each_log in logs_data %}
-                        {% for log in each_log.get('_source', {}).get('messages', []) %}
-                            {% set dr_id = None %}
-                            {% set tclass="" %}
-                            {%  if log.get('deposit_record', None) and log.get('deposit_record', None) != "None"  and deposit_record_logs.get(log['deposit_record'], None) %}
-                                {% set dr_id = log['deposit_record'] %}
-                                {% set tclass = "tablesorter-hasChildRow" %}
-                            {% endif %}
-                            <tr class="{{ tclass }}">
-                                <td>{{log['date']}}</td>
-                                <td>{{log['level']}}</td>
-                                <td>{{ log['message'] }}<br/>
-                                    {%  if log.get('notification', None) and log.get('notification', None) != "None" %}
-                                        <a target="_blank" href="{{ api_base_url }}notification/{{ log['notification'] }}">Link to notification</a> <br/>
-                                    {%  endif %}
-                                    {%  if dr_id %}
-                                        <a href="#" class="toggle">Show / hide deposit logs</a> <br/>
-                                    {%  endif %}
-                                </td>
-                            </tr>
-                            {% if dr_id %}
-                                {% for dr_log in deposit_record_logs[log['deposit_record']] %}
-                                    <tr class="tablesorter-childRow collapse" >
-                                        <td>{{ dr_log.get('date', '') }}</td>
-                                        <td>{{ dr_log.get('level', '') }}</td>
-                                        <td>{{ dr_log.get('message', '') }}</td>
-                                    </tr>
-                                {%  endfor %}
-                            {%  endif %}
-                        {% endfor %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {%  endif %}
-        </div>
+  <div class="row cms">
+    <div class="col span-12">
+      <h3>Showing sword deposit logs for : {{ from_date }}
+        {%  if to_date %}
+          to {{ to_date }}
+        {% endif %}
+      </h3>
+      {%  if logs_data|length == 0 %}
+        <h3>No logs for chosen date</h3>
+      {% else %}
+        <table class="tablesorter-green" id="logs_data">
+          <thead>
+          <tr>
+            <th>Date</th>
+            <th>Level</th>
+            <th>Message</th>
+          </tr>
+          </thead>
+          <tbody>
+          {%  for each_log in logs_data %}
+            {% for log in each_log.get('_source', {}).get('messages', []) %}
+              {% set dr_id = None %}
+              {% set tclass="" %}
+              {%  if log.get('deposit_record', None) and log.get('deposit_record', None) != "None"  and deposit_record_logs.get(log['deposit_record'], None) %}
+                {% set dr_id = log['deposit_record'] %}
+                {% set tclass = "tablesorter-hasChildRow" %}
+              {% endif %}
+              <tr class="{{ tclass }}">
+                <td>{{log['date']}}</td>
+                <td>{{log['level']}}</td>
+                <td>{{ log['message'] }}<br/>
+                  {%  if log.get('notification', None) and log.get('notification', None) != "None" %}
+                    <a target="_blank" href="{{ api_base_url }}notification/{{ log['notification'] }}">Link to notification</a> <br/>
+                  {%  endif %}
+                  {%  if dr_id %}
+                    <a href="#" class="toggle">Show / hide deposit logs</a> <br/>
+                  {%  endif %}
+                </td>
+              </tr>
+              {% if dr_id %}
+                {% for dr_log in deposit_record_logs[log['deposit_record']] %}
+                  <tr class="tablesorter-childRow collapse" >
+                    <td>{{ dr_log.get('date', '') }}</td>
+                    <td>{{ dr_log.get('level', '') }}</td>
+                    <td>{{ dr_log.get('message', '') }}</td>
+                  </tr>
+                {%  endfor %}
+              {%  endif %}
+            {% endfor %}
+          {% endfor %}
+          </tbody>
+        </table>
+      {%  endif %}
     </div>
-    <script>
-        var coll = document.getElementsByClassName("collapsible");
-        var i;
+  </div>
+  <script>
+    var coll = document.getElementsByClassName("collapsible");
+    var i;
 
-        for (i = 0; i < coll.length; i++) {
-            coll[i].addEventListener("click", function() {
-                this.classList.toggle("active");
-                var content = this.nextElementSibling;
-                if (content.style.display === "block") {
-                    content.style.display = "none";
-                } else {
-                    content.style.display = "block";
-                }
-            });
+    for (i = 0; i < coll.length; i++) {
+      coll[i].addEventListener("click", function() {
+        this.classList.toggle("active");
+        var content = this.nextElementSibling;
+        if (content.style.display === "block") {
+          content.style.display = "none";
+        } else {
+          content.style.display = "block";
         }
-        $("#logs_date").tablesorter()
+      });
+    }
+    $("#logs_date").tablesorter()
 
-        $("#logs_data").tablesorter({
-            widgets: ["zebra"],
-            widgetOptions : {
-                zebra : [ "normal-row", "alt-row" ]
-            }
-        });
-        $('.tablesorter-childRow td').hide();
-        $('.tablesorter').delegate('.toggle', 'click' ,function() {
+    $("#logs_data").tablesorter({
+      widgets: ["zebra"],
+      widgetOptions : {
+        zebra : [ "normal-row", "alt-row" ]
+      }
+    });
+    $('.tablesorter-childRow td').hide();
+    $('.tablesorter').delegate('.toggle', 'click' ,function() {
 
-            // use "nextUntil" to toggle multiple child rows
-            // toggle table cells instead of the row
-            // $(this).closest('tr').nextUntil('tr:not(.tablesorter-childRow)').find('td').toggle();
-            // in v2.5.12, the parent row now has the class tablesorter-hasChildRow
-            // so you can use this code as well
-            $(this).closest('tr').nextUntil('tr.tablesorter-hasChildRow').find('td').toggle();
+      // use "nextUntil" to toggle multiple child rows
+      // toggle table cells instead of the row
+      // $(this).closest('tr').nextUntil('tr:not(.tablesorter-childRow)').find('td').toggle();
+      // in v2.5.12, the parent row now has the class tablesorter-hasChildRow
+      // so you can use this code as well
+      $(this).closest('tr').nextUntil('tr.tablesorter-hasChildRow').find('td').toggle();
 
-            return false;
-        });
+      return false;
+    });
 
-    </script>
+  </script>
 {% endblock %}
