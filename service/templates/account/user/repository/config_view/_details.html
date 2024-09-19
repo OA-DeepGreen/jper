@@ -1,12 +1,17 @@
 <div class="row line-space">
-    <div class="col span-12">
-        <div class="right">
+    <div class="col span-6">
             <dl class="dl-details">
+                <dt>Date created:</dt>
+                <dd>{{ repo.created_date }}</dd>
                 <dt>Last updated:</dt>
                 <dd>{{ repo.last_updated }}</dd>
-                <dt>Created date:</dt>
-                <dd>{{ repo.created_date }}</dd>
             </dl>
+    </div>
+    <div class="col span-6">
+        <div class="right">
+            <form method="GET" action="/account/{{ repo_id }}/config">
+                <button class="accordion-button" id="download_match" type="submit">Download</button>
+            </form>
         </div>
     </div>
 </div>
