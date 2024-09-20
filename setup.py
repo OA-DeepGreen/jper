@@ -9,6 +9,7 @@ setup(
         "beautifulsoup4~=4.12",
         "openpyxl~=3.1",
         "werkzeug~=3.0",
+        "chardet~=5.2",
         "Flask~=3.0",
         "Flask-Login~=0.6",
         "itsdangerous~=2.2",
