@@ -1206,6 +1206,8 @@ class FilesAndJATS(PackageHandler):
         md.add_identifier(self.jats.doi, "doi")
 
         for author in self.jats.authors:
+            print('JATS Author')
+            print(author)
             name = author.get("given-names", "") + " " + author.get("surname", "")
             if name.strip() == "":
                 continue
@@ -1224,12 +1226,14 @@ class FilesAndJATS(PackageHandler):
                 ids.append({"type": "orcid", "id": orcid})
                 obj["identifier"] = ids
             ringgolds = author.get("ringgold", [])
+            print(ringgolds)
             for ringgold in ringgolds:
                 if ringgold is not None and ringgold != "":
                     ids = obj.get("identifier", [])
                     ids.append({"type": "ringgold", "id": ringgold})
                     obj["identifier"] = ids
             ror = author.get("ror", "")
+            print(ror)
             if ror is not None and ror != "":
                 ids = obj.get("identifier", [])
                 ids.append({"type": "ror", "id": ror})

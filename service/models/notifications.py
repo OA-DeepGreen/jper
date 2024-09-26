@@ -1654,6 +1654,8 @@ class RoutingMetadata(dataobj.DataObj):
         return False
 
     def merge(self, other):
+        print('In Merge')
+        print(other.get_author_ids())
         """
         Merge the supplied other RoutingMetadata object with this one.
 
@@ -1669,6 +1671,7 @@ class RoutingMetadata(dataobj.DataObj):
         for a in other.affiliations:
             self.add_affiliation(a)
         for aid in other.get_author_ids():
+            print(aid.get("id"), aid.get("type"))
             self.add_author_id(aid.get("id"), aid.get("type"))
         for p in other.postcodes:
             self.add_postcode(p)
