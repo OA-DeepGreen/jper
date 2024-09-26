@@ -1220,17 +1220,20 @@ class FilesAndJATS(PackageHandler):
             if affs is not None and affs != "":
                 obj["affiliation"] = affs
             if orcid is not None and orcid != "":
-                obj["identifier"] = []
-                obj["identifier"].append({"type" : "orcid", "id" : orcid})
+                ids = obj.get("identifier", [])
+                ids.append({"type": "orcid", "id": orcid})
+                obj["identifier"] = ids
             ringgolds = author.get("ringgold", [])
             for ringgold in ringgolds:
                 if ringgold is not None and ringgold != "":
-                    obj["identifier"] = []
-                    obj["identifier"].append({"type": "ringgold", "id": ringgold})
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ringgold", "id": ringgold})
+                    obj["identifier"] = ids
             ror = author.get("ror", "")
             if ror is not None and ror != "":
-                obj["identifier"] = []
-                obj["identifier"].append({"type": "ror", "id": ror})
+                ids = obj.get("identifier", [])
+                ids.append({"type": "ror", "id": ror})
+                obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
@@ -1283,8 +1286,20 @@ class FilesAndJATS(PackageHandler):
             if aff is not None:
                 obj["affiliation"] = aff
             if orcid is not None and orcid != "":
-                obj["identifier"] = []
-                obj["identifier"].append({"type" : "orcid", "id" : orcid})
+                ids = obj.get("identifier", [])
+                ids.append({"type": "orcid", "id": orcid})
+                obj["identifier"] = ids
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                if ringgold is not None and ringgold != "":
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ringgold", "id": ringgold})
+                    obj["identifier"] = ids
+            ror = author.get("ror", "")
+            if ror is not None and ror != "":
+                ids = obj.get("identifier", [])
+                ids.append({"type": "ror", "id": ror})
+                obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
@@ -1319,6 +1334,7 @@ class FilesAndJATS(PackageHandler):
 
         # individual authors, emails, affiliations
         for author in self.jats.contribs:
+            print(author)
             # name
             name = author.get("given-names", "") + " " + author.get("surname", "")
             if name.strip() != "":
@@ -1353,10 +1369,12 @@ class FilesAndJATS(PackageHandler):
 
             # Add Ringgolds and RoRs as identifiers
             identifiers = author.get("identifier", [])
+            print("JATS match data")
+            print(identifiers)
             for i in identifiers:
                 if i.get('id', None) and i.get('type', None):
                     match.add_author_id(i['id'], i["type"])
-
+            print('-'*10)
         # other keywords
         for k in self.jats.keywords:
             match.add_keyword(k)
@@ -2083,8 +2101,20 @@ class FilesAndRSC(PackageHandler):
             if affs is not None and affs != "":
                 obj["affiliation"] = affs
             if orcid is not None and orcid != "":
-                obj["identifier"] = []
-                obj["identifier"].append({"type" : "orcid", "id" : orcid})
+                ids = obj.get("identifier", [])
+                ids.append({"type": "orcid", "id": orcid})
+                obj["identifier"] = ids
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                if ringgold is not None and ringgold != "":
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ringgold", "id": ringgold})
+                    obj["identifier"] = ids
+            ror = author.get("ror", "")
+            if ror is not None and ror != "":
+                ids = obj.get("identifier", [])
+                ids.append({"type": "ror", "id": ror})
+                obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
