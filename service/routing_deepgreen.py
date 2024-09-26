@@ -255,6 +255,8 @@ def _match(notification_data, repository_config, provenance, acc_id):
     if not matched:
         return False, provenance
 
+    print(f"Found match in one of #{match_algorithms.keys()}")
+
     # Before matching keyword and content type, check if it matches the exclusions
     exclusion_matched = False
     for repo_property, sub in match_exclusion_algorithms.items():

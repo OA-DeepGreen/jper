@@ -755,6 +755,7 @@ class FilesAndJATS(PackageHandler):
         return self._merge_metadata(emd, jmd)
 
     def match_data(self):
+        print("in match data")
         """
         Get the match data as extracted from the package
 
@@ -1326,6 +1327,7 @@ class FilesAndJATS(PackageHandler):
         return md
 
     def _jats_match_data(self, match):
+        print("In jats match data")
         """
         Extract match data from the JATS XML
 
@@ -1371,10 +1373,18 @@ class FilesAndJATS(PackageHandler):
                 # for code in codes:
                 #     match.add_postcode(code)
 
-            # Add Ringgolds and RoRs as identifiers
+            # Add RoR
+            ror = author.get("ror", None)
+            if ror:
+                match.add_author_id(ror, "ror")
+
+            # Add Ringgold
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                match.add_author_id(ringgold, "ringgold")
+
+            # Add identifiers
             identifiers = author.get("identifier", [])
-            print("JATS match data")
-            print(identifiers)
             for i in identifiers:
                 if i.get('id', None) and i.get('type', None):
                     match.add_author_id(i['id'], i["type"])
@@ -1429,11 +1439,21 @@ class FilesAndJATS(PackageHandler):
                 # for code in codes:
                 #     match.add_postcode(code)
 
-            # Add Ringgolds and RoRs as identifiers
+            # Add identifier
             identifiers = author.get("identifier", [])
             for i in identifiers:
                 if i.get('id', None) and i.get('type', None):
                     match.add_author_id(i['id'], i["type"])
+
+            # Add RoR
+            ror = author.get("ror", None)
+            if ror:
+                match.add_author_id(ror, "ror")
+
+            # Add Ringgold
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                match.add_author_id(ringgold, "ringgold")
 
         # grant ids
         gs = self.epmc.grants
@@ -2175,11 +2195,21 @@ class FilesAndRSC(PackageHandler):
                 # for code in codes:
                 #     match.add_postcode(code)
 
-            # Add Ringgolds and RoRs as identifiers
+            # Add identifiers
             identifiers = author.get("identifier", [])
             for i in identifiers:
                 if i.get('id', None) and i.get('type', None):
                     match.add_author_id(i['id'], i["type"])
+
+            # Add RoR
+            ror = author.get("ror", None)
+            if ror:
+                match.add_author_id(ror, "ror")
+
+            # Add Ringgold
+            ringgolds = author.get("ringgold", [])
+            for ringgold in ringgolds:
+                match.add_author_id(ringgold, "ringgold")
 
         # other keywords
         for k in self.rsc_xml.keywords:
