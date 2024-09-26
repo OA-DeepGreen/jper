@@ -1351,6 +1351,12 @@ class FilesAndJATS(PackageHandler):
                 # for code in codes:
                 #     match.add_postcode(code)
 
+            # Add Ringgolds and RoRs as identifiers
+            identifiers = a.get("identifier", [])
+            for i in identifiers:
+                if i.get('id', None) and i.get('type', None):
+                    match.add_author_id(i['id'], i["type"])
+
         # other keywords
         for k in self.jats.keywords:
             match.add_keyword(k)
@@ -1400,6 +1406,12 @@ class FilesAndJATS(PackageHandler):
                 # codes = postcode.extract_all(aff)
                 # for code in codes:
                 #     match.add_postcode(code)
+
+            # Add Ringgolds and RoRs as identifiers
+            identifiers = a.get("identifier", [])
+            for i in identifiers:
+                if i.get('id', None) and i.get('type', None):
+                    match.add_author_id(i['id'], i["type"])
 
         # grant ids
         gs = self.epmc.grants
@@ -2128,6 +2140,12 @@ class FilesAndRSC(PackageHandler):
                 # codes = postcode.extract_all(a)
                 # for code in codes:
                 #     match.add_postcode(code)
+
+            # Add Ringgolds and RoRs as identifiers
+            identifiers = a.get("identifier", [])
+            for i in identifiers:
+                if i.get('id', None) and i.get('type', None):
+                    match.add_author_id(i['id'], i["type"])
 
         # other keywords
         for k in self.rsc_xml.keywords:
