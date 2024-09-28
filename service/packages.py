@@ -755,7 +755,6 @@ class FilesAndJATS(PackageHandler):
         return self._merge_metadata(emd, jmd)
 
     def match_data(self):
-        print("in match data")
         """
         Get the match data as extracted from the package
 
@@ -1207,8 +1206,6 @@ class FilesAndJATS(PackageHandler):
         md.add_identifier(self.jats.doi, "doi")
 
         for author in self.jats.authors:
-            print('JATS Author')
-            print(author)
             name = author.get("given-names", "") + " " + author.get("surname", "")
             if name.strip() == "":
                 continue
@@ -1227,14 +1224,12 @@ class FilesAndJATS(PackageHandler):
                 ids.append({"type": "orcid", "id": orcid})
                 obj["identifier"] = ids
             ringgolds = author.get("ringgold", [])
-            print(ringgolds)
             for ringgold in ringgolds:
                 if ringgold is not None and ringgold != "":
                     ids = obj.get("identifier", [])
                     ids.append({"type": "ringgold", "id": ringgold})
                     obj["identifier"] = ids
             ror = author.get("ror", "")
-            print(ror)
             if ror is not None and ror != "":
                 ids = obj.get("identifier", [])
                 ids.append({"type": "ror", "id": ror})
@@ -1327,7 +1322,6 @@ class FilesAndJATS(PackageHandler):
         return md
 
     def _jats_match_data(self, match):
-        print("In jats match data")
         """
         Extract match data from the JATS XML
 
@@ -1340,7 +1334,6 @@ class FilesAndJATS(PackageHandler):
 
         # individual authors, emails, affiliations
         for author in self.jats.contribs:
-            print(author)
             # name
             name = author.get("given-names", "") + " " + author.get("surname", "")
             if name.strip() != "":
@@ -1388,7 +1381,6 @@ class FilesAndJATS(PackageHandler):
             for i in identifiers:
                 if i.get('id', None) and i.get('type', None):
                     match.add_author_id(i['id'], i["type"])
-            print('-'*10)
         # other keywords
         for k in self.jats.keywords:
             match.add_keyword(k)
@@ -2293,3 +2285,4 @@ class FilesAndRSC(PackageHandler):
         """
         # is valid if rsc_xml is not none
         return self.rsc_xml is not None 
+

@@ -255,20 +255,14 @@ def _match(notification_data, repository_config, provenance, acc_id):
     if not matched:
         return False, provenance
 
-    print(f"Found match in one of #{match_algorithms.keys()}")
-
     # Before matching keyword and content type, check if it matches the exclusions
     exclusion_matched = False
     for repo_property, sub in match_exclusion_algorithms.items():
-        print(f"Starting exclusion match for #{repo_property}, #{sub}")
         for match_property, fn in sub.items():
             for rprop in getattr(rc, repo_property):
                 for mprop in getattr(md, match_property):
-                    print(f"#{fn}, #{rprop} and #{mprop}")
                     m = fn(rprop, mprop)
-                    print(f"Found #{m} for #{rprop} and #{mprop}")
                     if m is not False:  # it will be a string then
-                        print("Exclusion matched")
                         exclusion_matched = True
 
                         # convert the values that have matched the exclusion to string values suitable for provenance
@@ -727,7 +721,6 @@ def _author_match(author_obj_1, author_obj_2):
     :param author_obj_2: second author object
     :return: True if match, False if not
     """
-    print(author_obj_1, author_obj_2)
     t1 = author_obj_1.get("type", "")
     i1 = _normalise(author_obj_1.get("id", ""))
 
@@ -744,8 +737,6 @@ def _author_match(author_obj_1, author_obj_2):
 
 
 def _author_string_match(author_string, author_obj):
-    print("_author_string_match")
-    print(author_string, author_obj)
     """
     Match an arbitrary string against the id in the author object
 
