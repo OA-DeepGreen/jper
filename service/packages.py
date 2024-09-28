@@ -2293,3 +2293,4 @@ class FilesAndRSC(PackageHandler):
         """
         # is valid if rsc_xml is not none
         return self.rsc_xml is not None 
+

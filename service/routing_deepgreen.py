@@ -255,7 +255,7 @@ def _match(notification_data, repository_config, provenance, acc_id):
     if not matched:
         return False, provenance
 
-    print(f"Found match in one of #{match_algorithms.keys()}")
+    print(f"Found match in one of #{match_algorithms.keys()}. Now looking for exclusions."
 
     # Before matching keyword and content type, check if it matches the exclusions
     exclusion_matched = False
@@ -803,11 +803,14 @@ def _exact_substring(s1, s2):
     # keep a copy of these for the provenance reporting
     os1 = s1
     os2 = s2
+    print(f"s1: {os1}")
+    print(f"s2: {os2}")
 
     # normalise the strings
     s1 = _normalise(s1)
     s2 = _normalise(s2)
-
+    print(f"s1: {s1}")
+    print(f"s2: {s2}")
     # if s1 in s2:
     #     return u"'{a}' appears in '{b}'".format(a=os1, b=os2)
     #
@@ -819,6 +822,8 @@ def _exact_substring(s1, s2):
     #                 before, without escaping, s1 containing a single ')' or '('
     #                 caused an exception (and thus a stalled(!!) failure). Shite...
     #
+    print("Search string 1:", r'\b' + re.escape(s1) + r'\b')
+    print("Search string 2:", s2)
     if re.search(r'\b' + re.escape(s1) + r'\b', s2, re.UNICODE) is not None:
         app.logger.debug("stl: Match exact_substring s1:{x} s2:{y}".format(x=os1, y=os2))
         app.logger.debug("stl: '{a}' appears in '{b}'".format(a=s1, b=s2))
