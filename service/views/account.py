@@ -421,7 +421,7 @@ def download(account_id):
     mem.seek(0)
     strm.close()
     fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
-    return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+    return send_file(mem, as_attachment=True, download_name=fname, mimetype='text/csv')
 
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
@@ -849,7 +849,7 @@ def config(username):
         mem.seek(0)
         strm.close()
         fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=username, x=dates.now())
-        return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+        return send_file(mem, as_attachment=True, download_name=fname, mimetype='text/csv')
 
     elif request.method == "POST":
         try:
@@ -1162,9 +1162,10 @@ def register():
         abort(401)
 
     form = AdduserForm(request.form)
-    vals = request.json if request.json else request.values.to_dict()
+    vals = None
 
     if request.method == 'POST' and form.validate():
+        vals = request.values
         role = vals.get('radio', None)
         if not vals.get('id', None):
             vals['id'] = str(uuid.uuid4())

@@ -2,6 +2,8 @@
 *.egg-info/*
 .*.swp
 src*
+!API/src
+!OAUtils/src
 .Python
 build/*
 dist/*
