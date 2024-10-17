@@ -1229,11 +1229,12 @@ class FilesAndJATS(PackageHandler):
                     ids = obj.get("identifier", [])
                     ids.append({"type": "ringgold", "id": ringgold})
                     obj["identifier"] = ids
-            ror = author.get("ror", "")
-            if ror is not None and ror != "":
-                ids = obj.get("identifier", [])
-                ids.append({"type": "ror", "id": ror})
-                obj["identifier"] = ids
+            rors = author.get("ror", [])
+            for ror in rors:
+                if ror is not None and ror != "":
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ror", "id": ror})
+                    obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
@@ -1295,11 +1296,12 @@ class FilesAndJATS(PackageHandler):
                     ids = obj.get("identifier", [])
                     ids.append({"type": "ringgold", "id": ringgold})
                     obj["identifier"] = ids
-            ror = author.get("ror", "")
-            if ror is not None and ror != "":
-                ids = obj.get("identifier", [])
-                ids.append({"type": "ror", "id": ror})
-                obj["identifier"] = ids
+            rors = author.get("ror", [])
+            for ror in rors:
+                if ror is not None and ror != "":
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ror", "id": ror})
+                    obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
@@ -1367,8 +1369,8 @@ class FilesAndJATS(PackageHandler):
                 #     match.add_postcode(code)
 
             # Add RoR
-            ror = author.get("ror", None)
-            if ror:
+            rors = author.get("ror", [])
+            for ror in rors:
                 match.add_author_id(ror, "ror")
 
             # Add Ringgold
@@ -1438,8 +1440,8 @@ class FilesAndJATS(PackageHandler):
                     match.add_author_id(i['id'], i["type"])
 
             # Add RoR
-            ror = author.get("ror", None)
-            if ror:
+            rors = author.get("ror", [])
+            for ror in rors:
                 match.add_author_id(ror, "ror")
 
             # Add Ringgold
@@ -2126,11 +2128,12 @@ class FilesAndRSC(PackageHandler):
                     ids = obj.get("identifier", [])
                     ids.append({"type": "ringgold", "id": ringgold})
                     obj["identifier"] = ids
-            ror = author.get("ror", "")
-            if ror is not None and ror != "":
-                ids = obj.get("identifier", [])
-                ids.append({"type": "ror", "id": ror})
-                obj["identifier"] = ids
+            rors = author.get("ror", [])
+            for ror in rors:
+                if ror is not None and ror != "":
+                    ids = obj.get("identifier", [])
+                    ids.append({"type": "ror", "id": ror})
+                    obj["identifier"] = ids
             # 2018-10-17 TD
             md.add_author(obj)
 
@@ -2194,8 +2197,8 @@ class FilesAndRSC(PackageHandler):
                     match.add_author_id(i['id'], i["type"])
 
             # Add RoR
-            ror = author.get("ror", None)
-            if ror:
+            rors = author.get("ror", [])
+            for ror in rors:
                 match.add_author_id(ror, "ror")
 
             # Add Ringgold
