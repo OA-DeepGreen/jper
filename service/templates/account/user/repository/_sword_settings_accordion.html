@@ -1,0 +1,11 @@
+<!-- Sword settings accordion -->
+<div class="accordion-row">Sword settings
+  <button class="accordion-section" data-panel="section-view-sword">View</button>
+  <button class="accordion-section" data-panel="section-update-sword">Update</button>
+  <div class="panel section-view-sword">
+   {% include 'account/user/repository/_sword_settings.html' %}
+  </div>
+  <div class="panel section-update-sword">
+    {% include 'account/user/repository/_sword_settings_form.html' %}
+  </div>
+</div>

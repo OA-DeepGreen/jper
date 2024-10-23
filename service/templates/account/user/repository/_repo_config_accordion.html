@@ -1,0 +1,14 @@
+<!-- Repo config accordion -->
+<div class="accordion-row">Repository configuration for matching
+  <button class="accordion-button">
+    <a target="_blank" href="/account/configview{% if current_user.has_role('admin') %}/{{account.id}}?api_key={{current_user.data['api_key']}}{% else %}?api_key={{account.data['api_key']}}{% endif %}">View</a>
+    <i class="fa fa-external-link" aria-hidden="true"></i>
+  </button>
+  <form class="inline" method="GET" action="{{request.path}}/config">
+    <button class="accordion-button" id="download_match" type="submit">Download</button>
+  </form>
+  <button class="accordion-section" data-panel="section-update-config">Update</button>
+  <div class="panel section-update-config">
+   {% include 'account/user/repository/_matching_details_form.html' %}
+  </div>
+</div>
