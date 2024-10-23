@@ -1,0 +1,18 @@
+<!-- Sword status accordion -->
+<div class="accordion-row">Sword status
+  {% if sword_status.status == 'problem' %}
+    {% set cls = "warning" %}
+  {% elif sword_status.status == 'failing' %}
+    {% set cls = "danger" %}
+  {% else %}
+    {% set cls = "success" %}
+  {% endif %}
+  <butoon class="{{cls}} accordion-section" data-panel="section-sword-status">{{ sword_status.status }}</butoon>
+  <button class="accordion-button">
+    <a target="_blank"  href="/account/sword_logs/{{account.id}}">View logs</a>
+  </button>
+  {% include 'account/user/repository/_modify_sword_status_form.html' %}
+  <div class="panel section-sword-status">
+    {% include 'account/user/repository/_sword_status.html' %}
+  </div>
+</div>
