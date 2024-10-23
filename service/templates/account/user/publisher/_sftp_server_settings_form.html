@@ -1,0 +1,33 @@
+{% if current_user.is_super %}
+    <div style="margin-bottom:10px;">
+     <button onclick="show_form('manage_sftp_details')">Show / hide form to manage connection details</button>
+    </div>
+    <div id="manage_sftp_details" style="display:none;">
+        <h3>Manage SFTP server settings</h3>
+        <p>If any of the values in the form are left blank, it will revert to the default value</p>
+        <div>
+            <form method="post" action="{{request.path}}/sftp_server" class="form">
+                <ul class="form-fields">
+                    <li class="form-fields__item--text">
+                        <span class="form-fields__label-text">SFTP username</span>
+                        <input type="text" class="input--large" name="sftp_server_username"
+                            value="{{account.sftp_server_username}}" />
+                    </li>
+                    <li class="form-fields__item--text">
+                        <span class="form-fields__label-text">SFTP server URL</span>
+                        <input type="text" class="input--large" name="sftp_server_url"
+                            value="{{account.sftp_server_url}}" />
+                    </li>
+                    <li class="form-fields__item--text">
+                        <span class="form-fields__label-text">SFTP server port</span>
+                        <input type="text" class="input--large" name="sftp_server_port"
+                            value="{{account.sftp_server_port}}" />
+                    </li>
+                </ul>
+                <button class="btn btn--3d btnright" id="update" type="submit">Update
+                        settings</button>
+            </form>
+        </div>
+
+    </div>
+{% endif %}
