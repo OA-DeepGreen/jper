@@ -1,0 +1,23 @@
+{% set ssh_text = " """ %}
+<div style="margin:10px 0px;">
+    <button onclick="show_form('add_ssh_key')">Show / hide form to add SSH key</button>
+</div>
+<div id="add_ssh_key" style="display: none;">
+    <h3>Add SSH key</h3>
+    <div class="row">
+        <form method="POST" action="{{request.path}}/add_ssh_key" class="form">
+            <ul class="form-fields">
+                <li class="form-fields__item--text">
+                    <span class="form-fields__label-text">Title</span>
+                    <input type="text" name="title" class="form-control" value=""/>
+                </li>
+                <li class="form-fields__item--text">
+                    <span class="form-fields__label-text">SSH Key</span>
+                    <textarea name="ssh_key" class="form-control"
+                              placeholder="{{ ssh_help_text }}" rows="15" value=""></textarea>
+                </li>
+                <button class="btn btn--3d" id="Add SSH key" type="submit">Add SSH key</button>
+            </ul>
+        </form>
+    </div>
+</div>
