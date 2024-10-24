@@ -384,8 +384,8 @@ def download(account_id):
 
     since = request.args.get('since')
     if since == '' or since is None:
-        # since = '01/06/2019'
-        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -435,8 +435,8 @@ def details(repo_id):
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
-        # since = '01/06/2019'
-        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -485,8 +485,8 @@ def matching(repo_id):
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
-        # since = '01/06/2019'
-        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -518,8 +518,8 @@ def failing(provider_id):
         abort(404)
     since = request.args.get('since')
     if since == '' or since is None:
-        # since = '01/06/2019'
-        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
