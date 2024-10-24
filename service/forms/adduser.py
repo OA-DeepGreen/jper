@@ -1,47 +1,10 @@
-'''
-Created on 18 Nov 2015
-
-Form for webservice
-
-@author: Mateusz.Kasiuba
-'''
-from engine.query.QueryInvoker import H_QueryInvoker
-from utils.config import MULTI_PAGE
-from wtforms import Form, TextField, PasswordField, validators, RadioField
+from wtforms import Form, PasswordField, validators, RadioField
+from wtforms import StringField as TextField
 from werkzeug.routing import ValidationError
 import re 
 import time
 from datetime import datetime
-from service import models
-
-
-def valid_url(form, url):
-    try:
-        if(re.findall('\pageSize=\d+', form.url.data)):
-            raise ValidationError(' Specify pageSize is not allowed')
-        if(False == H_QueryInvoker().is_valid(MULTI_PAGE, form.url.data)):   
-            raise ValidationError('0 results from %s for this engine' % MULTI_PAGE)
-    except Exception as e:
-        raise ValidationError('Url is wrong check it again: ' + str(e))
-
-    return True
-
-def valid_date(form, date):
-    """
-    Private method - validate date
-    
-    Args:
-        value - date
-    
-    Returns:
-        Boolean
-    """
-    try:
-        time.mktime(datetime.strptime(form.end_date.data, "%Y-%m-%d").timetuple())
-    except Exception as e:
-        raise ValidationError('Date is wrong: ' + str(e))
-
-    return True
+from service.models import Account
 
 def is_email(form, email):
     """
@@ -60,8 +23,7 @@ def valid_verify_email(form, email):
     try:
         if(form.email.data!=form.email_verify.data):
             raise ValidationError('Email address is not the same')
-        if models.Account.pull_by_email(form.email.data) is not None:
-            print('Account already exist')
+        if Account.pull_by_email(form.email.data) is not None:
             raise ValidationError('An account already exists for that email address')
     except Exception as e:
         raise ValidationError('Email is wrong check it again: ' + str(e))
@@ -100,11 +62,12 @@ def validate_password(form, email):
 Create a form for WEBSERVICE
 '''
 class AdduserForm(Form):
+
     id = TextField('Id', render_kw={"placeholder": "Optional. If left blank, a UUID will be generated."})
-    password_verify = PasswordField('Password verify', [validators.Length(min=8, max=2035), validators.Required(), validate_password])
-    password = PasswordField('Password', [validators.Length(min=8, max=2035), validators.Required()])
-    email = TextField('Email address', [validators.Length(min=2, max=2035), validators.Required(), is_email])
-    email_verify = TextField('Confirm Email address', [validators.Length(min=2, max=2035), validators.Required(), valid_verify_email])
+    password_verify = PasswordField('Password verify', [validators.Length(min=8, max=2035), validators.DataRequired(), validate_password])
+    password = PasswordField('Password', [validators.Length(min=8, max=2035), validators.DataRequired()])
+    email = TextField('Email address', [validators.Length(min=2, max=2035), validators.DataRequired(), is_email])
+    email_verify = TextField('Confirm Email address', [validators.Length(min=2, max=2035), validators.DataRequired(), valid_verify_email])
     radio = RadioField('Account type', choices=[('publisher','Publisher account'),('repository','Repository account'),('admin','Admin')])
     repository_sigel = TextField('Repository sigel (comma separated)')
     repository_bibid = TextField('Repository bibid (EZB)')

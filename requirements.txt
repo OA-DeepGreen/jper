@@ -8,9 +8,5 @@ git+https://github.com/OA-DeepGreen/esprit.git@590fdfb92957bf4a11dbde32fd9d7e813
 # install octopus (initialise the submodule first)
 -e magnificent-octopus
 
-# install the sub-projects
--e API/src
--e OAUtils/src
-
 # now run the normal setup.py and get all the normal PyPI dependencies from there
 -e .
