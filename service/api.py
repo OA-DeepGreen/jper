@@ -515,21 +515,21 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "analysis_date": {
+                            "last_updated": {
                                 "gte": mpl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"analysis_date":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
 
         if upto is not None:
             mpl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = mpl.upto
+            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -541,7 +541,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' list matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('List all matches for query ' + json.dumps(qr))
-
         res = models.MatchProvenance.query(q=qr)
         app.logger.debug('List matches query resulted ' + json.dumps(res))
         mpl.matches = [models.MatchProvenance(i['_source']).data for i in res.get('hits',{}).get('hits',[])]
@@ -733,19 +732,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "analysis_date": {
+                            "last_updated": {
                                 "gte": mpl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"analysis_date":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
         }
 
         if upto is not None:
             mpl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = mpl.upto
+            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -757,7 +756,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' bulk matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('Bulk all matches for query ' + json.dumps(qr))
-
         mpl.matches = []
         for mp in models.MatchProvenance.iterate(q=qr):
             mpl.matches.append(mp.data)
