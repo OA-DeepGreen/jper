@@ -20,7 +20,8 @@ from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
 from io import StringIO, TextIOWrapper, BytesIO
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, relativedelta
+
 
 blueprint = Blueprint('account', __name__)
 
@@ -90,7 +91,6 @@ def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-
     since = _validate_date(since, param='since')
     upto = _validate_date(upto, param='upto')
     page = _validate_page()
@@ -118,6 +118,7 @@ def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
+
     since = _validate_date(since, param='since')
     upto = _validate_date(upto, param='upto')
     page = _validate_page()
@@ -231,9 +232,11 @@ def _sword_logs(repo_id, from_date, to_date):
 def _validate_date(dt, param='since'):
     if dt is None or dt == "":
         return _bad_request("Missing required parameter {param}".format(param=param))
-
+    out_format = None
+    if param == 'upto':
+        out_format = "%Y-%m-%dT23:59:59Z"
     try:
-        dt = dates.reformat(dt)
+        dt = dates.reformat(dt, out_format=out_format)
     except ValueError:
         return _bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
 
@@ -381,7 +384,8 @@ def download(account_id):
 
     since = request.args.get('since')
     if since == '' or since is None:
-        since = '01/06/2019'
+        # since = '01/06/2019'
+        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -431,7 +435,8 @@ def details(repo_id):
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
-        since = '01/06/2019'
+        # since = '01/06/2019'
+        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -480,11 +485,11 @@ def matching(repo_id):
     provider = acc.has_role('publisher')
     since = request.args.get('since')
     if since == '' or since is None:
-        since = '01/06/2019'
+        # since = '01/06/2019'
+        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
-
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     notification_prefix = "matches"
     xtable = mtable
@@ -513,7 +518,8 @@ def failing(provider_id):
         abort(404)
     since = request.args.get('since')
     if since == '' or since is None:
-        since = '01/06/2019'
+        # since = '01/06/2019'
+        since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
@@ -555,15 +561,15 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = _validate_date(request.args.get('to', None), param='to')
+        to_date = _validate_date(request.args.get('to', None), param='upto')
         to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = _validate_date(request.args.get('from', None), param='from')
+        from_date = _validate_date(request.args.get('from', None), param='since')
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = _validate_date(request.args.get('date', None), param='date')
+        from_date = _validate_date(request.args.get('date', None), param='since')
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
     # Default from and to dates
 
