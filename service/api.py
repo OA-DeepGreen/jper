@@ -732,19 +732,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "analysis_date": {
+                            "last_updated": {
                                 "gte": mpl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"analysis_date":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
         }
 
         if upto is not None:
             mpl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = mpl.upto
+            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
