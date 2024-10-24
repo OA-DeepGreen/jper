@@ -1,9 +1,6 @@
 <div class="box box--padding-large box--brd-mgreyblue">
-    <h3>View routing history</h3>
+    <h3>View and download routing history</h3>
     <div class="row">
         <a href="/account/details/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}">View routed notifications for this institution</a>
-        <form method="POST" action="/account/download/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}" class="form">
-            <button class="btn btn--3d btnright" id="download_routed_log" type="submit">Download routed log</button>
-        </form>
     </div>
 </div>
