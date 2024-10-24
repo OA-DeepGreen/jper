@@ -46,10 +46,11 @@ def route(unrouted):
     except packages.PackageException as e:
         app.logger.debug("Routing - Notification:{y} failed with error '{x}'".format(y=unrouted.id, x=str(e)))
         raise RoutingException(str(e))
-
-    # extract the match data from the notification and combine it with the match data from the package
+    # get a RoutingMetadata object which contains all the extracted metadata from this notification
     match_data = unrouted.match_data()
     if pmd is not None:
+        # Add the package routing metadata with the routing metadata from the notification
+        # This copies just the author affiliation, author name and subject (as keyword)
         match_data.merge(pmd)
 
     app.logger.debug("Routing - Notification:{y} match_data:{x}".format(y=unrouted.id, x=match_data))
@@ -143,28 +144,38 @@ def match(notification_data, repository_config, provenance):
     rc = repository_config
 
     match_algorithms = {
-        "domains" : {
+        "domains": {
+            "urls": domain_url,
+            "emails": domain_email
+        },
+        "name_variants": {
+            "affiliations": exact_substring
+        },
+        "author_emails": {
+            "emails": exact
+        },
+        "author_ids": {
+            "author_ids": author_match
+        },
+        "grants": {
+            "grants": exact
+        },
+        "strings": {
+            "urls": domain_url,
+            "emails": exact,
+            "affiliations": exact_substring,
+            "author_ids": author_string_match,
+            "grants": exact
+        }
+    }
+
+    match_exclusion_algorithms = {
+        "excluded_domains" : {
             "urls" : domain_url,
             "emails" : domain_email
         },
-        "name_variants" : {
+        "excluded_name_variants" : {
             "affiliations" : exact_substring
-        },
-        "author_emails" : {
-            "emails" : exact
-        },
-        "author_ids" : {
-            "author_ids" : author_match
-        },
-        "grants" : {
-            "grants" : exact
-        },
-        "strings" : {
-            "urls" : domain_url,
-            "emails" : exact,
-            "affiliations" : exact_substring,
-            "author_ids" : author_string_match,
-            "grants" : exact
         }
     }
     # 2016-08-18 and 2018-08-18 TD : take out postcodes. In Germany, these are not as geo-local as in the UK, sigh.
@@ -172,16 +183,16 @@ def match(notification_data, repository_config, provenance):
     # I have added a config option and set the default to false, as tests were failing
     if app.config.get("EXTRACT_POSTCODES", False):
         match_algorithms["postcodes"] = {
-            "postcodes" : postcode_match
+            "postcodes": postcode_match
         }
         match_algorithms["strings"]["postcodes"] = postcode_match
 
     repo_property_values = {
-        "author_ids" : author_id_string
+        "author_ids": author_id_string
     }
 
     match_property_values = {
-        "author_ids" : author_id_string
+        "author_ids": author_id_string
     }
 
     # do the required matches
@@ -195,8 +206,10 @@ def match(notification_data, repository_config, provenance):
                         matched = True
 
                         # convert the values that have matched to string values suitable for provenance
-                        rval = repo_property_values.get(repo_property)(rprop) if repo_property in repo_property_values else rprop
-                        mval = match_property_values.get(match_property)(mprop) if match_property in match_property_values else mprop
+                        rval = repo_property_values.get(repo_property)(
+                            rprop) if repo_property in repo_property_values else rprop
+                        mval = match_property_values.get(match_property)(
+                            mprop) if match_property in match_property_values else mprop
 
                         # record the provenance
                         provenance.add_provenance(repo_property, rval, match_property, mval, m)
@@ -205,30 +218,67 @@ def match(notification_data, repository_config, provenance):
     if not matched:
         return False
 
-    # do the match refinements
-    # if the configuration specifies a keyword, it must match the notification data, otherwise
-    # the match fails
+    # Before matching keyword and content type, check if it matches the exclusions
+    exclusion_matched = False
+    for repo_property, sub in match_exclusion_algorithms.items():
+        for match_property, fn in sub.items():
+            for rprop in getattr(rc, repo_property):
+                for mprop in getattr(md, match_property):
+                    m = fn(rprop, mprop)
+                    if m is not False:  # it will be a string then
+                        exclusion_matched = True
+
+                        # convert the values that have matched the exclusion to string values suitable for provenance
+                        rval = repo_property_values.get(repo_property)(
+                            rprop) if repo_property in repo_property_values else rprop
+                        mval = match_property_values.get(match_property)(
+                            mprop) if match_property in match_property_values else mprop
+                        m = "Excluding this match: " + m
+                        # record the provenance
+                        provenance.add_provenance(repo_property, rval, match_property, mval, m)
+
+    # if it matches an exclusion, then no need to look at the optional refinements
+    if exclusion_matched:
+        return False
+
+    # do further match refinements
+    # if the configuration specifies a keyword,
+    #     it must match the notification data, otherwise the match fails
     if len(rc.keywords) > 0:
-        trip = False
+        keyword_matched = False
         for rk in rc.keywords:
             for mk in md.keywords:
                 m = exact(rk, mk)
                 if m is not False: # then it is a string
-                    trip = True
+                    keyword_matched = True
                     provenance.add_provenance("keywords", rk, "keywords", mk, m)
-        if not trip:
+        if not keyword_matched:
+            return False
+
+    # if the configuration specifies an excluded keyword,
+    #     it must not match the notification data
+    if len(rc.excluded_keywords) > 0:
+        excluded_keyword_matched = False
+        for rk in rc.excluded_keywords:
+            for mk in md.keywords:
+                m = exact(rk, mk)
+                if m is not False: # then it is a string
+                    excluded_keyword_matched = True
+                    m = "Excluding this match: " + m
+                    provenance.add_provenance("keywords", rk, "keywords", mk, m)
+        if excluded_keyword_matched:
             return False
 
     # as above, if the config requires a content type it must match the notification data or the match fails
     if len(rc.content_types) > 0:
-        trip = False
+        content_type_matched = False
         for rc in rc.content_types:
             for mc in md.content_types:
                 m = exact(rc, mc)
                 if m is True:
-                    trip = True
+                    content_type_matched = True
                     provenance.add_provenance("content_types", rc, "content_types", mc, m)
-        if not trip:
+        if not content_type_matched:
             return False
 
     return len(provenance.provenance) > 0

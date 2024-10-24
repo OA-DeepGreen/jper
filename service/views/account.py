@@ -12,7 +12,7 @@ from octopus.lib import dates
 from service.api import JPER, ParameterException
 from service.views.webapi import _bad_request
 from service.repository_licenses import get_matching_licenses
-from service.lib import csv_helper, email_helper
+from service.lib import csv_helper, email_helper, request_deposit_helper
 import math
 import csv
 import sys
@@ -20,14 +20,16 @@ from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
 from io import StringIO, TextIOWrapper, BytesIO
-from datetime import timedelta
+from datetime import timedelta, datetime
+# from dateutil.relativedelta import relativedelta
+
 
 blueprint = Blueprint('account', __name__)
 
 # Notification table/csv for repositories
 ntable = {
             "screen" : ["Send Date", ["DOI","Publisher"], ["Publication Date", "Embargo"], "Title", "Analysis Date"],
-            "header" : ["Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
+            "header" : ["ID", "Send Date", "DOI", "Publisher", "Publication Date", "Embargo", "Title", "Analysis Date"],
      "Analysis Date" : "notifications[*].analysis_date",
          "Send Date" : "notifications[*].created_date",
            "Embargo" : "notifications[*].embargo.duration",
@@ -40,7 +42,7 @@ ntable = {
 # Matching table/csv for providers (with detailed reasoning)
 mtable = {
          "screen" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to {EZB-Id}", "Term", "Appears in {notification_field}"],
-         "header" : ["Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
+         "header" : ["ID", "Analysis Date", "ISSN or EISSN", "DOI", "License", "Forwarded to", "Term", "Appears in"],
   "Analysis Date" : "matches[*].created_date",
   "ISSN or EISSN" : "matches[*].alliance.issn",
             "DOI" : "matches[*].alliance.doi",
@@ -53,7 +55,7 @@ mtable = {
 # Rejected table/csv for providers
 ftable = {
          "screen" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
-         "header" : ["Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
+         "header" : ["ID", "Send Date", "ISSN or EISSN", "DOI", "Reason", "Analysis Date"],
       "Send Date" : "failed[*].created_date",
   "Analysis Date" : "failed[*].analysis_date",
   "ISSN or EISSN" : "failed[*].issn_data",
@@ -63,23 +65,23 @@ ftable = {
 
 # Config table/csv for repositories
 ctable = {
-        # "screen" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        # "header" : ["Name Variants", "Domains", "Grant Numbers", "ORCIDs", "Author Emails", "Keywords"],
-        "screen" : ["Name Variants", "Domains", "Grant Numbers", "Keywords"],
-        "header" : ["Name Variants", "Domains", "Grant Numbers", "Dummy1", "Dummy2", "Keywords"],
- "Name Variants" : "repoconfig[0].name_variants[*]",
-       "Domains" : "repoconfig[0].domains[*]",
-#     "Postcodes" : "repoconfig[0].postcodes[*]",
- "Grant Numbers" : "repoconfig[0].grants[*]",
-        "Dummy1" : "repoconfig[0].author_ids[?(@.type=='xyz1')].id",
-        "Dummy2" : "repoconfig[0].author_ids[?(@.type=='xyz2')].id",
-#        "ORCIDs" : "repoconfig[0].author_ids[?(@.type=='orcid')].id",
-# "Author Emails" : "repoconfig[0].author_ids[?(@.type=='email')].id",
-      "Keywords" : "repoconfig[0].keywords[*]",
+        "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
+                    "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+        "header": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
+                   "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+ "Name Variants": "repoconfig[0].name_variants[*]",
+       "Domains": "repoconfig[0].domains[*]",
+ "Grant Numbers": "repoconfig[0].grants[*]",
+      "Keywords": "repoconfig[0].keywords[*]",
+           "RoR": "repoconfig[0].author_ids[?(@.type=='ror')].id",
+      "Ringgold": "repoconfig[0].author_ids[?(@.type=='ringgold')].id",
+"Excluded Name Variants": "repoconfig[0].excluded_name_variants[*]",
+"Excluded Domains": "repoconfig[0].excluded_domains[*]",
+    "Excluded Keywords": "repoconfig[0].excluded_keywords[*]",
 }
 
 
-def _list_failrequest(provider_id=None, bulk=False):
+def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     """
     Process a list request, either against the full dataset or the specific provider_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -89,22 +91,24 @@ def _list_failrequest(provider_id=None, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
+
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
     try:
         if bulk is True:
-            flist = JPER.bulk_failed(current_user, since, provider_id=provider_id)
+            flist = JPER.bulk_failed(current_user, since, upto=upto, provider_id=provider_id)
         else:
-            flist = JPER.list_failed(current_user, since, page=page, page_size=page_size, provider_id=provider_id)
+            flist = JPER.list_failed(current_user, since, upto=upto, page=page, page_size=page_size, provider_id=provider_id)
     except ParameterException as e:
         return _bad_request(str(e))
 
     return flist.json()
 
 
-def _list_matchrequest(repo_id=None, provider=False, bulk=False):
+def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk=False):
     """
     Process a list request, either against the full dataset or the specific repo_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -115,7 +119,9 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
+
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
@@ -123,10 +129,10 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
         # 2016-11-24 TD : bulk switch to decrease the number of different calls
         if bulk:
-            mlist = JPER.bulk_matches(current_user, since, repository_id=repo_id, provider=provider)
+            mlist = JPER.bulk_matches(current_user, since, upto=upto, repository_id=repo_id, provider=provider)
         else:
             # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            mlist = JPER.list_matches(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
+            mlist = JPER.list_matches(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                       provider=provider)
     except ParameterException as e:
         return _bad_request(str(e))
@@ -134,7 +140,7 @@ def _list_matchrequest(repo_id=None, provider=False, bulk=False):
     return mlist.json()
 
 
-def _list_request(repo_id=None, provider=False, bulk=False):
+def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=False):
     """
     Process a list request, either against the full dataset or the specific repo_id supplied
     This function will pull the arguments it requires out of the Flask request object.  See the API documentation
@@ -145,7 +151,8 @@ def _list_request(repo_id=None, provider=False, bulk=False):
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(param='since')
+    since = _validate_date(since, param='since')
+    upto = _validate_date(upto, param='upto')
     page = _validate_page()
     page_size = _validate_page_size()
 
@@ -153,10 +160,10 @@ def _list_request(repo_id=None, provider=False, bulk=False):
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
         # 2016-11-24 TD : bulk switch to decrease the number of different calls
         if bulk is True:
-            nlist = JPER.bulk_notifications(current_user, since, repository_id=repo_id, provider=provider)
+            nlist = JPER.bulk_notifications(current_user, since, upto=upto, repository_id=repo_id, provider=provider)
         else:
             # 2016-09-07 TD : trial to include some kind of reporting for publishers here!
-            nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id,
+            nlist = JPER.list_notifications(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                             provider=provider)
     except ParameterException as e:
         return _bad_request(str(e))
@@ -223,17 +230,18 @@ def _sword_logs(repo_id, from_date, to_date):
     return logs, deposit_record_logs
 
 
-def _validate_date(param='since'):
-    since = request.values.get(param, None)
-    if since is None or since == "":
-        return _bad_request("Missing required parameter 'since'")
-
+def _validate_date(dt, param='since'):
+    if dt is None or dt == "":
+        return _bad_request("Missing required parameter {param}".format(param=param))
+    out_format = None
+    if param == 'upto':
+        out_format = "%Y-%m-%dT23:59:59Z"
     try:
-        since = dates.reformat(since)
+        dt = dates.reformat(dt, out_format=out_format)
     except ValueError:
-        return _bad_request("Unable to understand since date '{x}'".format(x=since))
+        return _bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
 
-    return since
+    return dt
 
 
 def _validate_page():
@@ -255,19 +263,43 @@ def _validate_page_size():
 
 
 def _get_notification_value(header, notification):
-    if header == 'id':
+    if header == 'ID':
         return notification.get('id', '')
-    elif header == 'Analysis Date':
-        return notification.get('analysis_date', '')
+    if header == 'Analysis Date':
+        value = notification.get('analysis_date', '')# ntable
+        if value == '': #mtable, ftable
+            value = notification.get('created_date', 'ERROR')
+        return value
+    elif header == "ISSN or EISSN":
+        value = notification.get('alliance',{}).get('issn','') # mtable
+        if value == "":
+            value = notification.get('issn_data', '')#ftable
+        return value
     elif header == 'Send Date':
         return notification.get('created_date', '')
     elif header == 'Embargo':
         return notification.get('embargo', {}).get('duration', '')
     elif header == 'DOI':
+        # ntable, ftable
+        doi_value = ''
         identifiers = notification.get('metadata', {}).get('identifier', [])
         for identifier in identifiers:
             if identifier.get('type', '') == 'doi':
-                return identifier.get('id', '')
+                doi_value = identifier.get('id', '')
+        # mtable
+        if doi_value == '':
+            doi_value = notification.get('alliance', {}).get('doi', '')
+        return doi_value
+    elif header == "License": # mtable only
+        return notification.get('alliance', {}).get('link', '')
+    elif header == "Forwarded to": # mtable only
+        return notification.get("bibid",'')
+    elif header == "Term": # mtable only
+        return notification.get('provenance', [])[0].get('term', '')
+    elif header == "Appears in": # mtable only
+        return notification.get('provenance', [])[0].get('notification_field', '')
+    elif header == "Reason": # ftable only
+        return notification.get('reason', '')
     elif header == 'Publisher':
         return notification.get('metadata', {}).get('publisher', '')
     elif header == 'Title':
@@ -285,35 +317,34 @@ def _get_notification_value(header, notification):
     return ''
 
 
-def _notifications_for_display(results, table):
+def _notifications_for_display(results, table, include_deposit_details=True):
     notifications = []
     # header
-    header_row = ['id']
+    header_row = []
     for header in table['header']:
         if isinstance(header, list):
             header_row.append(' / '.join(header))
         else:
             header_row.append(header)
     # I've appended columns to display sword deposit details
-    header_row.append('deposit_date')
-    header_row.append('deposit_count')
-    header_row.append('deposit_status')
-    header_row.append('request_status')
+    if include_deposit_details:
+        header_row.append('deposit_date')
+        header_row.append('deposit_count')
+        header_row.append('deposit_status')
+        header_row.append('request_status')
     notifications.append(header_row)
     # results
-    for result in results.get('notifications', []):
-        row = {
-            'id': _get_notification_value('id', result)
-        }
-        for header in table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']:
-            cell = []
+    for result in results:
+        row = {}
+        fields = table['header']
+        if include_deposit_details:
+            fields = table['header'] + ['deposit_date', 'deposit_count', 'deposit_status', 'request_status']
+        for header in fields:
             val = _get_notification_value(header, result)
-            cell.append(val)
             key = header.lower().replace(' ', '_')
-            row[key] = cell
+            row[key] = val
         notifications.append(row)
     return notifications
-
 
 @blueprint.before_request
 def restrict():
@@ -352,33 +383,44 @@ def download(account_id):
     provider = acc.has_role('publisher')
     data = None
 
+    since = request.args.get('since')
+    if since == '' or since is None:
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+
     if provider:
         if request.args.get('rejected', False):
             fprefix = "failed"
+            notification_prefix = "failed"
             xtable = ftable
-            html = _list_failrequest(provider_id=account_id, bulk=True)
+            json_results = _list_failrequest(provider_id=account_id, since=since, upto=upto, bulk=True)
         else:
             fprefix = "matched"
+            notification_prefix = "matches"
             xtable = mtable
-            html = _list_matchrequest(repo_id=account_id, provider=provider, bulk=True)
+            json_results = _list_matchrequest(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
     else:
         fprefix = "routed"
+        notification_prefix = "notifications"
         xtable = ntable
-        html = _list_request(repo_id=account_id, provider=provider, bulk=True)
+        json_results = _list_request(repo_id=account_id, since=since, upto=upto, provider=provider, bulk=True)
 
-    res = json.loads(html)
-
-    rows = []
-    for hdr in xtable["header"]:
-        rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
-
-    rows = list(zip_longest(*rows, fillvalue=''))
-    #
-    # Python 3 you need to use StringIO with csv.write. send_file requires BytesIO, so you have to do both.
+    results = json.loads(json_results)
+    notifications = results.get(notification_prefix, [])
+    data_to_display = _notifications_for_display(notifications, xtable, include_deposit_details=False)
+    fieldnames = []
+    for val in xtable["header"]:
+        fieldnames.append(val.lower().replace(' ', '_'))
     strm = StringIO()
-    writer = csv.writer(strm, delimiter=',', quoting=csv.QUOTE_ALL)
-    writer.writerow(xtable["header"])
-    writer.writerows(rows)
+    writer = csv.DictWriter(strm, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    for notification in data_to_display:
+        if isinstance(notification, list):
+            continue
+        writer.writerow(notification)
     mem = BytesIO()
     mem.write(strm.getvalue().encode('utf-8-sig'))
     mem.seek(0)
@@ -386,40 +428,52 @@ def download(account_id):
     fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
     return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
 
-
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
     acc = models.Account.pull(repo_id)
     if acc is None:
         abort(404)
     provider = acc.has_role('publisher')
+    since = request.args.get('since')
+    if since == '' or since is None:
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
     if provider:
-        data = _list_matchrequest(repo_id=repo_id, provider=provider)
+        notification_prefix = "matches"
+        xtable = mtable
+        include_deposit_details = False
+        data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     else:
-        data = _list_request(repo_id=repo_id, provider=provider)
-    #
-    link = '/account/details'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
-    if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        notification_prefix = "notifications"
+        xtable = ntable
+        include_deposit_details = True
+        data = _list_request(repo_id=repo_id, since=since, upto=upto, provider=provider)
 
+    link = '/account/details'
+
+    api_key = acc.data['api_key']
+    if current_user.has_role('admin'):
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
     # NOTE: The data is returned is json. I then convert it back to python object
     #       I have not fixed all notification views.
     #       So keeping this unnecessary conversion to and from json.
     results = json.loads(data)
-    data_to_display = _notifications_for_display(results, ntable)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
     if provider:
-        return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)], total=results['total'],
-                               page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
-    return render_template('account/details.html', repo=data, results=data_to_display, total=results['total'],
-                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link, date=date, repo_id=repo_id)
+        return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
+                               page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                               since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='matched')
+    return render_template('account/notifications/routed.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type='routed')
 
 
 # 2016-10-19 TD : restructure matching and(!!) failing history output (primarily for publishers) -- start --
@@ -428,25 +482,34 @@ def matching(repo_id):
     acc = models.Account.pull(repo_id)
     if acc is None:
         abort(404)
-    #
+
     provider = acc.has_role('publisher')
-    data = _list_matchrequest(repo_id=repo_id, provider=provider)
-    #
+    since = request.args.get('since')
+    if since == '' or since is None:
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+    data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
+    notification_prefix = "matches"
+    xtable = mtable
+    include_deposit_details = False
     link = '/account/matching'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
+    api_key = acc.data['api_key']
     if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
 
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/matching.html', repo=data, tabl=[json.dumps(mtable)],
-                           num_of_pages=num_of_pages, page_num=page_num, link=link, date=date)
+    return render_template('account/notifications/matched.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=repo_id, api_key=api_key, type="matched")
 
 
 @blueprint.route('/failing/<provider_id>', methods=["GET", "POST"])
@@ -454,26 +517,33 @@ def failing(provider_id):
     acc = models.Account.pull(provider_id)
     if acc is None:
         abort(404)
-    #
-    # provider = acc.has_role('publisher')
+    since = request.args.get('since')
+    if since == '' or since is None:
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = '01/06/2019'
+    upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+
     # 2016-10-19 TD : not needed here for the time being
-    data = _list_failrequest(provider_id=provider_id)
-    #
+    data = _list_failrequest(provider_id=provider_id, since=since, upto=upto)
+    notification_prefix = "failed"
+    xtable = ftable
+    include_deposit_details = False
     link = '/account/failing'
-    date = request.args.get('since')
-    if date == '':
-        date = '01/06/2019'
+    api_key = acc.data['api_key']
     if current_user.has_role('admin'):
-        link += '/' + acc.id + '?since=' + date + '&api_key=' + current_user.data['api_key']
-    else:
-        link += '/' + acc.id + '?since=01/06/2019&api_key=' + acc.data['api_key']
+        api_key = current_user.data['api_key']
+    link += '/' + acc.id + '?since=' + since + '&upto=' + upto + '&api_key=' + api_key
 
     results = json.loads(data)
-
+    data_to_display = _notifications_for_display(results.get(notification_prefix, []), xtable,
+                                                 include_deposit_details=include_deposit_details)
     page_num = int(request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1)))
     num_of_pages = int(math.ceil(results['total'] / results['pageSize']))
-    return render_template('account/failing.html', repo=data, tabl=[json.dumps(ftable)], num_of_pages=num_of_pages,
-                           page_num=page_num, link=link, date=date)
+    return render_template('account/notifications/rejected.html', results=data_to_display, total=results['total'],
+                           page_size=results['pageSize'], num_of_pages=num_of_pages, page_num=page_num, link=link,
+                           since=since, upto=upto, email=acc.email, repo_id=provider_id, api_key=api_key, type="failed")
 
 
 @blueprint.route('/sword_logs/<repo_id>', methods=["GET"])
@@ -492,17 +562,18 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = _validate_date(param='to')
+        to_date = _validate_date(request.args.get('to', None), param='upto')
         to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = _validate_date(param='from')
+        from_date = _validate_date(request.args.get('from', None), param='since')
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = _validate_date(param='date')
+        from_date = _validate_date(request.args.get('date', None), param='since')
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
     # Default from and to dates
+
     if not from_date:
         from_date = deposit_dates[0].get('key_as_string').split('T')[0]
     from_date_display = str(dates.parse(from_date).strftime("%d/%m/%Y"))
@@ -516,42 +587,41 @@ def sword_logs(repo_id):
 
 
 @blueprint.route("/configview", methods=["GET", "POST"])
-@blueprint.route("/configview/<repoid>", methods=["GET", "POST"])
-def configView(repoid=None):
+@blueprint.route("/configview/<repo_id>", methods=["GET", "POST"])
+def configView(repo_id=None):
     app.logger.debug(current_user.id + " " + request.method + " to config route")
-    if repoid is None:
+    if repo_id is None:
         if current_user.has_role('repository'):
-            repoid = current_user.id
+            repo_id = current_user.id
         elif current_user.has_role('admin'):
             return ''  # the admin cannot do anything at /config, but gets a 200 so it is clear they are allowed
         else:
             abort(400)
     elif not current_user.has_role('admin'):  # only the superuser can set a repo id directly
         abort(401)
-    rec = models.RepositoryConfig().pull_by_repo(repoid)
+    acc = models.Account.pull(repo_id)
+    if acc is None:
+        abort(404)
+    rec = models.RepositoryConfig().pull_by_repo(repo_id)
     if rec is None:
         rec = models.RepositoryConfig()
-        rec.repo = repoid
+        rec.repo = repo_id
         # rec.repository = repoid
         # 2016-09-16 TD : The field 'repository' has changed to 'repo' due to
         #                 a bug fix coming with a updated version ES 2.3.3 
     if request.method == 'GET':
-        # get the config for the current user and return it
-        # this route may not actually be needed, but is convenient during development
-        # also it should be more than just the strings data once complex configs are accepted
-        json_data = json.dumps(rec.data, ensure_ascii=False)
-        return render_template('account/configview.html', repo=json_data)
+        return render_template('account/configview.html', repo=rec, email=acc.email, repo_id=repo_id)
     elif request.method == 'POST':
         if request.json:
-            saved = rec.set_repo_config(jsoncontent=request.json, repository=repoid)
+            saved = rec.set_repo_config(jsoncontent=request.json, repository=repo_id)
         else:
             try:
                 if request.files['file'].filename.endswith('.csv'):
                     saved = rec.set_repo_config(csvfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
                 elif request.files['file'].filename.endswith('.txt'):
                     saved = rec.set_repo_config(textfile=TextIOWrapper(request.files['file'], encoding='utf-8'),
-                                                repository=repoid)
+                                                repository=repo_id)
             except:
                 saved = False
         if saved:
@@ -921,19 +991,7 @@ def resend_notification(username):
     # 2. Get the url to return the user to
     # 3. If all notifications to be resent, get from and to date and redo the query?
     notification_ids = json.loads(request.form.get('notification_ids'))
-    count = 0
-    duplicate = 0
-    for n_id in list(notification_ids):
-        rec = models.RequestNotification.pull_by_ids(n_id, username, status='queued', size=1)
-        if not rec:
-            rec = models.RequestNotification()
-            rec.account_id = username
-            rec.notification_id = n_id
-            rec.status = 'queued'
-            rec.save()
-            count += 1
-        else:
-            duplicate += 1
+    count, duplicate = request_deposit_helper.request_deposit(notification_ids, username)
     msg = "Queued {n} notifications for deposit".format(n=count)
     if duplicate > 0:
         msg = msg + '<br>' + '{n} notifications are already waiting in queue'.format(n=duplicate)

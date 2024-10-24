@@ -1,0 +1,76 @@
+<script>
+
+$("#dataAOTable").tablesorter();
+
+// on page load, ensure button text reflects checkbox state
+function toggle_button_text() {
+    if ($(".request_notification_checkbox").is(':checked')) {
+        $('#select_all_notifications').text("Remove selection from this page");
+    } else {
+        $('#select_all_notifications').text("Select all on this page");
+    }
+}
+toggle_button_text();
+
+$('#select_all_notifications').on('click', function() {
+    if ($(".request_notification_checkbox").is(':checked')) {
+        // uncheck all
+        $(".request_notification_checkbox").prop('checked', false);
+        $( this ).text("Select all on this page");
+    } else {
+        $(".request_notification_checkbox").prop('checked', true);
+        $( this ).text("Remove selection from this page");
+    }
+});
+
+function _submit_notifications_for_deposit(formobj, ids) {
+    formobj.find("input[name='notification_ids']").val(JSON.stringify(ids));
+    let actionUrl = formobj.attr('action');
+    console.log(actionUrl);
+
+    $.ajax({
+        type: "POST",
+        url: actionUrl,
+        data: formobj.serialize(), // serializes the form's elements.
+        success: function(data)
+        {
+            let msg = '<div class="alert info"><span class="closebtn">&times;</span>' + data + '</div>';
+            console.log(msg);
+            $('#form_alert').append(msg);
+        }
+    });
+}
+
+$('#form_request_deposits').on('submit', function(event) {
+    event.preventDefault();
+    // gather all ids
+    let ids = [];
+    $(".request_notification_checkbox:checked").each(function(){
+        ids.push($(this).val());
+    });
+    let formobj = $(this);
+    _submit_notifications_for_deposit(formobj, ids);
+    // uncheck all
+    $(".request_notification_checkbox").prop('checked', false);
+    $('#select_all_notifications').text("Select all on this page");
+});
+
+$('.form_request_a_deposit').on('submit', function(event) {
+    event.preventDefault();
+    // gather ids
+    let ids = [];
+    let formobj = $(this);
+    let ele = formobj.find("input[name='notification_ids']")
+    let data = ele.data( "nid" );
+    $("#request_"+data).prop('checked', false);
+    ids.push(data);
+    _submit_notifications_for_deposit(formobj, ids)
+});
+
+$(document).on("click", ".closebtn", function(){
+    var div = this.parentElement;
+    div.style.opacity = "0";
+    setTimeout(function(){ div.style.display = "none"; }, 600);
+});
+
+</script>

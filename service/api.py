@@ -386,7 +386,7 @@ class JPER(object):
                 return None
 
     @classmethod
-    def list_notifications(cls, account, since, page=None, page_size=None, repository_id=None, provider=False):
+    def list_notifications(cls, account, since, upto=None, page=None, page_size=None, repository_id=None, provider=False):
         # def list_notifications(cls, account, since, page=None, page_size=None, repository_id=None):
         # 2016-09-07 TD : trial to make some publisher's reporting available
         """
@@ -394,6 +394,7 @@ class JPER(object):
 
         :param account: user Account as which to carry out this action (all users can request notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest notification date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
         :param repository_id: the id of the repository whose notifications to return.  If no id is provided, all notifications for all repositories will be queried.
@@ -403,6 +404,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         if page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
@@ -420,17 +429,21 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
+
+        if upto is not None:
+            nl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -461,12 +474,13 @@ class JPER(object):
 
 
     @classmethod
-    def list_matches(cls, account, since, page=None, page_size=None, repository_id=None, provider=False):
+    def list_matches(cls, account, since, upto=None, page=None, page_size=None, repository_id=None, provider=False):
         """
         List match provenances which meet the criteria specified by the parameters
 
         :param account: user Account as which to carry out this action (all users can request matches, so this is primarily for logging purposes)
         :param since: date string for the earliest match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
         :param repository_id: the id of the repository whose matches to return.  If no id is provided, all matches for all repositories will be queried.
@@ -476,6 +490,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         if page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
@@ -500,10 +522,14 @@ class JPER(object):
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
+
+        if upto is not None:
+            mpl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -515,7 +541,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' list matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('List all matches for query ' + json.dumps(qr))
-
         res = models.MatchProvenance.query(q=qr)
         app.logger.debug('List matches query resulted ' + json.dumps(res))
         mpl.matches = [models.MatchProvenance(i['_source']).data for i in res.get('hits',{}).get('hits',[])]
@@ -525,12 +550,13 @@ class JPER(object):
 
 
     @classmethod
-    def list_failed(cls, account, since, page=None, page_size=None, provider_id=None):
+    def list_failed(cls, account, since, upto=None, page=None, page_size=None, provider_id=None):
         """
         List failed notifications which meet the criteria specified by the parameters
 
         :param account: user Account as which to carry out this action (all users can request failed notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest failed analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param page: page number in result set to return (which results appear will also depend on the page_size parameter)
         :param page_size: number of results to return in this page of results
         :param provider_id: the id of the provider whose failed notifications to return.  If no id is provided, all failed notifications for all providers will be queried.
@@ -540,6 +566,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         if page == 0:
             raise ParameterException("'page' parameter must be greater than or equal to 1")
@@ -557,20 +591,24 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             ## "sort": [{"analysis_date":{"order":"desc"}}],
             ## 2018-03-07 TD : change of sort key to 'created_date', but still newest first
             # 2016-09-06 TD : change of sort order newest first
             "from": (page - 1) * page_size,
             "size": page_size
         }
+
+        if upto is not None:
+            fnl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
@@ -587,13 +625,14 @@ class JPER(object):
 
 
     @classmethod
-    def bulk_notifications(cls, account, since, repository_id=None, provider=False):
+    def bulk_notifications(cls, account, since, upto=None, repository_id=None, provider=False):
         # 2016-09-07 TD : trial to make some publisher's reporting available
         """
         Bulk list notification which meet the criteria specified by the parameters
 
         :param account: user Account as which to carry out this action (all users can request notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest notification date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param repository_id: the id of the repository whose notifications to return.  If no id is provided, all notifications for all repositories will be queried.
         :return: models.NotificationList containing the parameters and results
         """
@@ -601,6 +640,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         nl = models.NotificationList()
         nl.since = dates.format(since)
@@ -611,15 +658,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
+
+        if upto is not None:
+            nl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -649,12 +700,13 @@ class JPER(object):
 
 
     @classmethod
-    def bulk_matches(cls, account, since, repository_id=None, provider=False):
+    def bulk_matches(cls, account, since, upto=None, repository_id=None, provider=False):
         """
         Bulk match provenances which meet the criteria specified by the parameters
 
         :param account: user Account as which to carry out this action (all users can request matches, so this is primarily for logging purposes)
         :param since: date string for the earliest match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param repository_id: the id of the repository whose matches to return.  If no id is provided, all matches for all repositories will be queried.
         :return: models.MatchProvenanceList containing the parameters and results
         """
@@ -662,6 +714,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         mpl = models.MatchProvenanceList()
         mpl.since = dates.format(since)
@@ -679,8 +739,12 @@ class JPER(object):
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
         }
+
+        if upto is not None:
+            mpl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = mpl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -692,7 +756,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' bulk matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('Bulk all matches for query ' + json.dumps(qr))
-
         mpl.matches = []
         for mp in models.MatchProvenance.iterate(q=qr):
             mpl.matches.append(mp.data)
@@ -702,12 +765,13 @@ class JPER(object):
 
 
     @classmethod
-    def bulk_failed(cls, account, since, provider_id=None):
+    def bulk_failed(cls, account, since, upto=None, provider_id=None):
         """
         Bulk failed notifications which meet the criteria specified by the parameters
 
         :param account: user Account as which to carry out this action (all users can request failed notifications, so this is primarily for logging purposes)
         :param since: date string for the earliest failed analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
+        :param upto: date string for the last match analysis date requested.  Should be of the form YYYY-MM-DDTHH:MM:SSZ, though other sensible formats may also work
         :param provider_id: the id of the provider whose failed notifications to return.  If no id is provided, all failed notifications for all providers will be queried.
         :return: models.FailedNotificationList containing the parameters and results
         """
@@ -715,6 +779,14 @@ class JPER(object):
             since = dates.parse(since)
         except ValueError as e:
             raise ParameterException("Unable to understand since date '{x}'".format(x=since))
+
+        if upto == '':
+            upto = None
+        if upto is not None:
+            try:
+                upto = dates.parse(upto)
+            except ValueError as e:
+                raise ParameterException("Unable to understand upto date '{x}'".format(x=upto))
 
         fnl = models.FailedNotificationList()
         fnl.since = dates.format(since)
@@ -725,15 +797,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
+
+        if upto is not None:
+            fnl.upto = dates.format(upto)
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}

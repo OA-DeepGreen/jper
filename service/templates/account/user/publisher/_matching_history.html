@@ -1,17 +1,10 @@
-		<div class="box box--padding-large box--brd-mgreyblue">
-			<h3>View matching history</h3>
-			<div class="row">
-				<a href="/account/matching/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}">View matched notifications for this account</a>
-				<form method="POST" action="/account/download/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}" class="form">
-					<button class="btn btn--3d btnright" id="download_matching_log" type="submit">Download matching log</button>
-				</form>
-			</div>
-			<br>
-			<div class="row">
-				<a href="/account/failing/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}">View rejected notifications for this account</a>
-				<form method="POST" action="/account/download/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}&rejected=1" class="form">
-					<button class="btn btn--3d btnright" id="download_rejected_log" type="submit">Download rejected log</button>
-				</form>
-			</div>
-
-		</div>
+<div class="box box--padding-large box--brd-mgreyblue">
+    <h3>View and download matching history</h3>
+    <div class="row">
+        <a href="/account/matching/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}">View and download matched notifications</a>
+    </div>
+    <br>
+    <div class="row">
+        <a href="/account/failing/{{account.id}}?since=01/06/2019&api_key={{current_user.data['api_key']}}">View and download rejected notifications</a>
+    </div>
+</div>

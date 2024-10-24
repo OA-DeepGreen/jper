@@ -1,0 +1,28 @@
+{%  if total > 0 %}
+<div class="row line-space">
+  <div class="col span-12">
+    <table id="rejectedTable" class="tablesorter-green">
+      <thead>
+        <tr>
+          <th class="sorter-iso8601date">Send Date</th>
+          <th>ISSN or E-ISSN</th>
+          <th>DOI</th>
+          <th>Reason</th>
+          <th class="sorter-iso8601date">Analysis Date</th>
+        </tr>
+      </thead>
+      {%  for notification in results[1:] %}
+        {#  First row of results is header. So getting notifications from 2nd row #}
+        {#  First column is id #}
+        <tr class="tablesorter">
+          <td>{{ notification['send_date'] | safe }}</td>
+          <td>{{ notification['issn_or_eissn'] | safe }}</td>
+          <td>{{ notification['doi'] | safe }}</td>
+          <td>{{ notification['reason'] | safe }}</td>
+          <td>{{notification['analysis_date']}}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}

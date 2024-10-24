@@ -262,28 +262,30 @@ class XSLT(object):
                   <xsl:attribute name="email"><xsl:value-of select=".//email"/></xsl:attribute>
                 </xsl:if>
 
-                <xsl:if test="contains(contrib-id/@contrib-id-type,'orcid')">
-                <identifiers>
-                  <identifier>
-                    <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
-                    <xsl:variable name='orcid' select="contrib-id[@contrib-id-type='orcid']/text()"/>
-
-                    <xsl:choose>
-                    <xsl:when test="substring($orcid, string-length($orcid))='/'">
-                      <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
-                      <xsl:call-template name="cut-orcid">
-                        <xsl:with-param name="orcid" select="$orcid2"/>
-                      </xsl:call-template>
-                    </xsl:when>
-                    <xsl:otherwise>
-                      <xsl:call-template name="cut-orcid">
-                        <xsl:with-param name="orcid" select="$orcid"/>
-                      </xsl:call-template>
-                    </xsl:otherwise>
-                    </xsl:choose>
-                  </identifier>
-                </identifiers>
-                </xsl:if>
+                <xsl:for-each select="./contrib-id">
+                  <xsl:if test="@contrib-id-type='orcid'">
+                  <identifiers>
+                    <identifier>
+                      <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
+                      <xsl:variable name='orcid' select="./text()"/>
+                      <xsl:choose>
+                      <xsl:when test="substring($orcid, string-length($orcid))='/'">
+                        <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
+                        <xsl:call-template name="cut-orcid">
+                          <xsl:with-param name="orcid" select="$orcid2"/>
+                        </xsl:call-template>
+                      </xsl:when>
+                      <xsl:otherwise>
+                        <xsl:call-template name="cut-orcid">
+                          <xsl:with-param name="orcid" select="$orcid"/>
+                        </xsl:call-template>
+                      </xsl:otherwise>
+                      </xsl:choose>
+                    </identifier>
+                  </identifiers>
+                  </xsl:if>
+                </xsl:for-each>
+                
               </person>
             </xsl:if>
           </xsl:for-each>
@@ -790,11 +792,13 @@ class XSLT(object):
                               <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
-                          <xsl:if test="contains(contrib-id/@contrib-id-type,'orcid')">
-                              <mods:nameIdentifier type="orcid">
-                                  <xsl:copy-of select="contrib-id[@contrib-id-type='orcid']/text()"/>
-                              </mods:nameIdentifier>
-                          </xsl:if>
+                          <xsl:for-each select="./contrib-id">
+                            <xsl:if test="@contrib-id-type='orcid'">
+                                <mods:nameIdentifier type="orcid">
+                                    <xsl:copy-of select="./text()"/>
+                                </mods:nameIdentifier>
+                            </xsl:if>
+                          </xsl:for-each>
                           <xsl:if test="string-length(.//email/text()) > 0">
                             <mods:nameIdentifier type="email">
                               <xsl:value-of select=".//email"/>

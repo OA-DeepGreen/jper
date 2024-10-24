@@ -419,6 +419,10 @@ div.actions div {
     margin-bottom: 10px;
 }
 
+.table .row:last-child {
+    border-bottom: none;
+}
+
 .details {
     margin-bottom: 20px;
 }
@@ -429,3 +433,145 @@ div.actions div {
     margin-bottom: 5px;
 }
 
+.accordion-row, .accordion {
+  background-color: #eee;
+  color: #444;
+  margin-bottom: 10px;
+  padding: 12px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-weight: bold;
+  transition: 0.4s;
+}
+
+.inline {
+  display: inline-block;
+}
+
+.accordion-section, .accordion-button {
+  background-color: #04AA6D;
+  color: #fff;
+  cursor: pointer;
+  padding: 5px;
+  margin: 0px 0px 5px 5px;
+  border: 1px #ccc;
+  font-weight: normal;
+}
+
+.accordion-row-active, .accordion-section:hover, .accordion-button:hover,
+.accordion-active, .accordion:hover {
+  background-color: #ccc;
+  color: #000;
+  font-weight: normal;
+}
+
+.accordion-button a{
+  color: #fff;
+  text-decoration: none;
+  font-weight: normal;
+}
+
+.accordion-button a:hover {
+  color: #000;
+  text-decoration: none;
+  font-weight: normal;
+}
+
+.accordion:after {
+  content: '\02795'; /* Unicode character for "plus" sign (+) */
+  font-size: 13px;
+  color: #777;
+  float: right;
+  margin-left: 5px;
+}
+
+.accordion-active:after {
+  content: "\2796"; /* Unicode character for "minus" sign (-) */
+}
+
+.panel {
+  margin-top: 10px;
+  padding: 10px;
+  display: none;
+  background-color: white;
+  overflow: hidden;
+  font-weight: normal;
+}
+
+dl.dl-details {
+  display: grid;
+  grid-template-columns: max-content auto;
+}
+
+dl.dl-details dt {
+  grid-column-start: 1;
+  font-weight: bold;
+  padding-right: 10px;
+}
+
+dl.dl-details dd {
+  grid-column-start: 2;
+  padding-left: 10px;
+  font-weight: normal;
+}
+
+.per-page {
+    padding-top: 25px;
+    float: right;
+}
+
+.right {
+    float: right;
+}
+
+.line-space {
+    margin-bottom: 15px;
+}
+
+.alert {
+  padding: 20px;
+  background-color: #f44336;
+  color: white;
+  opacity: 1;
+  transition: opacity 0.6s;
+  margin-bottom: 15px;
+}
+
+.alert.success {background-color: #04AA6D;}
+.alert.info {background-color: #2196F3;}
+.alert.warning {background-color: #ff9800;}
+
+.closebtn {
+  margin-left: 15px;
+  color: white;
+  font-weight: bold;
+  float: right;
+  font-size: 22px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.closebtn:hover {
+  color: black;
+}
+
+.accordion-section.success, .success {
+    background-color: #04AA6D;
+} /* Green */
+
+.accordion-section.warning, .warning {
+    background-color: #ff9800;
+} /* Orange */
+
+
+.accordion-section.danger, .danger {
+  background-color: #f44336;
+} /* Red */
+
+.default {
+    background-color: #e7e7e7;
+    color: black;
+} /* Grey
