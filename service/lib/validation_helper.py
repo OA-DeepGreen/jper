@@ -5,14 +5,14 @@ from octopus.core import app
 
 def validate_date(dt, param='since'):
     if dt is None or dt == "":
-        return _bad_request("Missing required parameter {param}".format(param=param))
+        return bad_request("Missing required parameter {param}".format(param=param))
     out_format = None
     if param == 'upto':
         out_format = "%Y-%m-%dT23:59:59Z"
     try:
         dt = dates.reformat(dt, out_format=out_format)
     except ValueError:
-        return _bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
+        return bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
 
     return dt
 
@@ -22,7 +22,7 @@ def validate_page():
     try:
         page = int(page)
     except:
-        return _bad_request("'page' parameter is not an integer")
+        return bad_request("'page' parameter is not an integer")
     return page
 
 
@@ -31,7 +31,7 @@ def validate_page_size():
     try:
         page_size = int(page_size)
     except:
-        return _bad_request("'pageSize' parameter is not an integer")
+        return bad_request("'pageSize' parameter is not an integer")
     return page_size
 
 
