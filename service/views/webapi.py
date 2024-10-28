@@ -5,10 +5,12 @@ from flask import Blueprint, make_response, url_for, request, abort, redirect
 from flask import stream_with_context, Response
 import json
 from io import TextIOWrapper
+from datetime import datetime
 from octopus.core import app
 from octopus.lib import webapp
 from octopus.lib import dates
 from flask_login import login_user, current_user
+from service.lib.validation_helper import validate_date, validate_page, validate_page_size, bad_request
 from service.api import JPER, ValidationException, ParameterException, UnauthorisedException
 from service import models
 from werkzeug.routing import BuildError
@@ -27,6 +29,7 @@ def _not_found():
     resp.status_code = 404
     return resp
 
+
 def _unauthorised():
     """
     Construct a response object to represent a 404 (Not Found)
@@ -38,17 +41,6 @@ def _unauthorised():
     resp.status_code = 401
     return resp
 
-def _bad_request(message):
-    """
-    Construct a response object to represent a 400 (Bad Request) around the supplied message
-
-    :return: Flask response for a 400 with a json response body containing the error
-    """
-    app.logger.info("Sending 400 Bad Request from client: {x}".format(x=message))
-    resp = make_response(json.dumps({"status" : "error", "error" : message}))
-    resp.mimetype = "application/json"
-    resp.status_code = 400
-    return resp
 
 def _accepted(obj):
     """
@@ -285,30 +277,21 @@ def _list_request(repo_id=None):
     :param repo_id: the repo id to limit the request to
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = request.values.get("since")
-    page = request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1))
-    page_size = request.values.get("pageSize", app.config.get("DEFAULT_LIST_PAGE_SIZE", 25))
+    since = request.values.get('since')
+    if since == '' or since is None:
+        since = '01/06/2019'
+    since = validate_date(since, param='since')
 
-    if since is None or since == "":
-        return _bad_request("Missing required parameter 'since'")
+    upto = request.values.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+    upto = validate_date(upto, param='upto')
 
-    try:
-        since = dates.reformat(since)
-    except ValueError as e:
-        return _bad_request("Unable to understand since date '{x}'".format(x=since))
-
-    try:
-        page = int(page)
-    except:
-        return _bad_request("'page' parameter is not an integer")
+    page = validate_page()
+    page_size = validate_page_size()
 
     try:
-        page_size = int(page_size)
-    except:
-        return _bad_request("'pageSize' parameter is not an integer")
-
-    try:
-        nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
+        nlist = JPER.list_notifications(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id)
     except ParameterException as e:
         return _bad_request(str(e))
 
