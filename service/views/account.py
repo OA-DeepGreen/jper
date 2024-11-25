@@ -984,9 +984,12 @@ def add_ssh_key(username):
         subject = f"New SSH key for #{acc.id}"
         message = f"""New SSH key has been added to the account #{acc.id}.
         The key has to be copied to the publisher account and when ready needs to be activated in Deepgreen."""
-        email_helper.send_email_to_admin(subject, message)
-        flash('The ssh key has been added', "success")
-    except Exception as e:
+        try:
+            email_helper.send_email_to_admin(subject, message)
+            flash('The ssh key has been added', "success")
+        except Exception as _e:
+            flash('The ssh key has been added. There was an error sending an email', "success")
+    except Exception as _e:
         ex_type, ex_value, ex_traceback = sys.exc_info()
         flash('Error saving SSH key: ' + str(ex_value), 'error')
     return redirect(url_for('.username', username=username))
