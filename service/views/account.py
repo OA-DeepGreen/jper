@@ -325,6 +325,11 @@ def restrict():
 def index():
     if not current_user.is_super:
         abort(401)
+    sword_status = {}
+    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
+        acc_id = s.get('_source', {}).get('id')
+        if acc_id:
+            sword_status[acc_id] = s.get('_source', {}).get('status', '')
     users = []
     for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
         user = {
@@ -332,13 +337,12 @@ def index():
             'email': u.get('_source', {}).get('email', ''),
             'role': u.get('_source', {}).get('role', [])
         }
+        if 'publisher' in user['role']:
+            user['status'] = u.get('_source', {}).get('publisher', {}).get('routing_status', '')
+        elif user['id'] in sword_status:
+            user['status'] = sword_status[user['id']]
         users.append(user)
-    sword_status = {}
-    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
-        acc_id = s.get('_source', {}).get('id')
-        if acc_id:
-            sword_status[acc_id] = s.get('_source', {}).get('status', '')
-    return render_template('account/users.html', users=users, sword_status=sword_status)
+    return render_template('account/users.html', users=users)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)

@@ -1072,6 +1072,32 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
 
 
     @classmethod
+    def pull_all_active_publishers(cls):
+        size = 1000
+        q = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "role": "publisher"
+                            }
+                        },
+                        {
+                            "match": {
+                                "publisher.routing_status": "active"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": size,
+            "from": 0
+        }
+        ans = cls.pull_all(q, size=size, return_as_object=False)
+        return ans
+
+    @classmethod
     def pull_all_by_email(cls,email):
         return cls.pull_all_by_key('email',email)
 
