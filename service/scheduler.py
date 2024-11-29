@@ -26,6 +26,8 @@ from octopus.core import app, initialise
 from service import reports
 from service import models
 from service.lib.cleanup_repository_logs import cleanup_repository_logs
+import paramiko
+import stat
 
 if app.config.get('DEEPGREEN_EZB_ROUTING', False):
     from service import routing_deepgreen as routing
@@ -157,52 +159,56 @@ def pkgformat(src):
     app.logger.debug('Pkgformat returns ' + pkg_fmt)
     return pkg_fmt
 
+def _recursive_copy(scp, remote_path, local_path):
+    os.makedirs(local_path, exist_ok=True)
+    for item in scp.listdir_attr(remote_path):
+        remote_item = remote_path + '/' + item.filename
+        local_item = os.path.join(local_path, item.filename)
+        if stat.S_ISDIR(item.st_mode):
+            _recursive_copy(scp, remote_item, local_item)
+        else:
+            try:
+                scp.get(remote_item, local_item)
+                app.logger.info(f"Remote file {remote_file} has been copied successfully.")
+            except FileNotFoundError:
+                app.logger.error(f"Remote file {remote_file} is missing. Stopping.")
+                break
+            except Exception as e:
+                app.logger.error('moveftp - Extraction could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
+                break
 
-#
-# 2019-07-17 TD : change target of the move operation to the big dg_storage for all deliveries
-#
 def moveftp():
-    try:
-        # # move any files in the jail of ftp users into the temp directory for later processing
-        # tmpdir = app.config.get('TMP_DIR','/tmp')
-        pubstoredir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
-        userdir = app.config.get('USERDIR', '/home/sftpusers')
-        userdirs = os.listdir(userdir)
-        fl = os.path.dirname(os.path.abspath(__file__)) + '/models/moveFTPfiles.sh'
-        app.logger.info("Scheduler - from FTP folders found " + str(len(userdirs)) + " user directories")
-        for dir in userdirs:
-            if not os.path.isdir(os.path.join(userdir, dir)):
-                continue
-            # 2019-07-30 TD : One more loop over possible subfolders of the user
-            #                 Please note: They are *exclusively* created by 'createFTPuser.sh'
-            #                 At least, there should be the (old) 'xfer' folder
-            founditems = False
-            for xfer in os.listdir(os.path.join(userdir, dir)):
-                if len(os.listdir(os.path.join(userdir, dir, xfer))):
-                    founditems = True
-                    for thisitem in os.listdir(os.path.join(userdir, dir, xfer)):
-                        app.logger.info('Scheduler - moving file ' + thisitem + ' for Account:' + dir)
-                        try:
-                            newowner = getpass.getuser()
-                        except:
-                            newowner = app.config.get('PUBSTORE_USER', 'green')
-                        uniqueid = uuid.uuid4().hex
-                        targetdir = os.path.join(pubstoredir, dir)
-                        pendingdir = os.path.join(pubstoredir, dir, 'pending')
-                        uniquedir = os.path.join(pubstoredir, dir, uniqueid)
-                        moveitem = os.path.join(userdir, dir, xfer, thisitem)
-                        subprocess.call( [ 'sudo', fl, dir, newowner, targetdir, uniqueid, uniquedir, moveitem, pendingdir ] )
-                        # subprocess.call([fl, dir, newowner, targetdir, uniqueid, uniquedir, moveitem, pendingdir])
+    default_sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
+    default_sftp_port   = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+    user_pubkey = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY", '')
+    user_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
+    pubstoredir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+    remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
+    remote_postdir = "xfer" # Get it from the configuration?
 
-            if founditems is False:
-                app.logger.debug('Scheduler - found nothing to move for Account:' + dir)
-    except:
-        app.logger.error("Scheduler - move from FTP failed")
+    if not remote_basedir.endswith("/"):
+        remote_basedir = remote_basedir + "/"
+    if not remote_postdir.startswith("/"):
+        remote_postdir = "/" + remote_postdir
 
+    publishers =  models.Account.pull_all_active_publishers()
+    for publisher in publishers:
+        id = publisher['id']
+        server = publisher.get('sftp_server', {}).get('url', default_sftp_server)
+        port = publisher.get('sftp_server', {}).get('port', default_sftp_port)
+        username = publisher.get('sftp_server', {}).get('username', id)
 
-if app.config.get('MOVEFTP_SCHEDULE', 10) != 0:
-    schedule.every(app.config.get('MOVEFTP_SCHEDULE', 10)).minutes.do(moveftp)
+        remote_dir = remote_basedir + username + remote_postdir
 
+        c = paramiko.SSHClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=server, username=user, key_filename=user_pubkey, passphrase=user_passphrase)
+        scp = paramiko.SFTPClient.from_transport(c.get_transport())
+
+        _recursive_copy(scp, remote_dir, local_dir)
+
+        scp.close()
+        c.close()
 
 #
 # 2019-07-17 TD : process the big delivery/publisher dg_storage for all pending items
