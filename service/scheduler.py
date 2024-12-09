@@ -28,6 +28,8 @@ from service import models
 from service.lib.cleanup_repository_logs import cleanup_repository_logs
 import paramiko
 import stat
+import subprocess
+from datetime import datetime
 
 if app.config.get('DEEPGREEN_EZB_ROUTING', False):
     from service import routing_deepgreen as routing
@@ -159,23 +161,98 @@ def pkgformat(src):
     app.logger.debug('Pkgformat returns ' + pkg_fmt)
     return pkg_fmt
 
-def _recursive_copy(scp, remote_path, local_path):
+def _doChecksumComparison(c, remote_file, local_file, cksum):
+    # Checksum on the server
+    command = cksum + " " + remote_file.strip()
+    stdin, stdout, stderr = c.exec_command(command)
+    server_cks = stdout.readlines()[0].strip().split()[0]
+
+    # Checksum on local directory
+    command = cksum + " " + local_file.strip()
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    local_cks = result.stdout.split("\n")[0].strip().split()[0]
+
+    # Return if the checksum matches for the file between server and local
+    return server_cks == local_cks
+
+
+def _moveFilesInServer(s, file, remote_path, r_new, cleanUp):
+    # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
+    # Get the file name and its parent directory in the remote server
+    file_name = file
+    file_dir = ""
+    if "/" in file.strip():
+        file_dir = file.strip().rsplit("/",1)[0]
+        file_name = file.strip().rsplit("/",1)[1]
+    file_subdir = file_dir.replace(remote_path, '').strip()
+    if file_subdir.startswith("/"):
+        file_subdir = file_subdir[1:]
+
+    # Create the destination directory before moving the file over
+    if len(file_subdir.strip()) > 0:
+        command = f"mkdir -p {r_new}/{file_subdir}"
+    else:
+        command = f"mkdir -p {r_new}"
+    stdin, stdout, stderr = s.exec_command(command)
+    if len(stderr.readlines()) > 0:
+        app.logger.error(f"Something wrong in making the destination subdir : File system full?")
+
+    # Move the file to the destination
+    if len(file_subdir.strip()) > 0:
+        command = f"mv {file} {r_new}/{file_subdir}/{file_name}"
+    else:
+        command = f"mv {file} {r_new}/{file_name}"
+    stdin, stdout, stderr = s.exec_command(command)
+    s_error = stderr.readlines()
+    if len(s_error) > 0:
+        app.logger.error(f"Something wrong in moving the file to destination subdir? Error log below")
+        for line in s_error:
+            app.logger.error(f"moveFileError : {line}")
+
+    # Clean up the server of empty directories (if any). A bit of unnecessary overhead, so avoid for subdirectories
+    if cleanUp:
+        command = f"find {remote_path} -empty -type d -delete"
+        stdin, stdout, stderr = s.exec_command(command)
+        s_error = stderr.readlines()
+        if len(s_error) > 0:
+            app.logger.error(f"Something went wrong in cleaning up the remote paths. This should not have happened? Error log below")
+            for line in s_error:
+                app.logger.error(f"moveFileError : {line}")
+        command = f"mkdir -p {remote_path}"
+        stdin, stdout, stderr = s.exec_command(command)
+
+
+def _recursive_copy(c, remote_path, local_path, cksum, r_parent_path, remote_ok, remote_fail):
+    scp = paramiko.SFTPClient.from_transport(c.get_transport())
     os.makedirs(local_path, exist_ok=True)
     for item in scp.listdir_attr(remote_path):
         remote_item = remote_path + '/' + item.filename
         local_item = os.path.join(local_path, item.filename)
         if stat.S_ISDIR(item.st_mode):
-            _recursive_copy(scp, remote_item, local_item)
+            _recursive_copy(c, remote_item, local_item, cksum, r_parent_path, remote_ok, remote_fail)
         else:
             try:
-                scp.get(remote_item, local_item)
-                app.logger.info(f"Remote file {remote_file} has been copied successfully.")
+                scp.get(remote_item, local_item) # Copy
+                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {local_item}.")
+                cksum_status = _doChecksumComparison(c, remote_item, local_item, cksum)
+                cleanUp = False
+                if remote_path == r_parent_path:
+                    cleanUp = True
+                if cksum_status:
+                    app.logger.info(f"moveftp/recursiveCopy : Checksum OK. Moving file {remote_item} to {remote_ok}")
+                    _moveFilesInServer(c, remote_item, r_parent_path, remote_ok, cleanUp) # Move and clean up
+                else:
+                    app.logger.error(f"moveftp/recursiveCopy : Checksum Failed! Moving file {remote_item} to {remote_fail}")
+                    _moveFilesInServer(c, remote_item, r_parent_path, remote_fail, cleanUp)
             except FileNotFoundError:
-                app.logger.error(f"Remote file {remote_file} is missing. Stopping.")
+                app.logger.error(f"moveftp/recursiveCopy : Remote file {remote_item} is missing. Stopping moveFTP as this should not happen (file system issue?).")
                 break
             except Exception as e:
-                app.logger.error('moveftp - Extraction could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
+                app.logger.error('moveftp/recursiveCopy : Extraction could not be done for ' + remote_item + ' : "{x}"'.format(x=str(e)))
+                app.logger.error(f"moveftp/recursiveCopy : Moving file {remote_item} to {remote_fail}")
+                _moveFilesInServer(c, remote_item, r_parent_path, remote_fail, False)
                 break
+
 
 def moveftp():
     default_sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
@@ -185,6 +262,7 @@ def moveftp():
     pubstoredir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
     remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
     remote_postdir = "xfer" # Get it from the configuration?
+    cksum_command = app.config.get("SFTP_CHECKSUM", "sha512sum")
 
     if not remote_basedir.endswith("/"):
         remote_basedir = remote_basedir + "/"
@@ -203,9 +281,9 @@ def moveftp():
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         c.connect(hostname=server, username=user, key_filename=user_pubkey, passphrase=user_passphrase)
-        scp = paramiko.SFTPClient.from_transport(c.get_transport())
 
-        _recursive_copy(scp, remote_dir, local_dir)
+        # Do the copy, checksum, move and cleanup
+        _recursive_copy(c, remote_dir, local_dir, cksum_command, remote_dir, remote_ok, remote_fail)
 
         scp.close()
         c.close()
