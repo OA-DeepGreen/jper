@@ -1143,7 +1143,7 @@ def register():
     vals = None
 
     if request.method == 'POST' and form.validate():
-        vals = request.values
+        vals = request.values.to_dict()
         role = vals.get('radio', None)
         if not vals.get('id', None):
             vals['id'] = str(uuid.uuid4())
