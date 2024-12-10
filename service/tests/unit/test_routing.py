@@ -70,7 +70,7 @@ class TestRouting(ESTestCase):
             ("ed.ac.uk", "ic.ac.uk", False)
         ]
         for ms in match_set:
-            m = routing.domain_url(ms[0], ms[1])
+            m = routing._domain_url(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -85,7 +85,7 @@ class TestRouting(ESTestCase):
             ("https://www.ic.ac.uk/physics", "richard@sci.ic.ac.uk", False)
         ]
         for ms in match_set:
-            m = routing.domain_email(ms[0], ms[1])
+            m = routing._domain_email(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -101,7 +101,7 @@ class TestRouting(ESTestCase):
             ("  lettERS", "VariyIng CAPITAL LeTTers  ", True)
         ]
         for ms in match_set:
-            m = routing.exact_substring(ms[0], ms[1])
+            m = routing._exact_substring(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -115,7 +115,7 @@ class TestRouting(ESTestCase):
             ("Mark", "Richard", False)
         ]
         for ms in match_set:
-            m = routing.exact_substring(ms[0], ms[1])
+            m = routing._exact_substring(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -130,7 +130,7 @@ class TestRouting(ESTestCase):
             ({"type": "email", "id" : "richard@here"}, {"type" : "orcid", "id" : "abcd"}, False)
         ]
         for ms in match_set:
-            m = routing.author_match(ms[0], ms[1])
+            m = routing._author_match(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -144,7 +144,7 @@ class TestRouting(ESTestCase):
             ("whatever", {"type" : "orcid", "id" : "abcd"}, False)
         ]
         for ms in match_set:
-            m = routing.author_string_match(ms[0], ms[1])
+            m = routing._author_string_match(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -160,7 +160,7 @@ class TestRouting(ESTestCase):
             ("HP45 8IO", "eh9 7uu", False)
         ]
         for ms in match_set:
-            m = routing.postcode_match(ms[0], ms[1])
+            m = routing._postcode_match(ms[0], ms[1])
             if m is False:
                 assert ms[2] is False
             else:
@@ -175,7 +175,7 @@ class TestRouting(ESTestCase):
         source2 = fixtures.NotificationFactory.notification_metadata()
         metadata = models.NotificationMetadata(source2)
 
-        routing.enhance(routed, metadata)
+        routing._enhance(routed, metadata)
 
         # now just check that elements of the metadata have made it over to the routed notification
         # or not as needed, using a reference record to compare the changes
@@ -271,7 +271,7 @@ class TestRouting(ESTestCase):
         # get the ids of the repo accounts so we can repackage for them
         repo_ids = [acc1.id, acc2.id]
 
-        links = routing.repackage(unrouted, repo_ids)
+        links = routing._repackage(unrouted, repo_ids)
 
         assert len(links) == 1
         assert links[0].get("type") == "package"
@@ -320,7 +320,7 @@ class TestRouting(ESTestCase):
         del ms1["metadata"]["project"]
         metadata1 = models.NotificationMetadata(ms1)
 
-        routing.enhance(routed1, metadata1)
+        routing._enhance(routed1, metadata1)
 
         # check the results
         assert len(routed1.authors) == 0
@@ -335,7 +335,7 @@ class TestRouting(ESTestCase):
         ms2 = deepcopy(metadata_source)
         metadata2 = models.NotificationMetadata(ms2)
 
-        routing.enhance(routed2, metadata2)
+        routing._enhance(routed2, metadata2)
 
         # check the results
         assert len(routed2.authors) == 2
@@ -370,7 +370,7 @@ class TestRouting(ESTestCase):
         del ms3["metadata"]["project"]
         metadata3 = models.NotificationMetadata(ms3)
 
-        routing.enhance(routed3, metadata3)
+        routing._enhance(routed3, metadata3)
 
         # check the results
         assert len(routed3.authors) == 2
@@ -402,7 +402,7 @@ class TestRouting(ESTestCase):
         ms4 = deepcopy(metadata_source)
         metadata4 = models.NotificationMetadata(ms4)
 
-        routing.enhance(routed4, metadata4)
+        routing._enhance(routed4, metadata4)
 
         # check the results
         assert len(routed4.authors) == 3

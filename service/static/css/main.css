@@ -557,3 +557,21 @@ dl.dl-details dd {
 .closebtn:hover {
   color: black;
 }
+
+.accordion-section.success, .success {
+    background-color: #04AA6D;
+} /* Green */
+
+.accordion-section.warning, .warning {
+    background-color: #ff9800;
+} /* Orange */
+
+
+.accordion-section.danger, .danger {
+  background-color: #f44336;
+} /* Red */
+
+.default {
+    background-color: #e7e7e7;
+    color: black;
+} /* Grey

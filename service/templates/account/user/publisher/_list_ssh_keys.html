@@ -1,0 +1,93 @@
+<h3>SSH keys</h3>
+<div class="table">
+    <div class="title-row row">
+        <div class="col span-2">Title</div>
+        <div class="col span-6">SSH public key</div>
+        <div class="col span-2">Status</div>
+        <div class="col span-2">Action</div>
+    </div>
+    <div class="row">
+        <div class="col span-2"><b>{{ deepgreen_ssh_key['title'] }}</b></div>
+        <div class="col span-6">
+            <div style="word-wrap: break-word">{{ deepgreen_ssh_key['public_key'] }}</div>
+        </div>
+        <div class="col span-2">
+            <div><span class="status box--info" >Active</span></div>
+        </div>
+        <div class="col span-2"></div>
+    </div>
+    {% if account.ssh_keys|length > 0 %}
+        {% for ssh_key in account.ssh_keys[::-1] %}
+            <div class="row">
+                <div class="col span-2">
+                    {%  if ssh_key.get('title', '') %}
+                        <b>{{ ssh_key['title']  }}</b>
+                    {% endif %}
+                </div>
+                <div class="col span-6">
+                    {%  if ssh_key.get('public_key', '') %}
+                        <div style="word-wrap: break-word">{{ ssh_key['public_key']  }}</div>
+                    {% endif %}
+                </div>
+                <div class="col span-2">
+                    {%  if ssh_key.get('status', '') %}
+                        {% if ssh_key['status'] == 'new' %}
+                            <div><span class="status box--success" >{{ ssh_key['status']  }}</span></div>
+                        {% elif ssh_key['status'] == 'active' %}
+                            <div><span class="status box--info" >{{ ssh_key['status']  }}</span></div>
+                        {% else %}
+                            <div><span class="status box--warning" >{{ ssh_key['status']  }}</span></div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="col span-2">
+                    {%  if ssh_key.get('status', '') %}
+                        {% if ssh_key.get('status', '') == 'new' and current_user.is_super %}
+                            <form method="POST" action="{{request.path}}/activate_ssh_key" class="form">
+                                <ul class="form-fields">
+                                    <input type="hidden" name="id" class="form-control" value="{{ ssh_key['id'] }}"/>
+                                    <button class="btn btn--3d" id="Activate SSH key" type="submit">Activate SSH key</button>
+                                </ul>
+                            </form><br/>
+                            <form method="POST" action="{{request.path}}/delete_ssh_key" class="form">
+                                <ul class="form-fields">
+                                    <input type="hidden" name="id" class="form-control" value="{{ ssh_key['id'] }}"/>
+                                    <button class="btn btn--3d" id="Delete SSH key" type="submit">Delete SSH key</button>
+                                </ul>
+                            </form>
+                        {% endif %}
+                        {% if ssh_key.get('status', '') == 'inactive' %}
+                            <form method="POST" action="{{request.path}}/activate_ssh_key" class="form">
+                                <ul class="form-fields">
+                                    <input type="hidden" name="id" class="form-control" value="{{ ssh_key['id'] }}"/>
+                                    <button class="btn btn--3d" id="Activate SSH key" type="submit">Activate SSH key</button>
+                                </ul>
+                            </form><br/>
+                            <form method="POST" action="{{request.path}}/delete_ssh_key" class="form">
+                                <ul class="form-fields">
+                                    <input type="hidden" name="id" class="form-control" value="{{ ssh_key['id'] }}"/>
+                                    <button class="btn btn--3d" id="Delete SSH key" type="submit">Delete SSH key</button>
+                                </ul>
+                            </form>
+                        {% endif %}
+                        {% if ssh_key.get('status', '') == 'active' %}
+                            <form method="POST" action="{{request.path}}/deactivate_ssh_key" class="form">
+                                <ul class="form-fields">
+                                    <input type="hidden" name="id" class="form-control" value="{{ ssh_key['id'] }}"/>
+                                    <button class="btn btn--3d" id="Make SSH key inactive" type="submit">Make SSH key inactive</button>
+                                </ul>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="row">
+        <p>Add your SSH public key to connect to the SFTP server</p>
+        <p>Once the key is active, Send a directory (alternatively a flat ZIP file) for each
+            single publication notification. There should be no files in the top level of
+            your SFTP folder.</p>
+        </div>
+    {% endif %}
+</div>

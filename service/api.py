@@ -429,21 +429,21 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
 
         if upto is not None:
             nl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = nl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -522,7 +522,7 @@ class JPER(object):
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
             "from": (page - 1) * page_size,
             "size": page_size
         }
@@ -541,7 +541,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' list matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('List all matches for query ' + json.dumps(qr))
-
         res = models.MatchProvenance.query(q=qr)
         app.logger.debug('List matches query resulted ' + json.dumps(res))
         mpl.matches = [models.MatchProvenance(i['_source']).data for i in res.get('hits',{}).get('hits',[])]
@@ -592,14 +591,14 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
             ## "sort": [{"analysis_date":{"order":"desc"}}],
             ## 2018-03-07 TD : change of sort key to 'created_date', but still newest first
             # 2016-09-06 TD : change of sort order newest first
@@ -609,7 +608,7 @@ class JPER(object):
 
         if upto is not None:
             fnl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = fnl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
@@ -659,19 +658,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": nl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
 
         if upto is not None:
             nl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = nl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = nl.upto
 
         if repository_id is not None:
             # 2016-09-07 TD : trial to filter for publisher's reporting
@@ -740,7 +739,7 @@ class JPER(object):
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"last_updated": {"order": "desc"}}],
         }
 
         if upto is not None:
@@ -757,7 +756,6 @@ class JPER(object):
             app.logger.debug(str(repository_id) + ' bulk matches for query ' + json.dumps(qr))
         else:
             app.logger.debug('Bulk all matches for query ' + json.dumps(qr))
-
         mpl.matches = []
         for mp in models.MatchProvenance.iterate(q=qr):
             mpl.matches.append(mp.data)
@@ -799,19 +797,19 @@ class JPER(object):
                 "bool": {
                     "filter": {
                         "range": {
-                            "last_updated": {
+                            "analysis_date": {
                                 "gte": fnl.since
                             }
                         }
                     }
                 }
             },
-            "sort": [{"last_updated":{"order":"desc"}}],
+            "sort": [{"analysis_date":{"order":"desc"}}],
         }
 
         if upto is not None:
             fnl.upto = dates.format(upto)
-            qr["query"]["bool"]["filter"]["range"]["last_updated"]["lte"] = fnl.upto
+            qr["query"]["bool"]["filter"]["range"]["analysis_date"]["lte"] = fnl.upto
 
         if provider_id is not None:
             qr['query']['bool']["must"] = {"match": {"provider.id.exact": provider_id}}
