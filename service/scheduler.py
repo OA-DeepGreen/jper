@@ -178,7 +178,7 @@ def _makeDirInServer(scp, r_dir):
                 # We do not care as most of these calls will fail as the directories already exist
 
 
-def _moveFilesInServer(s, file, remote_path, r_new, cleanUp):
+def _moveFilesInServer(scp, file, remote_path, r_new, cleanUp):
     # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
     # Get the file name and its parent directory in the remote server
     file_name = file
