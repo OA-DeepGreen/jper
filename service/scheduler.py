@@ -251,7 +251,7 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
                 scp.get(remote_item, local_file_path) # Copy
                 # ln -sf $uniquedir $pendingdir/.
                 sym_link_path = pending_dir + "/" + unique_dir
-                path(sym_link_path).symlink_to(unique_dir_path)
+                Path(sym_link_path).symlink_to(unique_dir_path)
                 app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {local_file_path}. Move to {remote_ok}")
                 cleanUp = False
                 if remote_path == r_parent_path:
