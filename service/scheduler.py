@@ -265,12 +265,12 @@ def moveftp():
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    publishers =  models.Account.pull_all_active_publishers()
+    publishers = models.Account.pull_all_active_publishers()
     for publisher in publishers:
-        id = publisher.id
-        server = publisher.sftp_server.get('url', default_sftp_server)
-        port = publisher.sftp_serve.get('port', default_sftp_port)
-        username = publisher.sftp_server.get('username', id)
+        id = publisher['id']
+        server = publisher.get('sftp_server', {}).get('url', default_sftp_server)
+        port = publisher.get('sftp_serve.get', {}).get('port', default_sftp_port)
+        username = publisher.get('sftp_server', {}).get('username', id)
 
         remote_dir = remote_basedir + username + remote_postdir
 
