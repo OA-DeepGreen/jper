@@ -645,7 +645,7 @@ def username(username):
     dg_public_key = ''
     if os.path.isfile(ssh_key_file):
         with open(ssh_key_file) as f:
-            dg_public_key = f.readlines()
+            dg_public_key = f.read()
     deepgreen_ssh_key = {
         "title": "Deepgreen service",
         "public_key": dg_public_key,
