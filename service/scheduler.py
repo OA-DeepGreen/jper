@@ -251,10 +251,9 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
 
 def moveftp():
     default_sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-    default_sftp_port   = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
-    user_pubkey = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY", '')
-    user_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
-    pubstoredir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+    default_sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+    dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+    dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
     remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
     remote_postdir = "xfer" # Get it from the configuration?
 
@@ -275,7 +274,7 @@ def moveftp():
 
         remote_dir = remote_basedir + username + remote_postdir
 
-        c.connect(hostname=server, port=port, username=username, key_filename=user_pubkey, passphrase=user_passphrase)
+        c.connect(hostname=server, port=port, username=username, key_filename=dg_pubkey_file, passphrase=dg_passphrase)
         scp = paramiko.SFTPClient.from_transport(c.get_transport())
 
         # Do the copy, move and cleanup
