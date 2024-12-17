@@ -235,15 +235,24 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
             app.logger.info( f"moveftp/recursiveCopy : This ({remote_item}) is a directory. Did not move.")
         else:
             try:
-                [l_dir, l_file] = local_item.rsplit("/",1)
-                l_dir = l_dir + "/" + uuid.uuid4().hex
+                # pubstroedir/sftp_foldername/uuid/file_name
+                # pubstroedir/sftp_foldername/pending/
+                [local_dir, local_file] = local_item.rsplit("/",1)
+                unique_dir = uuid.uuid4().hex
+                unique_dir_path = local_dir + "/" + unique_dir
+                pending_dir = local_dir + "/pending"
                 try:
-                    Path(l_dir).mkdir(parents=True, exist_ok=True)
+                    Path(unique_dir_path).mkdir(parents=True, exist_ok=True)
+                    Path(pending_dir).mkdir(parents=True, exist_ok=True)
                 except Exception as e:
-                    app.logger.error('moveftp/recursiveCopy : Error creating directory {l_dir} "{x}"'.format(x=str(e)))
-                l_item = l_dir + "/" + l_file
-                scp.get(remote_item, l_item) # Copy
-                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {l_item}. Move to {remote_ok}")
+                    app.logger.error('moveftp/recursiveCopy : Stopping. Error creating directories in {local_dir} "{x}"'.format(x=str(e)))
+                    break
+                local_file_path = unique_dir_path + "/" + local_file
+                scp.get(remote_item, local_file_path) # Copy
+                # ln -sf $uniquedir $pendingdir/.
+                sym_link_path = pending_dir + "/" + unique_dir
+                path(sym_link_path).symlink_to(unique_dir_path)
+                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {local_file_path}. Move to {remote_ok}")
                 cleanUp = False
                 if remote_path == r_parent_path:
                     cleanUp = True
