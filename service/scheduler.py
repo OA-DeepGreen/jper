@@ -255,7 +255,8 @@ def moveftp():
     dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
     dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
     remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
-    remote_postdir = "xfer" # Get it from the configuration?
+    local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+    remote_postdir = "xfer"
 
     if not remote_basedir.endswith("/"):
         remote_basedir = remote_basedir + "/"
