@@ -231,10 +231,13 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
         local_item = os.path.join(local_path, item.filename)
         if stat.S_ISDIR(item.st_mode):
             _recursive_copy(scp, remote_item, local_item, r_parent_path, remote_ok, remote_fail)
+            app.logger.info( f"moveftp/recursiveCopy : This ({remote_item}) is a directory. Did not move.")
         else:
             try:
-                scp.get(remote_item, local_item) # Copy
-                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {local_item}. Move to {remote_ok}")
+                [l_dir, l_file] = local_item.rsplit("/",1)
+                l_item = l_dir + "/" + uuid.uuid4().hex + "/" + l_file
+                scp.get(remote_item, l_item) # Copy
+                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {l_item}. Move to {remote_ok}")
                 cleanUp = False
                 if remote_path == r_parent_path:
                     cleanUp = True
@@ -282,11 +285,13 @@ def moveftp():
         remote_ok = remote_dir_parent + okdir
         remote_fail = remote_dir_parent + faildir
 
+        l_dir = local_dir + "/" + username
+
         c.connect(hostname=server, port=port, username=username, key_filename=dg_pubkey_file, passphrase=dg_passphrase)
         scp = paramiko.SFTPClient.from_transport(c.get_transport())
 
         # Do the copy, move and cleanup
-        _recursive_copy(scp, remote_dir, local_dir, remote_dir, remote_ok, remote_fail)
+        _recursive_copy(scp, remote_dir, l_dir, remote_dir, remote_ok, remote_fail)
 
         scp.close()
         c.close()
