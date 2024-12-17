@@ -673,11 +673,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         :return: The ftp_server information as a python dict object
         """
         sftp_server = self._get_single("sftp_server")
-        if not sftp_server['username']:
+        if not sftp_server:
+            sftp_server = {}
+        if not sftp_server.get('username', ''):
             sftp_server['username'] = self.id
-        if not sftp_server['url']:
+        if not sftp_server.get('url', ''):
             sftp_server['url'] = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        if not sftp_server['port']:
+        if not sftp_server.get('port', ''):
             sftp_server['port'] = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
         return sftp_server
 
