@@ -275,6 +275,13 @@ def moveftp():
 
         remote_dir = remote_basedir + username + remote_postdir
 
+        curr_now = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        okdir = "xfer_processed/" + curr_now
+        faildir = "xfer_failed/" + curr_now
+        remote_dir_parent = remote_basedir + username + "/"
+        remote_ok = remote_dir_parent + okdir
+        remote_fail = remote_dir_parent + faildir
+
         c.connect(hostname=server, port=port, username=username, key_filename=dg_pubkey_file, passphrase=dg_passphrase)
         scp = paramiko.SFTPClient.from_transport(c.get_transport())
 
