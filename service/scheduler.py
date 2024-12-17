@@ -21,6 +21,7 @@ the schedule would need access to any relevant directories.
 """
 
 import schedule, time, os, shutil, requests, datetime, tarfile, zipfile, subprocess, getpass, uuid, json
+from pathlib import Path
 from threading import Thread
 from octopus.core import app, initialise
 from service import reports
@@ -235,7 +236,12 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
         else:
             try:
                 [l_dir, l_file] = local_item.rsplit("/",1)
-                l_item = l_dir + "/" + uuid.uuid4().hex + "/" + l_file
+                l_dir = l_dir + "/" + uuid.uuid4().hex
+                try:
+                    Path(l_dir).mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    app.logger.error('moveftp/recursiveCopy : Error creating directory {l_dir} "{x}"'.format(x=str(e)))
+                l_item = l_dir + "/" + l_file
                 scp.get(remote_item, l_item) # Copy
                 app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {l_item}. Move to {remote_ok}")
                 cleanUp = False
