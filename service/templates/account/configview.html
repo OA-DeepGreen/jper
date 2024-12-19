@@ -67,7 +67,7 @@
             {% endwith %}
         {% endif %}
         <!-- excluded_domains -->
-        {% if repo.excluded_domains|length > 0 %}
+        {% if False and repo.excluded_domains|length > 0 %}
             {% with data=repo.excluded_domains, id='excluded_domains', title='Excluded Domains' %}
                 {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
