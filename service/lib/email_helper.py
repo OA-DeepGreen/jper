@@ -18,3 +18,4 @@ def send_email_to_admin(subject, message):
     s.send_message(msg)
     s.quit()
     return
+

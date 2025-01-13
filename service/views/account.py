@@ -10,9 +10,9 @@ from flask_login import login_user, logout_user, current_user
 from octopus.core import app
 from octopus.lib import dates
 from service.api import JPER, ParameterException
-from service.views.webapi import _bad_request
 from service.repository_licenses import get_matching_licenses
 from service.lib import csv_helper, email_helper, request_deposit_helper
+from service.lib.validation_helper import validate_date, validate_page, validate_page_size, bad_request
 import math
 import csv
 import sys
@@ -66,9 +66,9 @@ ftable = {
 # Config table/csv for repositories
 ctable = {
         "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                    "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+                    "Excluded Name Variants", "Excluded Keywords"],
         "header": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                   "Excluded Name Variants", "Excluded Domains", "Excluded Keywords"],
+                   "Excluded Name Variants", "Excluded Keywords"],
  "Name Variants": "repoconfig[0].name_variants[*]",
        "Domains": "repoconfig[0].domains[*]",
  "Grant Numbers": "repoconfig[0].grants[*]",
@@ -76,7 +76,6 @@ ctable = {
            "RoR": "repoconfig[0].author_ids[?(@.type=='ror')].id",
       "Ringgold": "repoconfig[0].author_ids[?(@.type=='ringgold')].id",
 "Excluded Name Variants": "repoconfig[0].excluded_name_variants[*]",
-"Excluded Domains": "repoconfig[0].excluded_domains[*]",
     "Excluded Keywords": "repoconfig[0].excluded_keywords[*]",
 }
 
@@ -92,10 +91,10 @@ def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = _validate_date(since, param='since')
-    upto = _validate_date(upto, param='upto')
-    page = _validate_page()
-    page_size = _validate_page_size()
+    since = validate_date(since, param='since')
+    upto = validate_date(upto, param='upto')
+    page = validate_page()
+    page_size = validate_page_size()
 
     try:
         if bulk is True:
@@ -103,7 +102,7 @@ def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
         else:
             flist = JPER.list_failed(current_user, since, upto=upto, page=page, page_size=page_size, provider_id=provider_id)
     except ParameterException as e:
-        return _bad_request(str(e))
+        return bad_request(str(e))
 
     return flist.json()
 
@@ -120,10 +119,10 @@ def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = _validate_date(since, param='since')
-    upto = _validate_date(upto, param='upto')
-    page = _validate_page()
-    page_size = _validate_page_size()
+    since = validate_date(since, param='since')
+    upto = validate_date(upto, param='upto')
+    page = validate_page()
+    page_size = validate_page_size()
 
     try:
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
@@ -135,7 +134,7 @@ def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk
             mlist = JPER.list_matches(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                       provider=provider)
     except ParameterException as e:
-        return _bad_request(str(e))
+        return bad_request(str(e))
 
     return mlist.json()
 
@@ -151,10 +150,10 @@ def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=Fals
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = _validate_date(since, param='since')
-    upto = _validate_date(upto, param='upto')
-    page = _validate_page()
-    page_size = _validate_page_size()
+    since = validate_date(since, param='since')
+    upto = validate_date(upto, param='upto')
+    page = validate_page()
+    page_size = validate_page_size()
 
     try:
         # nlist = JPER.list_notifications(current_user, since, page=page, page_size=page_size, repository_id=repo_id)
@@ -166,7 +165,7 @@ def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=Fals
             nlist = JPER.list_notifications(current_user, since, upto=upto, page=page, page_size=page_size, repository_id=repo_id,
                                             provider=provider)
     except ParameterException as e:
-        return _bad_request(str(e))
+        return bad_request(str(e))
 
     return nlist.json()
 
@@ -185,17 +184,17 @@ def _download_request(repo_id=None, provider=False):
     since = request.values.get("since")
 
     if since is None or since == "":
-        return _bad_request("Missing required parameter 'since'")
+        return bad_request("Missing required parameter 'since'")
 
     try:
         since = dates.reformat(since)
     except ValueError as e:
-        return _bad_request("Unable to understand since date '{x}'".format(x=since))
+        return bad_request("Unable to understand since date '{x}'".format(x=since))
 
     try:
         nbulk = JPER.bulk_notifications(current_user, since, repository_id=repo_id)
     except ParameterException as e:
-        return _bad_request(str(e))
+        return bad_request(str(e))
 
     return nbulk.json()
 
@@ -226,40 +225,8 @@ def _sword_logs(repo_id, from_date, to_date):
                             if detailed_log and detailed_log.messages:
                                 deposit_record_logs[msg['deposit_record']] = detailed_log.messages
     except ParameterException as e:
-        return _bad_request(str(e))
+        return bad_request(str(e))
     return logs, deposit_record_logs
-
-
-def _validate_date(dt, param='since'):
-    if dt is None or dt == "":
-        return _bad_request("Missing required parameter {param}".format(param=param))
-    out_format = None
-    if param == 'upto':
-        out_format = "%Y-%m-%dT23:59:59Z"
-    try:
-        dt = dates.reformat(dt, out_format=out_format)
-    except ValueError:
-        return _bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
-
-    return dt
-
-
-def _validate_page():
-    page = request.values.get("page", app.config.get("DEFAULT_LIST_PAGE_START", 1))
-    try:
-        page = int(page)
-    except:
-        return _bad_request("'page' parameter is not an integer")
-    return page
-
-
-def _validate_page_size():
-    page_size = request.values.get("pageSize", app.config.get("DEFAULT_LIST_PAGE_SIZE", 25))
-    try:
-        page_size = int(page_size)
-    except:
-        return _bad_request("'pageSize' parameter is not an integer")
-    return page_size
 
 
 def _get_notification_value(header, notification):
@@ -562,15 +529,15 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = _validate_date(request.args.get('to', None), param='upto')
+        to_date = validate_date(request.args.get('to', None), param='upto')
         to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = _validate_date(request.args.get('from', None), param='since')
+        from_date = validate_date(request.args.get('from', None), param='since')
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = _validate_date(request.args.get('date', None), param='since')
+        from_date = validate_date(request.args.get('date', None), param='since')
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
     # Default from and to dates
 
@@ -1016,9 +983,12 @@ def add_ssh_key(username):
         subject = f"New SSH key for #{acc.id}"
         message = f"""New SSH key has been added to the account #{acc.id}.
         The key has to be copied to the publisher account and when ready needs to be activated in Deepgreen."""
-        email_helper.send_email_to_admin(subject, message)
-        flash('The ssh key has been added', "success")
-    except Exception as e:
+        try:
+            email_helper.send_email_to_admin(subject, message)
+            flash('The ssh key has been added', "success")
+        except Exception as _e:
+            flash('The ssh key has been added. There was an error sending an email', "success")
+    except Exception as _e:
         ex_type, ex_value, ex_traceback = sys.exc_info()
         flash('Error saving SSH key: ' + str(ex_value), 'error')
     return redirect(url_for('.username', username=username))
