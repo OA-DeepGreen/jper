@@ -8,9 +8,9 @@ setup(
     install_requires=[
         "beautifulsoup4~=4.12",
         "openpyxl~=3.1",
-        "werkzeug~=3.0",
+        "Werkzeug<3.0",  # FIXME: we have passwords using sha1 that are undecodable after 3.0,
         "chardet~=5.2",
-        "Flask~=3.0",
+        "Flask<3.0",   # FIXME: after 3, needs version 3 of werkzeug,
         "Flask-Login~=0.6",
         "itsdangerous~=2.2",
         "requests~=2.32",
