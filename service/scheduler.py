@@ -235,8 +235,8 @@ def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remo
             app.logger.info( f"moveftp/recursiveCopy : This ({remote_item}) is a directory. Did not move.")
         else:
             try:
-                # pubstroedir/sftp_foldername/uuid/file_name
-                # pubstroedir/sftp_foldername/pending/
+                # pubstoredir/sftp_foldername/uuid/file_name
+                # pubstoredir/sftp_foldername/pending/
                 [local_dir, local_file] = local_item.rsplit("/",1)
                 unique_dir = uuid.uuid4().hex
                 unique_dir_path = local_dir + "/" + unique_dir
@@ -287,9 +287,15 @@ def moveftp():
     publishers = models.Account.pull_all_active_publishers()
     for publisher in publishers:
         id = publisher['id']
-        server = publisher.get('sftp_server', {}).get('url', default_sftp_server)
-        port = publisher.get('sftp_serve.get', {}).get('port', default_sftp_port)
-        username = publisher.get('sftp_server', {}).get('username', id)
+        server = publisher.get('sftp_server', {}).get('url', '')
+        if not (server and server.strip()):
+            server = default_sftp_server
+        port = publisher.get('sftp_server.get', {}).get('port', '')
+        if not (port and port.strip()):
+            port = default_sftp_port
+        username = publisher.get('sftp_server', {}).get('username', '')
+        if not (username and username.strip()):
+            username = id
 
         remote_dir = remote_basedir + username + remote_postdir
 
@@ -300,7 +306,7 @@ def moveftp():
         remote_ok = remote_dir_parent + okdir
         remote_fail = remote_dir_parent + faildir
 
-        l_dir = local_dir + "/" + username
+        l_dir = local_dir + "/" + id
 
         c.connect(hostname=server, port=port, username=username, key_filename=dg_pubkey_file, passphrase=dg_passphrase)
         scp = paramiko.SFTPClient.from_transport(c.get_transport())
