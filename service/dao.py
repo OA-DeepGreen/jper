@@ -952,3 +952,10 @@ class LicenseManagementDAO(dao.ESDAO):
             "sort": [{"last_updated": {"order": "desc"}}]
         }
         return cls.pull_all(q, size=1000, return_as_object=False)
+
+
+class RoutingHistoryDAO(dao.ESDAO):
+    """
+    DAO for RoutingHistoryDAO
+    """
+    __type__ = "routing_history"
