@@ -317,6 +317,9 @@ def moveftp():
         scp.close()
         c.close()
 
+if app.config.get('MOVEFTP_SCHEDULE', 10) != 0:
+    schedule.every(app.config.get('MOVEFTP_SCHEDULE', 10)).minutes.do(moveftp)
+
 #
 # 2019-07-17 TD : process the big delivery/publisher dg_storage for all pending items
 #
