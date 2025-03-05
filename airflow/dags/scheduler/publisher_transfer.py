@@ -1,0 +1,377 @@
+import os, stat, uuid, shutil, json, requests
+from pathlib import Path
+from datetime import datetime
+import paramiko
+from move_files.utils import zip, flatten, pkgformat
+# from service import models
+# from octopus.core import app
+
+class publisher_files():
+    def __init__(self):
+        self.__init_constants__() # First to be done
+        self.__init_from_app__()
+        # self.__init_publisher__(publisher)
+        self._is_scp = False
+        # self.__init_sftp_connection__() # Do this only when needed
+
+    def __init_sftp_connection__(self):
+        # Initialise the sFTP connection
+        self.c = paramiko.SSHClient()
+        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.c.connect( hostname=self.sftp_server, port=self.sftp_port,
+                        username=self.username, key_filename=self.dg_pubkey_file,
+                        # passphrase=self.dg_passphrase
+                        )
+        self.scp = paramiko.SFTPClient.from_transport(self.c.get_transport())
+        self._is_scp = True
+
+    def __init_constants__(self):
+        # Stuff that is not picked up from elsewhere
+        # self.remote_postdir = "xfer"
+        # self.remote_processed = "xfer_processed"
+        # self.remote_failed = "xfer_failed"
+
+        self.remote_postdir = ".ssh_test"
+        self.remote_processed = "xfer_processed"
+        self.remote_failed = "xfer_failed"
+        self.file_list = []
+
+    def __init_from_app__(self):
+        # Initialise the needed constants from the app
+        # self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
+        # self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+        # self.dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+        # self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
+        # self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
+        # self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+        # self.publishers = models.Account.pull_all_active_publishers()
+        # self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        # self.apiurl = app.config['API_URL']
+
+        self.publishers = []
+        self.sftp_server = "voyager.pp.rl.ac.uk"
+        self.sftp_port = ""
+        self.dg_pubkey_file = "/home/nraja/.ssh/keys/ral/ppdBastion"
+        self.dg_passphrase = ""
+        self.remote_basedir = "/home/ppd/"
+        self.local_dir = "/home/nraja/Work/deepGreen/airflow/test"
+        self.tmpdir = "/tmp"
+        self.apiurl = ""
+
+        if not self.remote_basedir.endswith("/"):
+            self.remote_basedir = self.remote_basedir + "/"
+        if not self.remote_postdir.startswith("/"):
+            self.remote_postdir = "/" + self.remote_postdir
+        if not self.local_dir.endswith("/"):
+            self.local_dir = self.local_dir + "/"
+        if not self.tmpdir.endswith("/"):
+            self.tmpdir = self.tmpdir + "/"
+
+    def __define_directories__(self):
+        # Use the stuff defined so far to define remote and local directories
+        self.remote_dir = self.remote_basedir + self.username + self.remote_postdir
+
+        curr_now = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        okdir = self.remote_processed + "/" + curr_now
+        faildir = self.remote_failed + "/" + curr_now
+        remote_dir_parent = self.remote_basedir + self.username + "/"
+        self.remote_ok = remote_dir_parent + okdir
+        self.remote_fail = remote_dir_parent + faildir
+
+        self.l_dir = self.local_dir + self.username
+        if not self.l_dir.endswith("/"):
+            self.l_dir = self.l_dir + "/"
+
+    # def __del__(self):
+    #     if self._is_scp:
+    #         self.scp.close()
+    #         self.c.close()
+
+    ##### End Initialisations and Destructor. Begin internal functions #####
+
+    def _makeDirInServer(self, r_dir):
+        # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
+        # Loop over the path
+        if not self._is_scp:
+            self.__init_sftp_connection__()
+        subdirs = r_dir.split("/")
+        path = ""
+        for subdir in subdirs:
+            sdir = subdir.strip()
+            if len(sdir) > 0:
+                path = path + "/" + sdir
+                try:
+                    self.scp.mkdir(path)
+                except Exception as e:
+                    # We do not care as most of these calls will fail as the directories already exist
+                    print(f"makeDirInServer : {str(e)} : Directory {path} probably exists already!")
+
+    def _moveFilesInServer(self, file, remote_path, r_new, cleanUp):
+        # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
+        # Get the file name and its parent directory in the remote server
+        file_name = file
+        file_dir = ""
+        if "/" in file.strip():
+            file_dir = file.strip().rsplit("/",1)[0]
+            file_name = file.strip().rsplit("/",1)[1]
+        file_subdir = file_dir.replace(remote_path, '').strip()
+        if file_subdir.startswith("/"):
+            file_subdir = file_subdir[1:]
+
+        # Create the destination directory before moving the file over
+        new_dir = r_new
+        if len(file_subdir.strip()) > 0:
+            new_dir = f"{r_new}/{file_subdir}"
+        try:
+            self._makeDirInServer(new_dir)
+        except Exception as e:
+            print(f'moveFilesInServer : Could not create destination directory {new_dir}. Error : {str(e)}')
+            return
+
+        # Move the file to the destination
+        if len(file_subdir.strip()) > 0:
+            new_file = f"{r_new}/{file_subdir}/{file_name}"
+        else:
+            new_file = f"{r_new}/{file_name}"
+
+        try:
+            if not self._is_scp:
+                self.__init_sftp_connection__()
+            self.scp.rename(remote_path + '/' + file, new_file)
+            print(f'moveFilesInServer : Successfully moved {file} to {new_file}.')
+        except Exception as e:
+            print(f'moveFilesInServer : Failed to move {file} to {new_file}. Error : {str(e)}')
+            return
+
+        # Clean up the server of empty directories (if any). A bit of unnecessary overhead, so avoid for subdirectories
+        if cleanUp:
+            print(f"moveFilesInServer: Cleaning up parent directory {remote_path}")
+            try:
+                self.scp.rmdir(remote_path)
+                print(f'moveFilesInServer : Successfully deleted directory {remote_path}.')
+                self.scp.mkdir(remote_path)
+                print(f'moveFilesInServer : Successfully re-created directory {remote_path}.')
+            except Exception as e:
+                print(f'moveFilesInServer : Could not delete directory {remote_path}. Likely not empty. Error : {str(e)}')
+
+    ##### End internal functions. Begin main (external) functions #####
+
+    def init_publisher(self, publisher):
+        # Initialise for a given publisher
+        # id = publisher['id']
+        # server = publisher.get('sftp_server', {}).get('url', '')
+        # if server and server.strip():
+        #     self.sftp_server = server
+        # port = publisher.get('sftp_server.get', {}).get('port', '')
+        # if port and port.strip():
+        #     self.sftp_port = port
+        # uname = publisher.get('sftp_server', {}).get('username', '')
+        # if uname and uname.strip():
+        #     self.username = uname
+        # else:
+        #     self.username = id
+
+        id = 0
+        server = ""
+        if server and server.strip():
+            self.sftp_server = server
+        port = "22"
+        if port and port.strip():
+            self.sftp_port = port
+        uname = "nraja"
+        if uname and uname.strip():
+            self.username = uname
+        else:
+            self.username = id
+
+        self.__define_directories__()
+
+    ##### --- moveftp ---
+
+    def list_remote_dir(self, rdir):
+        # Idempotent function to recursively get the list of files in a remote directory
+        if not self._is_scp:
+            self.__init_sftp_connection__()
+        rdir = rdir.rstrip('/')
+        try:
+            x = self.scp.stat(rdir)
+        except Exception as e:
+            print(f"list_remote_dir : Failed to access directory {rdir}. Error : {str(e)}")
+            return []
+        
+        folders = []
+        for item in self.scp.listdir_attr(rdir):
+            r_obj = rdir + '/' + item.filename
+            # Skip if file is already listed - Make this function idempotent
+            if r_obj in self.file_list:
+                continue
+            # Separate folders and files
+            if stat.S_ISDIR(item.st_mode):
+                folders.append(r_obj)
+            else:
+                self.file_list.append(r_obj)
+        # Recursive call for the folders
+        for folder in folders:
+            self.list_remote_dir(folder)
+        return self.file_list
+
+    def get_file(self, fileName): # Get one file and associated operations
+        # Initialise the sFTP connection if not already done
+        if not self._is_scp:
+            self.__init_sftp_connection__()
+        # Some sanity check - do I have a full path or just a file name?
+        if self.remote_dir in fileName:
+            remote_file = fileName
+            local_file = self.l_dir + fileName.removeprefix(self.remote_dir).lstrip("/")
+        else:
+            remote_file = self.remote_basedir + self.username + "/" + fileName
+            local_file = self.l_dir + fileName
+        # Retrieve the file
+        # First get the local and pending directories and file name
+        l_dir = os.path.dirname(local_file)
+        l_file = os.path.basename(local_file)
+        unique_dir = uuid.uuid4().hex
+        unique_dir_path = l_dir + "/" + unique_dir
+        pending_dir = self.l_dir + "pending" + l_dir.removeprefix(self.l_dir.rstrip("/"))
+        if not pending_dir.endswith("/"):
+            pending_dir = pending_dir + "/"
+        try:
+            Path(unique_dir_path).mkdir(parents=True, exist_ok=True)
+            Path(pending_dir).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print('moveftp/recursiveCopy : Stopping. Error creating directories in {local_dir} "{x}"'.format(x=str(e)))
+            return {"status": "Failed", "message": str(e)}
+        # Get the file from the server
+        remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
+        try:
+            local_file_path = unique_dir_path + "/" + l_file
+            self.scp.get(remote_file, local_file_path)
+            # ln -sf $uniquedir $pendingdir/.
+            sym_link_path = pending_dir + unique_dir
+            Path(sym_link_path).symlink_to(unique_dir_path)
+            cleanUp = False # Clean up only for master path
+            if os.path.dirname(remote_file) == self.remote_dir:
+                cleanUp = True
+            self._moveFilesInServer(remote_item, self.remote_dir, self.remote_ok, cleanUp) # Move and clean up
+            print(f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
+            return {"status": "Success", "linkPath": sym_link_path}
+        except FileNotFoundError as e:
+            print(f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
+            return {"status": "Failed", "message": str(e)}
+        except Exception as e:
+            print('getFile : sFTP could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
+            print(f"getFile : Moving file {remote_item} to {self.remote_fail}")
+            self._moveFilesInServer(remote_item, self.remote_dir, self.remote_fail, False)
+            return {"status": "Failed", "message": str(e)}
+
+    ##### --- copyftp ---
+
+    def copyftp(self, fileName):
+        # copy one pending file from the big delivery/publisher dg_storage into the temp dir for processing
+        # Make the tmpdir
+        try:
+            Path(os.path.join(self.tmpdir, self.username)).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print('copyftp : Stopping. Error creating directories in {self.tmpdir}? : "{x}"'.format(x=str(e)))
+            return {"status": "Failed", "message": str(e)}
+        # Do the copy
+        print('copyftp - copying file ' + fileName + ' for Account:' + self.username)
+        src = self.local_dir + self.username + '/pending/' + os.path.basename(fileName)
+        dst = self.tmpdir + self.username + "/" + os.path.basename(fileName)
+        try:
+            shutil.rmtree(dst, ignore_errors=True)  # target MUST NOT exist!
+            shutil.copytree(src, dst)
+        except Exception as e:
+            print()
+            return {"status": "Failed", "message": str(e)}
+        # Cleanup
+        try:
+            os.remove(src)  # try to take the pending symlink away
+            return {"status": "Success", 'pend_dir': dst}
+        except Exception as e:
+            print("copyftp - failed to delete pending entry: '{x}'".format(x=str(e)))
+            return {"status": "Failed", "message": str(e)}
+
+    ##### --- copyftp ---
+
+    def processftp(self, thisdir):
+        print(f"processftp - processing for file {thisdir}")
+        # configure for sending anything for the user of this dir
+        acc = models.Account().pull(self.username)
+        if acc is None:
+            print("No publisher account with name " + self.username + " is found. Not processing " + thisdir)
+            return{"status":"Failed", "message": f"No publisher named {self.username}"}
+        self.apiurl += '?api_key=' + acc.data['api_key']
+
+        # there is a uuid dir for each item moved in a given operation from the user jail
+        dirName = thisdir.split("/")[-1]
+        print('processftp - processing ' + thisdir + ' for Account:' + self.username)
+        for xpub in os.listdir(thisdir):
+            pub = xpub
+            # should be a dir per publication notification - that is what they are told to provide
+            # and at this point there should just be one pub in here, whether it be a file or directory or archive
+            # if just a file, even an archive, dump it into a directory so it can be zipped easily
+            thisfile = os.path.join(thisdir, pub)
+            if not os.path.isfile(thisfile):
+                return{"status":"Failed", "message": f"Not a file : {thisfile}"}
+            #
+            nf = uuid.uuid4().hex
+            newloc = os.path.join(thisdir, nf, '')
+            try:
+                os.makedirs(os.path.join(thisdir, nf))
+                shutil.move(thisfile, newloc)
+            except Exception as e:
+                return{"status":"Failed", "message": f"File system issue? : {str(e)}"}
+            pub = nf
+            print('Moved ' + thisfile + ' to ' + newloc)
+
+            # by now this should look like this:
+            # /Incoming/ftptmp/<useruuid>/<transactionuuid>/<uploadeddirORuuiddir>/<thingthatwasuploaded>
+
+            # they should provide a directory of files or a zip, but it could just be one file
+            # but we don't know the hierarchy of the content, so we have to unpack and flatten it all
+            # unzip and pull all docs to the top level then zip again. Should be jats file at top now
+            try:
+                flatten(thisdir + '/' + pub)
+            except Exception as e:
+                return{"status":"Failed", "message": f"Flatten failed for {thisdir + '/' + pub} : {str(e)}"}
+
+            # 2019-11-18 TD : 'flatten' has been modified to process bulk deliveries
+            #                 (i.e. more then one pub per zip file!) as well.
+            #                 If it is bulk, there maybe a lot of zip files, and
+            #                 we need a loop:
+            pdir = thisdir
+            if os.path.isdir(thisdir + '/' + pub + '/' + pub):
+                pdir = thisdir + '/' + pub + '/' + pub
+            #
+            for singlepub in os.listdir(pdir):
+                # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
+                # 2019-11-18 TD : original path without loop where zip file is packed
+                #                 from  source folder "thisdir + '/' + pub"
+                pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
+                pkg = os.path.join(pdir, singlepub + '.zip')
+                try:
+                    zip(os.path.join(pdir, singlepub), pkg)
+                except Exception as e:
+                    return{"status":"Failed", "message": f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}"}
+
+                # create a notification and send to the API to join the unroutednotification index
+                notification = {
+                    "content": {"packaging_format": pkg_fmt}
+                }
+                files = [
+                    ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
+                    ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
+                ]
+                # print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
+                # resp = requests.post(self.apiurl, files=files, verify=False)
+                # log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
+                # if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
+                #     print(f"Scheduler - processing completed with POST failure to {log_data}")
+                #     return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
+                # else:
+                #     print(f"Scheduler - processing completed with POST to {log_data}")
+                #     return{"status":"Success", "message": f"Processing complete."}
+
+            # shutil.rmtree(thisdir, ignore_errors=True)  # 2019-12-02 TD : kill "udir" folder no matter what status
+
