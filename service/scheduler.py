@@ -21,11 +21,16 @@ the schedule would need access to any relevant directories.
 """
 
 import schedule, time, os, shutil, requests, datetime, tarfile, zipfile, subprocess, getpass, uuid, json
+from pathlib import Path
 from threading import Thread
 from octopus.core import app, initialise
 from service import reports
 from service import models
 from service.lib.cleanup_repository_logs import cleanup_repository_logs
+import paramiko
+import stat
+import subprocess
+from datetime import datetime
 
 if app.config.get('DEEPGREEN_EZB_ROUTING', False):
     from service import routing_deepgreen as routing
@@ -141,7 +146,7 @@ def pkgformat(src):
                         if "//NLM//DTD Journal " in line:
                             pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
                             break
-                        elif "//NLM//DTD JATS " in line:
+                        elif "//NLM//DTD JATS " in line or "jats.nlm.nih.gov" in line:
                             pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
                             break
                         elif "//RSC//DTD RSC " in line:
@@ -158,51 +163,162 @@ def pkgformat(src):
     return pkg_fmt
 
 
-#
-# 2019-07-17 TD : change target of the move operation to the big dg_storage for all deliveries
-#
-def moveftp():
+def _makeDirInServer(scp, r_dir):
+    # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
+    # Loop over the path
+    subdirs = r_dir.split("/")
+    path = ""
+    for subdir in subdirs:
+        sdir = subdir.strip()
+        if len(sdir) > 0:
+            path = path + "/" + sdir
+            try:
+                scp.mkdir(path)
+            except Exception as e:
+                app.logger.debug(f"makeDirInServer : {str(e)} : Directory {path} probably exists already!")
+                # We do not care as most of these calls will fail as the directories already exist
+
+
+def _moveFilesInServer(scp, file, remote_path, r_new, cleanUp):
+    # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
+    # Get the file name and its parent directory in the remote server
+    file_name = file
+    file_dir = ""
+    if "/" in file.strip():
+        file_dir = file.strip().rsplit("/",1)[0]
+        file_name = file.strip().rsplit("/",1)[1]
+    file_subdir = file_dir.replace(remote_path, '').strip()
+    if file_subdir.startswith("/"):
+        file_subdir = file_subdir[1:]
+
+    # Create the destination directory before moving the file over
+    new_dir = r_new
+    if len(file_subdir.strip()) > 0:
+        new_dir = f"{r_new}/{file_subdir}"
     try:
-        # # move any files in the jail of ftp users into the temp directory for later processing
-        # tmpdir = app.config.get('TMP_DIR','/tmp')
-        pubstoredir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
-        userdir = app.config.get('USERDIR', '/home/sftpusers')
-        userdirs = os.listdir(userdir)
-        fl = os.path.dirname(os.path.abspath(__file__)) + '/models/moveFTPfiles.sh'
-        app.logger.info("Scheduler - from FTP folders found " + str(len(userdirs)) + " user directories")
-        for dir in userdirs:
-            if not os.path.isdir(os.path.join(userdir, dir)):
-                continue
-            # 2019-07-30 TD : One more loop over possible subfolders of the user
-            #                 Please note: They are *exclusively* created by 'createFTPuser.sh'
-            #                 At least, there should be the (old) 'xfer' folder
-            founditems = False
-            for xfer in os.listdir(os.path.join(userdir, dir)):
-                if len(os.listdir(os.path.join(userdir, dir, xfer))):
-                    founditems = True
-                    for thisitem in os.listdir(os.path.join(userdir, dir, xfer)):
-                        app.logger.info('Scheduler - moving file ' + thisitem + ' for Account:' + dir)
-                        try:
-                            newowner = getpass.getuser()
-                        except:
-                            newowner = app.config.get('PUBSTORE_USER', 'green')
-                        uniqueid = uuid.uuid4().hex
-                        targetdir = os.path.join(pubstoredir, dir)
-                        pendingdir = os.path.join(pubstoredir, dir, 'pending')
-                        uniquedir = os.path.join(pubstoredir, dir, uniqueid)
-                        moveitem = os.path.join(userdir, dir, xfer, thisitem)
-                        subprocess.call( [ 'sudo', fl, dir, newowner, targetdir, uniqueid, uniquedir, moveitem, pendingdir ] )
-                        # subprocess.call([fl, dir, newowner, targetdir, uniqueid, uniquedir, moveitem, pendingdir])
+        _makeDirInServer(scp, new_dir)
+    except Exception as e:
+        app.logger.error(f'moveFilesInServer/recursiveCopy : Could not create destination directory {new_dir}. Error : {str(e)}')
+        return
 
-            if founditems is False:
-                app.logger.debug('Scheduler - found nothing to move for Account:' + dir)
-    except:
-        app.logger.error("Scheduler - move from FTP failed")
+    # Move the file to the destination
+    if len(file_subdir.strip()) > 0:
+        new_file = f"{r_new}/{file_subdir}/{file_name}"
+    else:
+        new_file = f"{r_new}/{file_name}"
+    try:
+        scp.rename(file, new_file)
+        app.logger.error(f'moveFilesInServer/recursiveCopy : Successfully moved {file} to {new_file}.')
+    except Exception as e:
+        app.logger.error(f'moveFilesInServer/recursiveCopy : Failed to move {file} to {new_file}. Error : {str(e)}')
+        return
 
+    # Clean up the server of empty directories (if any). A bit of unnecessary overhead, so avoid for subdirectories
+    if cleanUp:
+        print(f"Cleaning up parent directory : {remote_path}")
+        try:
+            scp.rmdir(remote_path)
+            app.logger.info(f'moveFilesInServer/recursiveCopy : Successfully deleted directory {remote_path}.')
+            scp.mkdir(remote_path)
+            app.logger.info(f'moveFilesInServer/recursiveCopy : Successfully re-created directory {remote_path}.')
+        except Exception as e:
+            app.logger.error(f'moveFilesInServer/recursiveCopy : Could not delete directory {remote_path}. Likely not empty. Error : {str(e)}')
+
+
+def _recursive_copy(scp, remote_path, local_path, r_parent_path, remote_ok, remote_fail):
+    os.makedirs(local_path, exist_ok=True)
+    for item in scp.listdir_attr(remote_path):
+        remote_item = remote_path + '/' + item.filename
+        local_item = os.path.join(local_path, item.filename)
+        if stat.S_ISDIR(item.st_mode):
+            _recursive_copy(scp, remote_item, local_item, r_parent_path, remote_ok, remote_fail)
+            app.logger.info( f"moveftp/recursiveCopy : This ({remote_item}) is a directory. Did not move.")
+        else:
+            try:
+                # pubstoredir/sftp_foldername/uuid/file_name
+                # pubstoredir/sftp_foldername/pending/
+                [local_dir, local_file] = local_item.rsplit("/",1)
+                unique_dir = uuid.uuid4().hex
+                unique_dir_path = local_dir + "/" + unique_dir
+                pending_dir = local_dir + "/pending"
+                try:
+                    Path(unique_dir_path).mkdir(parents=True, exist_ok=True)
+                    Path(pending_dir).mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    app.logger.error('moveftp/recursiveCopy : Stopping. Error creating directories in {local_dir} "{x}"'.format(x=str(e)))
+                    break
+                local_file_path = unique_dir_path + "/" + local_file
+                scp.get(remote_item, local_file_path) # Copy
+                # ln -sf $uniquedir $pendingdir/.
+                sym_link_path = pending_dir + "/" + unique_dir
+                Path(sym_link_path).symlink_to(unique_dir_path)
+                app.logger.info(f"moveftp/recursiveCopy : Remote file {remote_item} has been copied successfully to {local_file_path}. Move to {remote_ok}")
+                cleanUp = False
+                if remote_path == r_parent_path:
+                    cleanUp = True
+                _moveFilesInServer(scp, remote_item, r_parent_path, remote_ok, cleanUp) # Move and clean up
+            except FileNotFoundError:
+                app.logger.error(f"moveftp/recursiveCopy : Remote file {remote_item} is missing. Stopping moveFTP as this should not happen (file system issue?).")
+                break
+            except Exception as e:
+                app.logger.error('moveftp/recursiveCopy : Extraction could not be done for ' + remote_item + ' : "{x}"'.format(x=str(e)))
+                app.logger.error(f"moveftp/recursiveCopy : Moving file {remote_item} to {remote_fail}")
+                _moveFilesInServer(scp, remote_item, r_parent_path, remote_fail, False)
+                break
+
+
+def moveftp():
+    default_sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
+    default_sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+    dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+    dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
+    remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
+    local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+    remote_postdir = "xfer"
+
+    if not remote_basedir.endswith("/"):
+        remote_basedir = remote_basedir + "/"
+    if not remote_postdir.startswith("/"):
+        remote_postdir = "/" + remote_postdir
+
+    c = paramiko.SSHClient()
+    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    publishers = models.Account.pull_all_active_publishers()
+    for publisher in publishers:
+        id = publisher['id']
+        server = publisher.get('sftp_server', {}).get('url', '')
+        if not (server and server.strip()):
+            server = default_sftp_server
+        port = publisher.get('sftp_server.get', {}).get('port', '')
+        if not (port and port.strip()):
+            port = default_sftp_port
+        username = publisher.get('sftp_server', {}).get('username', '')
+        if not (username and username.strip()):
+            username = id
+
+        remote_dir = remote_basedir + username + remote_postdir
+
+        curr_now = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        okdir = "xfer_processed/" + curr_now
+        faildir = "xfer_failed/" + curr_now
+        remote_dir_parent = remote_basedir + username + "/"
+        remote_ok = remote_dir_parent + okdir
+        remote_fail = remote_dir_parent + faildir
+
+        l_dir = local_dir + "/" + id
+
+        c.connect(hostname=server, port=port, username=username, key_filename=dg_pubkey_file, passphrase=dg_passphrase)
+        scp = paramiko.SFTPClient.from_transport(c.get_transport())
+
+        # Do the copy, move and cleanup
+        _recursive_copy(scp, remote_dir, l_dir, remote_dir, remote_ok, remote_fail)
+
+        scp.close()
+        c.close()
 
 if app.config.get('MOVEFTP_SCHEDULE', 10) != 0:
     schedule.every(app.config.get('MOVEFTP_SCHEDULE', 10)).minutes.do(moveftp)
-
 
 #
 # 2019-07-17 TD : process the big delivery/publisher dg_storage for all pending items

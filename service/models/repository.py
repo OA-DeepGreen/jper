@@ -380,8 +380,8 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                             self.data['excluded_name_variants'] = self.data.get('excluded_name_variants', []) + [val]
                         elif fld == 'domain':
                             self.data['domains'] = self.data.get('domains', []) + [val]
-                        elif fld == 'excludeddomain':
-                            self.data['excluded_domains'] = self.data.get('excluded_domains', []) + [val]
+                        # elif fld == 'excludeddomain':
+                        #     self.data['excluded_domains'] = self.data.get('excluded_domains', []) + [val]
                         elif fld == 'institutionalidentifier':
                             self.data['institutional_identifier'] = val
                         elif fld == 'ror':
