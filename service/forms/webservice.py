@@ -6,7 +6,8 @@ Form for webservice
 @author: Mateusz.Kasiuba
 '''
 
-from wtforms import Form, BooleanField, TextField, validators, SelectField
+from wtforms import Form, BooleanField, validators, SelectField
+from wtforms import StringField as TextField
 from engine.query.QueryInvoker import H_QueryInvoker
 from utils.config import MULTI_PAGE, FREQUENCY_DAILY, FREQUENCY_WEEKLY, FREQUENCY_MONTHLY
 from werkzeug.routing import ValidationError
@@ -66,13 +67,13 @@ def valid_wait_window(form,wait):
 Create a form for WEBSERVICE
 '''
 class WebserviceForm(Form):
-    name = TextField('Name', [validators.Length(min=2, max=2035), validators.Required()])
-    url = TextField('Endpoint URL', [validators.Length(min=6, max=2035), validators.Required(), valid_url])
-    query = TextField('Filter Query', [validators.Required()])
+    name = TextField('Name', [validators.Length(min=2, max=2035), validators.DataRequired()])
+    url = TextField('Endpoint URL', [validators.Length(min=6, max=2035), validators.DataRequired(), valid_url])
+    query = TextField('Filter Query', [validators.DataRequired()])
 #     email = TextField('Email', [validators.Email()])
     email = TextField('Notification Email ')
-    end_date = TextField('Start Date', [validators.Required(), valid_date])
+    end_date = TextField('Start Date', [validators.DataRequired(), valid_date])
     frequency =  SelectField('Frequency', choices=[(FREQUENCY_DAILY, 'Daily'), (FREQUENCY_WEEKLY, 'Weekly'), (FREQUENCY_MONTHLY, 'Monthly')])
     engine = SelectField('Engine', choices=[(MULTI_PAGE, 'MultiPage EPMC')])
-    wait_window = TextField('Article Processing Wait Window', [validators.Required(), validators.number_range(0), valid_wait_window])
+    wait_window = TextField('Article Processing Wait Window', [validators.DataRequired(), validators.number_range(0), valid_wait_window])
     active = BooleanField('Active')
