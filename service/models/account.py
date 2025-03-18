@@ -673,11 +673,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         :return: The ftp_server information as a python dict object
         """
         sftp_server = self._get_single("sftp_server")
-        if not sftp_server['username']:
+        if not sftp_server:
+            sftp_server = {}
+        if not sftp_server.get('username', ''):
             sftp_server['username'] = self.id
-        if not sftp_server['url']:
+        if not sftp_server.get('url', ''):
             sftp_server['url'] = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        if not sftp_server['port']:
+        if not sftp_server.get('port', ''):
             sftp_server['port'] = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
         return sftp_server
 
@@ -1070,6 +1072,32 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         ans = cls.pull_all(q, size=size, return_as_object=False)
         return _extract_bibids(ans)
 
+
+    @classmethod
+    def pull_all_active_publishers(cls):
+        size = 1000
+        q = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "role": "publisher"
+                            }
+                        },
+                        {
+                            "match": {
+                                "publisher.routing_status": "active"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": size,
+            "from": 0
+        }
+        ans = cls.pull_all(q, size=size, return_as_object=False)
+        return ans
 
     @classmethod
     def pull_all_by_email(cls,email):

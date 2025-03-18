@@ -25,7 +25,8 @@ setup(
         "unicodecsv==0.14.1",
         "Jinja2==3.0.3",
         "esprit",
-        "octopus"
+        "octopus",
+        "paramiko"
     ],
     url='http://cottagelabs.com/',
     author='Cottage Labs',

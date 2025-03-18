@@ -16,6 +16,7 @@ from service.lib.validation_helper import validate_date, validate_page, validate
 import math
 import csv
 import sys
+import os
 from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
@@ -324,6 +325,11 @@ def restrict():
 def index():
     if not current_user.is_super:
         abort(401)
+    sword_status = {}
+    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
+        acc_id = s.get('_source', {}).get('id')
+        if acc_id:
+            sword_status[acc_id] = s.get('_source', {}).get('status', '')
     users = []
     for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
         user = {
@@ -331,13 +337,12 @@ def index():
             'email': u.get('_source', {}).get('email', ''),
             'role': u.get('_source', {}).get('role', [])
         }
+        if 'publisher' in user['role']:
+            user['status'] = u.get('_source', {}).get('publisher', {}).get('routing_status', '')
+        elif user['id'] in sword_status:
+            user['status'] = sword_status[user['id']]
         users.append(user)
-    sword_status = {}
-    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
-        acc_id = s.get('_source', {}).get('id')
-        if acc_id:
-            sword_status[acc_id] = s.get('_source', {}).get('status', '')
-    return render_template('account/users.html', users=users, sword_status=sword_status)
+    return render_template('account/users.html', users=users)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)
@@ -635,9 +640,14 @@ def username(username):
         sword_status = None
 
     ssh_help_text = """Begins with 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'ssh-ed25519', 'sk-ecdsa-sha2-nistp256@openssh.com', or 'sk-ssh-ed25519@openssh.com'"""
+    ssh_key_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+    dg_public_key = ''
+    if os.path.isfile(ssh_key_file):
+        with open(ssh_key_file) as f:
+            dg_public_key = f.read()
     deepgreen_ssh_key = {
         "title": "Deepgreen service",
-        "public_key": app.config.get("DEEPGREEN_SSH_PUBLIC_KEY", ''),
+        "public_key": dg_public_key,
     }
     default_sftp_server = {
         'url':  app.config.get("DEFAULT_SFTP_SERVER_URL", ''),
