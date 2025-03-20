@@ -318,9 +318,9 @@ class publisher_files():
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirName = thisdir.split("/")[-1]
         dirList = os.listdir(thisdir)
-        print(f'processftp - processing {thisdir} for Account: {self.username'})
+        print(f'processftp - processing {thisdir} for Account: {self.username}')
         if len(dirList) > 1:
-            print(f"processftp ERROR1 : Why are there multiple directories? {kount}")
+            print(f"processftp ERROR : Why are there multiple directories? {kount}")
             return{"status":"Failed", "message": f"Too many directories : {dirList}"}
 
         pub = dirList[0]
