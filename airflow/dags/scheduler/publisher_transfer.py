@@ -62,6 +62,8 @@ class publisher_files():
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
         self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
         self.publishers = None
+        self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        self.apiurl = app.config['API_URL']
         if not self.remote_basedir.endswith("/"):
             self.remote_basedir = self.remote_basedir + "/"
         if not self.remote_postdir.startswith("/"):
@@ -70,8 +72,7 @@ class publisher_files():
             self.local_dir = self.local_dir + "/"
         if not self.tmpdir.endswith("/"):
             self.tmpdir = self.tmpdir + "/"
-        self.tmpdir = app.config.get('TMP_DIR', '/tmp')
-        self.apiurl = app.config['API_URL']
+
 
     def __init_publishers__(self, publisher_id=None, publisher=None):
         if not publisher_id:
