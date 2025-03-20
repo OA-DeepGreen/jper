@@ -52,7 +52,7 @@ class publisher_files():
         self.remote_postdir = "xfer"
         self.remote_processed = "xfer_processed"
         self.remote_failed = "xfer_failed"
-        self.file_list = []
+        self.file_list_publisher = []
 
     def __init_from_app__(self, publisher_id=""):
         # Initialise the needed constants from the app
@@ -204,17 +204,17 @@ class publisher_files():
         for item in self.scp.listdir_attr(rdir):
             r_obj = rdir + '/' + item.filename
             # Skip if file is already listed - Make this function idempotent
-            if r_obj in self.file_list:
+            if r_obj in self.file_list_publisher:
                 continue
             # Separate folders and files
             if stat.S_ISDIR(item.st_mode):
                 folders.append(r_obj)
             else:
-                self.file_list.append(r_obj)
+                self.file_list_publisher.append(r_obj)
         # Recursive call for the folders
         for folder in folders:
             self.list_remote_dir(folder)
-        return self.file_list
+        return self.file_list_publisher
 
     def get_file(self, fileName): # Get one file and associated operations
         # Initialise the sFTP connection if not already done

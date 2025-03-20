@@ -22,7 +22,7 @@ def move_from_server():
                 continue
             b = publisher_files(publisher['id'])
             b.list_remote_dir(b.remote_dir)
-            for f in b.file_list:
+            for f in b.file_list_publisher:
                 files_list.append((publisher['id'], f))
         print(f"Number of files to transfer : {len(files_list)}")
         f = [x[1] for x in files_list]
