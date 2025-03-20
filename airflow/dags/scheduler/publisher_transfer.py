@@ -2,9 +2,9 @@ import os, stat, uuid, shutil, json, requests
 from pathlib import Path
 from datetime import datetime
 import paramiko
-from move_files.utils import zip, flatten, pkgformat
-# from service import models
-# from octopus.core import app
+from scheduler.utils import zip, flatten, pkgformat
+from service import models
+from octopus.core import app
 
 class publisher_files():
     def __init__(self):
@@ -16,47 +16,55 @@ class publisher_files():
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
-        self.c = paramiko.SSHClient()
-        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.c.connect( hostname=self.sftp_server, port=self.sftp_port,
+        ### ONLY FOR TESTING ###
+        if self.username == 'cottagelabs':
+            key_filename = '/home/cloo/.ssh/deepgreen_id_rsa'
+            c1 = paramiko.SSHClient()
+            c1.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            c1.connect('sftp.kobv.de', 22, 'jumpcottagelabs', key_filename=key_filename)
+
+            transport = c1.get_transport()
+
+            host2 = 'vl90.kobv.de'
+            dest_addr = (host2, 22)
+            local_addr = ('127.0.0.1', 22)
+            channel = transport.open_channel("direct-tcpip", dest_addr, local_addr)
+
+            c2 = paramiko.SSHClient()
+            c2.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            c2.connect(host2, username='cottagelabs', key_filename=key_filename, sock=channel)
+
+            self.scp = paramiko.SFTPClient.from_transport(c2.get_transport())
+            self._is_scp = True
+            return
+
+        c = paramiko.SSHClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect( hostname=self.sftp_server, port=self.sftp_port,
                         username=self.username, key_filename=self.dg_pubkey_file,
                         # passphrase=self.dg_passphrase
                         )
-        self.scp = paramiko.SFTPClient.from_transport(self.c.get_transport())
+        self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
         self._is_scp = True
 
     def __init_constants__(self):
         # Stuff that is not picked up from elsewhere
-        # self.remote_postdir = "xfer"
-        # self.remote_processed = "xfer_processed"
-        # self.remote_failed = "xfer_failed"
-
-        self.remote_postdir = ".ssh_test"
+        self.remote_postdir = "xfer"
         self.remote_processed = "xfer_processed"
         self.remote_failed = "xfer_failed"
         self.file_list = []
 
     def __init_from_app__(self):
         # Initialise the needed constants from the app
-        # self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        # self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
-        # self.dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
-        # self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
-        # self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
-        # self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
-        # self.publishers = models.Account.pull_all_active_publishers()
-        # self.tmpdir = app.config.get('TMP_DIR', '/tmp')
-        # self.apiurl = app.config['API_URL']
-
-        self.publishers = []
-        self.sftp_server = "voyager.pp.rl.ac.uk"
-        self.sftp_port = ""
-        self.dg_pubkey_file = "/home/nraja/.ssh/keys/ral/ppdBastion"
-        self.dg_passphrase = ""
-        self.remote_basedir = "/home/ppd/"
-        self.local_dir = "/home/nraja/Work/deepGreen/airflow/test"
-        self.tmpdir = "/tmp"
-        self.apiurl = ""
+        self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
+        self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+        self.dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+        self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
+        self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
+        self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+        self.publishers = models.Account.pull_all_active_publishers()
+        self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        self.apiurl = app.config['API_URL']
 
         if not self.remote_basedir.endswith("/"):
             self.remote_basedir = self.remote_basedir + "/"
@@ -82,12 +90,7 @@ class publisher_files():
         if not self.l_dir.endswith("/"):
             self.l_dir = self.l_dir + "/"
 
-    # def __del__(self):
-    #     if self._is_scp:
-    #         self.scp.close()
-    #         self.c.close()
-
-    ##### End Initialisations and Destructor. Begin internal functions #####
+    ##### End Initialisations. Begin internal functions #####
 
     def _makeDirInServer(self, r_dir):
         # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
@@ -158,35 +161,27 @@ class publisher_files():
 
     def init_publisher(self, publisher):
         # Initialise for a given publisher
-        # id = publisher['id']
-        # server = publisher.get('sftp_server', {}).get('url', '')
-        # if server and server.strip():
-        #     self.sftp_server = server
-        # port = publisher.get('sftp_server.get', {}).get('port', '')
-        # if port and port.strip():
-        #     self.sftp_port = port
-        # uname = publisher.get('sftp_server', {}).get('username', '')
-        # if uname and uname.strip():
-        #     self.username = uname
-        # else:
-        #     self.username = id
-
-        id = 0
-        server = ""
+        self.id = publisher['id']
+        server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():
             self.sftp_server = server
-        port = "22"
+        port = publisher.get('sftp_server.get', {}).get('port', '')
         if port and port.strip():
             self.sftp_port = port
-        uname = "nraja"
+        else:
+            self.sftp_port = 22 # Default
+        uname = publisher.get('sftp_server', {}).get('username', '')
         if uname and uname.strip():
             self.username = uname
         else:
-            self.username = id
+            self.username = self.id
+
+        print(f"init_publisher> Initialised for publisher: {self.username}")
+        print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
 
         self.__define_directories__()
 
-    ##### --- moveftp ---
+    ##### --- Begin moveftp ---
 
     def list_remote_dir(self, rdir):
         # Idempotent function to recursively get the list of files in a remote directory
@@ -220,12 +215,17 @@ class publisher_files():
         if not self._is_scp:
             self.__init_sftp_connection__()
         # Some sanity check - do I have a full path or just a file name?
+        print(f'self remote_dir : {self.remote_dir}')
+        print(f'filename : {fileName}')
         if self.remote_dir in fileName:
             remote_file = fileName
             local_file = self.l_dir + fileName.removeprefix(self.remote_dir).lstrip("/")
         else:
             remote_file = self.remote_basedir + self.username + "/" + fileName
             local_file = self.l_dir + fileName
+        
+        print(f'remote file : {remote_file}')
+        print(f'local file : {local_file}')
         # Retrieve the file
         # First get the local and pending directories and file name
         l_dir = os.path.dirname(local_file)
@@ -264,7 +264,7 @@ class publisher_files():
             self._moveFilesInServer(remote_item, self.remote_dir, self.remote_fail, False)
             return {"status": "Failed", "message": str(e)}
 
-    ##### --- copyftp ---
+    ##### --- End moveftp. Begin copyftp ---
 
     def copyftp(self, fileName):
         # copy one pending file from the big delivery/publisher dg_storage into the temp dir for processing
@@ -276,8 +276,11 @@ class publisher_files():
             return {"status": "Failed", "message": str(e)}
         # Do the copy
         print('copyftp - copying file ' + fileName + ' for Account:' + self.username)
-        src = self.local_dir + self.username + '/pending/' + os.path.basename(fileName)
-        dst = self.tmpdir + self.username + "/" + os.path.basename(fileName)
+        partial_path = fileName.removeprefix(self.l_dir + 'pending').rstrip("/")
+        src = self.local_dir + self.username + '/pending/' + partial_path
+        dst = self.tmpdir + self.username + "/" + partial_path
+        print(f'source : {src}')
+        print(f'destination : {dst}')
         try:
             shutil.rmtree(dst, ignore_errors=True)  # target MUST NOT exist!
             shutil.copytree(src, dst)
@@ -285,6 +288,7 @@ class publisher_files():
             print()
             return {"status": "Failed", "message": str(e)}
         # Cleanup
+        print(f"copyftp: Copying finished. Cleaning up {src}")
         try:
             os.remove(src)  # try to take the pending symlink away
             return {"status": "Success", 'pend_dir': dst}
@@ -292,12 +296,13 @@ class publisher_files():
             print("copyftp - failed to delete pending entry: '{x}'".format(x=str(e)))
             return {"status": "Failed", "message": str(e)}
 
-    ##### --- copyftp ---
+    ##### --- End copyftp. Begin processftp ---
 
+    # Rough outline of what we expect to do.
     def processftp(self, thisdir):
-        print(f"processftp - processing for file {thisdir}")
+        print(f"processftp - processing file {thisdir}")
         # configure for sending anything for the user of this dir
-        acc = models.Account().pull(self.username)
+        acc = models.Account().pull(self.id)
         if acc is None:
             print("No publisher account with name " + self.username + " is found. Not processing " + thisdir)
             return{"status":"Failed", "message": f"No publisher named {self.username}"}
@@ -306,7 +311,10 @@ class publisher_files():
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirName = thisdir.split("/")[-1]
         print('processftp - processing ' + thisdir + ' for Account:' + self.username)
+        kount = 0
         for xpub in os.listdir(thisdir):
+            if kount > 0:
+                print(f"processftp ERROR1 : Why are there multiple directories? {kount}")
             pub = xpub
             # should be a dir per publication notification - that is what they are told to provide
             # and at this point there should just be one pub in here, whether it be a file or directory or archive
@@ -345,6 +353,8 @@ class publisher_files():
                 pdir = thisdir + '/' + pub + '/' + pub
             #
             for singlepub in os.listdir(pdir):
+                if kount > 0:
+                    print(f"processftp ERROR2 : Why are there multiple directories? {kount}")
                 # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
                 # 2019-11-18 TD : original path without loop where zip file is packed
                 #                 from  source folder "thisdir + '/' + pub"
@@ -363,15 +373,56 @@ class publisher_files():
                     ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
                     ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
                 ]
-                # print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
-                # resp = requests.post(self.apiurl, files=files, verify=False)
-                # log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
-                # if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-                #     print(f"Scheduler - processing completed with POST failure to {log_data}")
-                #     return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
-                # else:
-                #     print(f"Scheduler - processing completed with POST to {log_data}")
-                #     return{"status":"Success", "message": f"Processing complete."}
+                print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
+                resp = requests.post(self.apiurl, files=files, verify=False)
+                log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
+                kount = kount + 1
+                if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
+                    print(f"Scheduler - processing completed with POST failure to {log_data}")
+                    return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
+                else:
+                    print(f"Scheduler - processing completed with POST to {log_data}")
+                    return{"status":"Success", "uuid":singlepub, "message": f"Processing complete."}
 
             # shutil.rmtree(thisdir, ignore_errors=True)  # 2019-12-02 TD : kill "udir" folder no matter what status
 
+    ##### --- End processftp. Begin checkunrouted. ---
+
+    # Rough outline of what we expect to do.
+    def checkunrouted(self, obj):
+
+        urobjids = []
+        robjids = []
+
+        print("Checking for unrouted notifications")
+        # query the service.models.unroutednotification index
+        # returns a list of unrouted notification from the last three up to four months
+        # for obj in models.UnroutedNotification.scroll():
+        res = routing.route(obj)
+        if res:
+            robjids.append(obj.id)
+        else:
+            urobjids.append(obj.id)
+
+        # 2017-06-06 TD : replace str() by .format() string interpolation
+        print(f"Routing sent {cnt} notification(s) for routing".format(cnt=counter))
+
+        if app.config.get("DELETE_ROUTED", False) and len(robjids) > 0:
+            # 2017-06-06 TD : replace str() by .format() string interpolation
+            print(
+                "Routing deleting {x} of {cnt} unrouted notification(s) that have been processed and routed".format(
+                    x=len(robjids), cnt=counter))
+            models.UnroutedNotification.bulk_delete(robjids)
+            # 2017-05-17 TD :
+            time.sleep(2)  # 2 seconds grace time
+
+        if app.config.get("DELETE_UNROUTED", False) and len(urobjids) > 0:
+            # 2017-06-06 TD : replace str() by .format() string interpolation
+            print(
+                "Routing deleting {x} of {cnt} unrouted notifications that have been processed and were unrouted".format(
+                    x=len(urobjids), cnt=counter))
+            models.UnroutedNotification.bulk_delete(urobjids)
+            # 2017-05-17 TD :
+            time.sleep(2)  # again, 2 seconds grace
+
+    ##### --- End checkunrouted. ---
