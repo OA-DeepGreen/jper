@@ -45,6 +45,28 @@ def pkgformat(src):
     print('Pkgformat returns ' + pkg_fmt)
     return pkg_fmt
 
+# Utility function for processftp - called by flatten
+def extract(fl, path):
+    print('Extracting ' + fl)
+    try:
+        # TODO the tar method has not yet been tested...
+        tar = tarfile.open(fl)
+        # 2019-11-18 TD : add the actual path for extraction here
+        tar.extractall(path=path)
+        tar.close()
+        print('Extracted tar ' + fl)
+        return True
+    except:
+        try:
+            with zipfile.ZipFile(fl) as zf:
+                # 2019-11-18 TD : replace the 'hand made' routine by the library call
+                zf.extractall(path=path)
+            print('Extracted zip ' + fl)
+            return True
+        except Exception as e:
+            print('Scheduler - Extraction could not be done for ' + fl + ' : "{x}"'.format(x=str(e)))
+            return False
+
 # Another utility function for processftp
 def flatten(destination, depth=None):
     if depth is None:
