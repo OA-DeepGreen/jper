@@ -388,7 +388,7 @@ class publisher_files():
                     print(f"Scheduler - processing completed with POST failure to {log_data}")
                     return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
                 else:
-                    resp_id = resp.json['id']
+                    resp_id = resp.json()['id']
                     print(f"Scheduler - processing completed with POST to {log_data}")
                     return{"status":"Success", "resp_id":resp_id, "message": f"Processing complete."}
 
