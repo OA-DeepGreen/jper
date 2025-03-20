@@ -20,36 +20,31 @@ def move_from_server():
         for publisher in a.publishers:
             if publisher['id'] != '1efe7d4b-97a8-4e9f-80d9-11d1edc5c70a':
                 continue
-            a.init_publisher(publisher)
-            a.list_remote_dir(a.remote_dir)
-            for f in a.file_list:
-                files_list.append((publisher, f))
-        # publisher = None
-        # a.init_publisher(publisher)
-        # a.list_remote_dir(a.remote_dir)
-        # for f in a.file_list:
-        #     files_list.append((publisher, f))
-        print(f"Number of files to transfer : {len(a.file_list)}")
-        print(f"List of files to transfer : {a.file_list}")
+            b = publisher_files(publisher['id'])
+            b.list_remote_dir(b.remote_dir)
+            for f in b.file_list:
+                files_list.append((publisher['id'], f))
+        print(f"Number of files to transfer : {len(files_list)}")
+        f = [x[1] for x in files_list]
+        print(f"List of files to transfer : {f}")
         return files_list # This is visible in the xcom tab
 
     @task( task_id="get_single_file", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
     def get_single_file(file_tuple):
         # Transfer one file over to local bulk storage
-        publisher = file_tuple[0]
-        file_name = file_tuple[1]
         context = get_current_context()
         ti = context['ti'] # TaskInstance
+        publisher_id = file_tuple[0]
+        file_name = file_tuple[1]
         ##
-        a = publisher_files()
-        a.init_publisher(publisher)
+        a = publisher_files(publisher_id)
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.get_file(file_name)
         if result["status"] == "Success":
             print("Finished getting", file_name)
-            return (publisher, result['linkPath'])
+            return (publisher_id, result['linkPath'])
         else:
             raise AirflowException(f"Failed to get {file_name} : {result['message']}")
 
@@ -58,40 +53,38 @@ def move_from_server():
         # Copy file to temp area for further processing
         context = get_current_context()
         ti = context['ti'] # TaskInstance
-        publisher = local_tuple[0]
+        publisher_id = local_tuple[0]
         file_name = local_tuple[1]
         ##
-        a = publisher_files()
-        a.init_publisher(publisher)
+        a = publisher_files(publisher_id)
         ff = file_name.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.copyftp(file_name)
         if result["status"] == "Success":
             print(f"Finished moving {file_name} to {a.tmpdir}")
-            return(publisher, result['pend_dir'])
+            return(publisher_id, result['pend_dir'])
         else:
-            raise AirflowException(f"copyftp - Failed to copy {file_name} : {result['message']}")
+            raise AirflowException(f"copyftp - Failed to copy {file_name}, publisher id {publisher_id} : {result['message']}")
 
     @task( map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
     def process_ftp(pend_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
         ti = context['ti'] # TaskInstance
-        publisher = pend_tuple[0]
+        publisher_id = pend_tuple[0]
         pend_dir  = pend_tuple[1]
         ##
-        a = publisher_files()
-        a.init_publisher(publisher)
+        a = publisher_files(publisher_id)
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.processftp(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            return(publisher, result['uuid'])
+            return(publisher_id, result['uuid'])
         else:
-            raise AirflowException(f"process_ftp - Failed to process {pend_dir} : {result['message']}")
+            raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
 
     @task_group
     def process_one_file(file_tuple) -> None:

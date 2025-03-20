@@ -7,9 +7,9 @@ from service import models
 from octopus.core import app
 
 class publisher_files():
-    def __init__(self):
+    def __init__(self, publisher_id=""):
         self.__init_constants__() # First to be done
-        self.__init_from_app__()
+        self.__init_from_app__(publisher_id=publisher_id)
         # self.__init_publisher__(publisher)
         self._is_scp = False
         # self.__init_sftp_connection__() # Do this only when needed
@@ -54,7 +54,7 @@ class publisher_files():
         self.remote_failed = "xfer_failed"
         self.file_list = []
 
-    def __init_from_app__(self):
+    def __init_from_app__(self, publisher_id=""):
         # Initialise the needed constants from the app
         self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
         self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
@@ -62,7 +62,12 @@ class publisher_files():
         self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
         self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
-        self.publishers = models.Account.pull_all_active_publishers()
+        self.publishers = ""
+        if publisher_id == "":
+            print("init_from_app> Retrieving all active publishers")
+            self.publishers = models.Account.pull_all_active_publishers()
+        else:
+            self.__init_publisher__(publisher_id=publisher_id)
         self.tmpdir = app.config.get('TMP_DIR', '/tmp')
         self.apiurl = app.config['API_URL']
 
@@ -74,6 +79,29 @@ class publisher_files():
             self.local_dir = self.local_dir + "/"
         if not self.tmpdir.endswith("/"):
             self.tmpdir = self.tmpdir + "/"
+
+    def __init_publisher__(self, publisher_id):
+        # Initialise for a given publisher
+        self.id = publisher_id
+        publisher = models.Account().pull(self.id)
+        server = publisher.get('sftp_server', {}).get('url', '')
+        if server and server.strip():
+            self.sftp_server = server
+        port = publisher.get('sftp_server.get', {}).get('port', '')
+        if port and port.strip():
+            self.sftp_port = port
+        else:
+            self.sftp_port = 22 # Default
+        uname = publisher.get('sftp_server', {}).get('username', '')
+        if uname and uname.strip():
+            self.username = uname
+        else:
+            self.username = self.id
+
+        print(f"init_publisher> Initialised for publisher: {self.username}")
+        print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
+
+        self.__define_directories__()
 
     def __define_directories__(self):
         # Use the stuff defined so far to define remote and local directories
@@ -158,28 +186,6 @@ class publisher_files():
                 print(f'moveFilesInServer : Could not delete directory {remote_path}. Likely not empty. Error : {str(e)}')
 
     ##### End internal functions. Begin main (external) functions #####
-
-    def init_publisher(self, publisher):
-        # Initialise for a given publisher
-        self.id = publisher['id']
-        server = publisher.get('sftp_server', {}).get('url', '')
-        if server and server.strip():
-            self.sftp_server = server
-        port = publisher.get('sftp_server.get', {}).get('port', '')
-        if port and port.strip():
-            self.sftp_port = port
-        else:
-            self.sftp_port = 22 # Default
-        uname = publisher.get('sftp_server', {}).get('username', '')
-        if uname and uname.strip():
-            self.username = uname
-        else:
-            self.username = self.id
-
-        print(f"init_publisher> Initialised for publisher: {self.username}")
-        print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
-
-        self.__define_directories__()
 
     ##### --- Begin moveftp ---
 
