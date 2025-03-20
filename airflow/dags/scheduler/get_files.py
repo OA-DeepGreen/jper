@@ -86,13 +86,35 @@ def move_from_server():
         else:
             raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
 
+    @task( map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    def process_ftp_each(pend_dirs):
+        # Process the file - unzip and flatten it
+        context = get_current_context()
+        ti = context['ti'] # TaskInstance
+        publisher_id = pend_dirs[0]
+        pend_id  = pend_dirs[1]
+        ##
+        a = publisher_files(publisher_id)
+        context["map_index_template"] = f"{ti.map_index} {pend_id}"
+        ##
+        result = a.processftp(pend_dir)
+        if result["status"] == "Success":
+            print(f"Finished processing {pend_id}")
+            return(publisher_id, result['resp_id'])
+        else:
+            raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
+
+    @task_group
+    def process_ftp_route(pend_dirs) -> None:
+        route_id = process_ftp_each(pend_dirs)
+
     @task_group
     def process_one_file(file_tuple) -> None:
         # Each of the following processes a single file, with the output of one feeding into to the next
         local_tuple = get_single_file(file_tuple)
         pend_tuple  = copy_ftp(local_tuple)
         pend_dirs   = process_ftp(pend_tuple)
-
+        process_ftp_route.expand(pend_dirs=pend_dirs)
 
     # The first call / chaining of the tasks
     process_one_file.expand(file_tuple=get_file_list())

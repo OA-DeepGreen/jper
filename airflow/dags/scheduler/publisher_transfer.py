@@ -317,85 +317,79 @@ class publisher_files():
 
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirName = thisdir.split("/")[-1]
-        print('processftp - processing ' + thisdir + ' for Account:' + self.username)
-        kount = 0
-        for pub in os.listdir(thisdir):
-            if kount > 0:
-                print(f"processftp ERROR1 : Why are there multiple directories? {kount}")
-            kount = kount + 1
+        dirList = os.listdir(thisdir)
+        print(f'processftp - processing {thisdir} for Account: {self.username'})
+        if len(dirList) > 1:
+            print(f"processftp ERROR1 : Why are there multiple directories? {kount}")
+            return{"status":"Failed", "message": f"Too many directories : {dirList}"}
 
-            # should be a dir per publication notification - that is what they are told to provide
-            # and at this point there should just be one pub in here, whether it be a file or directory or archive
-            # if just a file, even an archive, dump it into a directory so it can be zipped easily
-            thisfile = os.path.join(thisdir, pub)
-            if not os.path.isfile(thisfile):
-                return{"status":"Failed", "message": f"Not a file : {thisfile}"}
-            #
-            nf = uuid.uuid4().hex
-            newloc = os.path.join(thisdir, nf, '')
-            try:
-                os.makedirs(os.path.join(thisdir, nf))
-                shutil.move(thisfile, newloc)
-            except Exception as e:
-                return{"status":"Failed", "message": f"File system issue? : {str(e)}"}
-            print('Moved ' + thisfile + ' to ' + newloc)
+        pub = dirList[0]
+        print(f'processftp - found directory {pub}')
 
-            # by now this should look like this:
-            # /Incoming/ftptmp/<useruuid>/<transactionuuid>/<uploadeddirORuuiddir>/<thingthatwasuploaded>
+        thisfile = os.path.join(thisdir, pub)
+        if not os.path.isfile(thisfile):
+            return{"status":"Failed", "message": f"Not a file : {thisfile}"}
+        #
+        nf = uuid.uuid4().hex
+        newloc = os.path.join(thisdir, nf, '')
+        try:
+            os.makedirs(os.path.join(thisdir, nf))
+            shutil.move(thisfile, newloc)
+        except Exception as e:
+            return{"status":"Failed", "message": f"File system issue? : {str(e)}"}
+        print('Moved ' + thisfile + ' to ' + newloc)
 
-            # they should provide a directory of files or a zip, but it could just be one file
-            # but we don't know the hierarchy of the content, so we have to unpack and flatten it all
-            # unzip and pull all docs to the top level then zip again. Should be jats file at top now
-            try:
-                flatten(thisdir + '/' + nf)
-            except Exception as e:
-                return{"status":"Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
+        # by now this should look like this:
+        # /Incoming/ftptmp/<useruuid>/<transactionuuid>/<uploadeddirORuuiddir>/<thingthatwasuploaded>
 
-            # 2019-11-18 TD : 'flatten' has been modified to process bulk deliveries
-            #                 (i.e. more then one pub per zip file!) as well.
-            #                 If it is bulk, there maybe a lot of zip files, and
-            #                 we need a loop:
-            pdir = thisdir
-            if os.path.isdir(thisdir + '/' + nf + '/' + nf):
-                pdir = thisdir + '/' + nf + '/' + nf
-            #
-            return{'status':"Success", "pend_dir":os.listdir(pdir)}
+        # they should provide a directory of files or a zip, but it could just be one file
+        # but we don't know the hierarchy of the content, so we have to unpack and flatten it all
+        # unzip and pull all docs to the top level then zip again. Should be jats file at top now
+        try:
+            flatten(thisdir + '/' + nf)
+        except Exception as e:
+            return{"status":"Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
 
+        # 2019-11-18 TD : 'flatten' has been modified to process bulk deliveries
+        #                 (i.e. more then one pub per zip file!) as well.
+        #                 If it is bulk, there maybe a lot of zip files, and
+        #                 we need a loop:
+        pdir = thisdir
+        if os.path.isdir(thisdir + '/' + nf + '/' + nf):
+            pdir = thisdir + '/' + nf + '/' + nf
+        # Could have multiple directories. Process them individually.
+        return{'status':"Success", "pend_dir":os.listdir(pdir)}
 
-    # def processftp_each(self, oneDir)
-    #         for singlepub in os.listdir(pdir):
-    #             if kount > 0:
-    #                 print(f"processftp ERROR2 : Why are there multiple directories? {kount}")
-    #             # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
-    #             # 2019-11-18 TD : original path without loop where zip file is packed
-    #             #                 from  source folder "thisdir + '/' + pub"
-    #             pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
-    #             pkg = os.path.join(pdir, singlepub + '.zip')
-    #             try:
-    #                 zip(os.path.join(pdir, singlepub), pkg)
-    #             except Exception as e:
-    #                 return{"status":"Failed", "message": f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}"}
+    # Process each possible flattened directory separately
+    def processftp_each(self, singlepub):
+        # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
+        # 2019-11-18 TD : original path without loop where zip file is packed
+        #                 from  source folder "thisdir + '/' + pub"
+        pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
+        pkg = os.path.join(pdir, singlepub + '.zip')
+        try:
+            zip(os.path.join(pdir, singlepub), pkg)
+        except Exception as e:
+            return{"status":"Failed", "message": f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}"}
 
-    #             # create a notification and send to the API to join the unroutednotification index
-    #             notification = {
-    #                 "content": {"packaging_format": pkg_fmt}
-    #             }
-    #             files = [
-    #                 ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
-    #                 ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
-    #             ]
-    #             print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
-    #             resp = requests.post(self.apiurl, files=files, verify=False)
-    #             log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
-    #             if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-    #                 print(f"Scheduler - processing completed with POST failure to {log_data}")
-    #                 return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
-    #             else:
-    #                 resp_id = resp.json()['id']
-    #                 print(f"Scheduler - processing completed with POST to {log_data}")
-    #                 return{"status":"Success", "resp_id":resp_id, "message": f"Processing complete."}
-
-    #         # shutil.rmtree(thisdir, ignore_errors=True)  # 2019-12-02 TD : kill "udir" folder no matter what status
+        # create a notification and send to the API to join the unroutednotification index
+        notification = {
+            "content": {"packaging_format": pkg_fmt}
+        }
+        files = [
+            ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
+            ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
+        ]
+        print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
+        resp = requests.post(self.apiurl, files=files, verify=False)
+        log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
+        if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
+            print(f"Scheduler - processing completed with POST failure to {log_data}")
+            return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
+        else:
+            resp_id = resp.json()['id']
+            print(f"Scheduler - processing completed with POST to {log_data}")
+            return{"status":"Success", "resp_id":resp_id, "message": f"Processing complete."}
 
     ##### --- End processftp. Begin checkunrouted. ---
 
