@@ -82,7 +82,7 @@ def move_from_server():
         result = a.processftp(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            return(publisher_id, result['uuid'])
+            return(publisher_id, result['resp_id'])
         else:
             raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
 
@@ -90,8 +90,8 @@ def move_from_server():
     def process_one_file(file_tuple) -> None:
         # Each of the following processes a single file, with the output of one feeding into to the next
         local_tuple = get_single_file(file_tuple)
-        pend_tuple = copy_ftp(local_tuple)
-        pend_dir = process_ftp(pend_tuple)
+        pend_tuple  = copy_ftp(local_tuple)
+        req_resp_id = process_ftp(pend_tuple)
 
 
     # The first call / chaining of the tasks
