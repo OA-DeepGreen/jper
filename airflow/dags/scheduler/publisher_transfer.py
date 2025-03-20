@@ -9,7 +9,8 @@ from octopus.core import app
 class publisher_files():
     def __init__(self, publisher_id=None, publisher=None):
         self.__init_constants__() # First to be done
-        self.__init_from_app__(publisher_id=publisher_id, publisher=publisher)
+        self.__init_from_app__()
+        self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         self._is_scp = False
 
     def __init_sftp_connection__(self):
@@ -52,7 +53,7 @@ class publisher_files():
         self.remote_failed = "xfer_failed"
         self.file_list_publisher = []
 
-    def __init_from_app__(self, publisher_id=None, publisher=None):
+    def __init_from_app__(self):
         # Initialise the needed constants from the app
         self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
         self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
@@ -61,14 +62,6 @@ class publisher_files():
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
         self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
         self.publishers = None
-        if not publisher_id:
-            print("init_from_app> Retrieving all active publishers")
-            self.publishers = models.Account.pull_all_active_publishers()
-        else:
-            self.__init_publisher__(publisher_id, publisher=publisher)
-        self.tmpdir = app.config.get('TMP_DIR', '/tmp')
-        self.apiurl = app.config['API_URL']
-
         if not self.remote_basedir.endswith("/"):
             self.remote_basedir = self.remote_basedir + "/"
         if not self.remote_postdir.startswith("/"):
@@ -77,6 +70,15 @@ class publisher_files():
             self.local_dir = self.local_dir + "/"
         if not self.tmpdir.endswith("/"):
             self.tmpdir = self.tmpdir + "/"
+        self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        self.apiurl = app.config['API_URL']
+
+    def __init_publishers__(self, publisher_id=None, publisher=None):
+        if not publisher_id:
+            print("init_from_app> Retrieving all active publishers")
+            self.publishers = models.Account.pull_all_active_publishers()
+        else:
+            self.__init_publisher__(publisher_id, publisher=publisher)
 
     def __init_publisher__(self, publisher_id, publisher=None):
         # Initialise for a given publisher
@@ -99,7 +101,6 @@ class publisher_files():
 
         print(f"init_publisher> Initialised for publisher: {self.username}")
         print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
-
         self.__define_directories__()
 
     def __define_directories__(self):
