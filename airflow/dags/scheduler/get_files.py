@@ -82,7 +82,10 @@ def move_from_server():
         result = a.processftp(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            return(publisher_id, result['pend_dir'])
+            pd = []
+            for dd in result['pend_dir']:
+                pd.append((publisher_id, dd))
+            return pd
         else:
             raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
 
@@ -102,7 +105,7 @@ def move_from_server():
             print(f"Finished processing {pend_id}")
             return(publisher_id, result['resp_id'])
         else:
-            raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
+            raise AirflowException(f"process_ftp_each - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
 
     @task_group
     def process_ftp_route(pend_dirs) -> None:
