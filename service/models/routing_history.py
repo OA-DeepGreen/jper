@@ -283,7 +283,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         current_date = dates.format(datetime.now())
         vals = {
             'date': current_date,
-            'action': sction,
+            'action': action,
             'file_location': file_location,
             'notification_id': notification_id
         }
