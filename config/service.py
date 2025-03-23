@@ -24,7 +24,9 @@ THREADED = True
 # important overrides for the ES module
 
 # elasticsearch back-end connection settings
-ELASTIC_SEARCH_HOST = "http://gateway:9200"
+# ELASTIC_SEARCH_HOST = "http://gateway:9200"
+ELASTIC_SEARCH_HOST = "http://localhost:9200"
+
 """base url to access elasticsearch"""
 
 ELASTIC_SEARCH_INDEX = "jper"
