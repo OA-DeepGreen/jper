@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+from itertools import chain
 
-from airflow import DAG, AirflowException
+from airflow import AirflowException
+from airflow.exceptions import AirflowTaskTerminated
 from airflow.operators.python_operator import PythonOperator
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
@@ -9,10 +11,10 @@ from scheduler.publisher_transfer import publisher_files
 
 #-----
 
-@dag( dag_id="get_server_files", catchup=False, tags=["get_server_files"], max_active_runs=1 )
+@dag(dag_id="get_server_files", catchup=False, tags=["get_server_files"], max_active_runs=1)
 def move_from_server():
 
-    @task( retries=3, max_active_tis_per_dag=1 )
+    @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=1 )
     def get_file_list():
         # Get File list
         files_list = []
@@ -28,8 +30,8 @@ def move_from_server():
         f = [x[1] for x in files_list]
         print(f"List of files to transfer : {f}")
         return files_list # This is visible in the xcom tab
-
-    @task( task_id="get_single_file", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    #=
+    @task(task_id="get_single_file", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
     def get_single_file(file_tuple):
         # Transfer one file over to local bulk storage
         context = get_current_context()
@@ -47,8 +49,8 @@ def move_from_server():
             return (publisher_id, result['linkPath'])
         else:
             raise AirflowException(f"Failed to get {file_name} : {result['message']}")
-
-    @task( map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    #=
+    @task(task_id="copy_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
     def copy_ftp(local_tuple):
         # Copy file to temp area for further processing
         context = get_current_context()
@@ -66,8 +68,8 @@ def move_from_server():
             return(publisher_id, result['pend_dir'])
         else:
             raise AirflowException(f"copyftp - Failed to copy {file_name}, publisher id {publisher_id} : {result['message']}")
-
-    @task( map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    #=
+    @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
     def process_ftp(pend_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
@@ -82,45 +84,61 @@ def move_from_server():
         result = a.processftp(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            pd = []
-            for dd in result['pend_dir']:
-                pd.append((publisher_id, dd))
-            return pd
+            return(publisher_id, result['proc_dir'])
+        elif result["status"] == "Processed":
+            print(result["message"])
+            raise AirflowTaskTerminated(f"process_ftp - failed to process {pend_dir}, publisher id {publisher_id}. Already processed.")
         else:
             raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
-
-    @task( map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
-    def process_ftp_each(pend_dirs):
+    #=
+    @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    def process_ftp_dirs(pend_dir):
         # Process the file - unzip and flatten it
         context = get_current_context()
         ti = context['ti'] # TaskInstance
-        publisher_id = pend_dirs[0]
-        pend_id  = pend_dirs[1]
+        publisher_id = pend_dir[0]
+        pend_dir  = pend_dir[1]
         ##
         a = publisher_files(publisher_id)
-        context["map_index_template"] = f"{ti.map_index} {pend_id}"
+        ff = pend_dir.removeprefix(a.l_dir)
+        context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
-        result = a.processftp(pend_dir)
+        result = a.processftp_dirs(pend_dir)
         if result["status"] == "Success":
-            print(f"Finished processing {pend_id}")
-            return(publisher_id, result['resp_id'])
+            print(f"Finished processing {pend_dir}")
+            return(publisher_id, result['resp_ids'])
         else:
-            raise AirflowException(f"process_ftp_each - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
-
-    @task_group
-    def process_ftp_route(pend_dirs) -> None:
-        route_id = process_ftp_each(pend_dirs)
-
-    @task_group
-    def process_one_file(file_tuple) -> None:
+            raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
+    #=
+    @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=3 )
+    def check_unrouted(notif):
+        context = get_current_context()
+        ti = context['ti'] # TaskInstance
+        publisher_id = notif[0]
+        chk_dir  = notif[1]
+        ##
+        a = publisher_files(publisher_id)
+        context["map_index_template"] = f"{ti.map_index} {chk_dir}"
+        result = a.checkunrouted(chk_dir)
+        if result["status"] == "Success":
+            print(f"Finished processing {chk_dir}")
+            return
+        else:
+            raise AirflowException(f"process_ftp - Failed to process {chk_dir}, publisher id {publisher_id} : {result['message']}")
+    ##
+    @task_group(group_id='ProcessFileFromPublisher')
+    def process_one_file(file_tuple, **context):
         # Each of the following processes a single file, with the output of one feeding into to the next
         local_tuple = get_single_file(file_tuple)
         pend_tuple  = copy_ftp(local_tuple)
-        pend_dirs   = process_ftp(pend_tuple)
-        process_ftp_route.expand(pend_dirs=pend_dirs)
+        proc_dirs   = process_ftp(pend_tuple)
+        pend_dirs   = process_ftp_dirs(proc_dirs)
+        check_unrouted(pend_dirs)
 
-    # The first call / chaining of the tasks
-    process_one_file.expand(file_tuple=get_file_list())
+    #
+    # The first call + chaining of the tasks
+    file_tuple=get_file_list()
+    pl = process_one_file.expand(file_tuple=file_tuple)
 
 #-----
 

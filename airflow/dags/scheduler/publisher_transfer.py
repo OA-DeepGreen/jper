@@ -61,6 +61,8 @@ class publisher_files():
         self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
         self.local_dir = app.config.get('PUBSTOREDIR', '/data/dg_storage')
+        self.delete_routed = app.config.get("DELETE_ROUTED", False)
+        self.delete_unrouted = app.config.get("DELETE_UNROUTED", False)
         self.publishers = None
         self.tmpdir = app.config.get('TMP_DIR', '/tmp')
         self.apiurl = app.config['API_URL']
@@ -328,7 +330,8 @@ class publisher_files():
 
         thisfile = os.path.join(thisdir, pub)
         if not os.path.isfile(thisfile):
-            return{"status":"Failed", "message": f"Not a file : {thisfile}"}
+            return{"status":"Processed", "message": f"Actual file probably already processed (with error?).\
+                    This is not a file : {thisfile}"}
         #
         nf = uuid.uuid4().hex
         newloc = os.path.join(thisdir, nf, '')
@@ -350,84 +353,81 @@ class publisher_files():
         except Exception as e:
             return{"status":"Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
 
-        # 2019-11-18 TD : 'flatten' has been modified to process bulk deliveries
-        #                 (i.e. more then one pub per zip file!) as well.
-        #                 If it is bulk, there maybe a lot of zip files, and
-        #                 we need a loop:
         pdir = thisdir
         if os.path.isdir(thisdir + '/' + nf + '/' + nf):
             pdir = thisdir + '/' + nf + '/' + nf
         # Could have multiple directories. Process them individually.
-        return{'status':"Success", "pend_dir":os.listdir(pdir)}
+        return{'status':'Success', 'proc_dir':pdir}
 
-    # Process each possible flattened directory separately
-    def processftp_each(self, singlepub):
-        # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
-        # 2019-11-18 TD : original path without loop where zip file is packed
-        #                 from  source folder "thisdir + '/' + pub"
-        pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
-        pkg = os.path.join(pdir, singlepub + '.zip')
-        try:
-            zip(os.path.join(pdir, singlepub), pkg)
-        except Exception as e:
-            return{"status":"Failed", "message": f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}"}
 
-        # create a notification and send to the API to join the unroutednotification index
-        notification = {
-            "content": {"packaging_format": pkg_fmt}
-        }
-        files = [
-            ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
-            ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
-        ]
-        print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
-        resp = requests.post(self.apiurl, files=files, verify=False)
-        log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {xpub} - {dirName}"
-        if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-            print(f"Scheduler - processing completed with POST failure to {log_data}")
-            return{"status":"Failed", "message": f"Processing complete, post failure to {log_data}"}
-        else:
-            resp_id = resp.json()['id']
-            print(f"Scheduler - processing completed with POST to {log_data}")
-            return{"status":"Success", "resp_id":resp_id, "message": f"Processing complete."}
+    def processftp_dirs(self, pdir):
+        resp_list = []
+        status = {'status':'Success'}
+        dirList = os.listdir(pdir)
+        print(f"Processing the directories : {dirList}")
+        for singlepub in dirList:
+            # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
+            # 2019-11-18 TD : original path without loop where zip file is packed
+            #                 from  source folder "thisdir + '/' + pub"
+            pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
+            pkg = os.path.join(pdir, singlepub + '.zip')
+            try:
+                zip(os.path.join(pdir, singlepub), pkg)
+            except Exception as e:
+                print(f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}")
+
+            # create a notification and send to the API to join the unroutednotification index
+            notification = {
+                "content": {"packaging_format": pkg_fmt}
+            }
+            files = [
+                ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
+                ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
+            ]
+            print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
+            resp = requests.post(self.apiurl, files=files, verify=False)
+            log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {pdir} - {singlepub}"
+            if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
+                print(f"Scheduler - processing completed with POST failure to {log_data}")
+                status = {'status':'Failed'}
+            else:
+                resp_list.append(resp.json()['id'])
+                print(f"Scheduler - processing completed with POST to {log_data}")
+        status['resp_ids'] = resp_list
+        status["message"] = "Processing complete"
+        return status
 
     ##### --- End processftp. Begin checkunrouted. ---
 
     # Rough outline of what we expect to do.
-    def checkunrouted(self, obj):
-
-        urobjids = []
-        robjids = []
-
-        print("Checking for unrouted notifications")
-        # query the service.models.unroutednotification index
-        # returns a list of unrouted notification from the last three up to four months
-        # for obj in models.UnroutedNotification.scroll():
-        res = routing.route(obj)
-        if res:
-            robjids.append(obj.id)
+    def checkunrouted(self, uids):
+        if app.config.get('DEEPGREEN_EZB_ROUTING', False):
+            from service import routing_deepgreen as routing
         else:
-            urobjids.append(obj.id)
+            from service import routing
 
-        # 2017-06-06 TD : replace str() by .format() string interpolation
-        print(f"Routing sent {cnt} notification(s) for routing".format(cnt=counter))
+        kounter = 0
+        for uid in uids:
+            kounter = kounter + 1
+            mun = models.UnroutedNotification()
+            obj = mun.pull(uid)
+            print("Checking for unrouted notifications")
+            res = routing.route(obj)
+            print(res)
+            print(f"Routing sent the {kounter}-th notification for routing")
 
-        if app.config.get("DELETE_ROUTED", False) and len(robjids) > 0:
-            # 2017-06-06 TD : replace str() by .format() string interpolation
-            print(
-                "Routing deleting {x} of {cnt} unrouted notification(s) that have been processed and routed".format(
-                    x=len(robjids), cnt=counter))
-            models.UnroutedNotification.bulk_delete(robjids)
-            # 2017-05-17 TD :
-            time.sleep(2)  # 2 seconds grace time
+            if self.delete_routed and res:
+                print(f"Routing deleting {obj.id} unrouted notification that has been processed and routed")
+                # models.UnroutedNotification.bulk_delete(obj.id)
+                obj.delete()
+                # time.sleep(2)  # 2 seconds grace time
 
-        if app.config.get("DELETE_UNROUTED", False) and len(urobjids) > 0:
-            # 2017-06-06 TD : replace str() by .format() string interpolation
-            print(
-                "Routing deleting {x} of {cnt} unrouted notifications that have been processed and were unrouted".format(
-                    x=len(urobjids), cnt=counter))
-            models.UnroutedNotification.bulk_delete(urobjids)
-            # 2017-05-17 TD :
-            time.sleep(2)  # again, 2 seconds grace
+            if self.delete_unrouted and not res:
+                print(f"Routing deleting {obj.id} unrouted notification that has been processed and was unrouted")
+                # models.UnroutedNotification.bulk_delete(obj.id)
+                obj.delete()
+                # time.sleep(2)  # again, 2 seconds grace
+
+        return{'status':"Success"}
 
     ##### --- End checkunrouted. ---
