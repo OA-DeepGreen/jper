@@ -2,16 +2,33 @@ import os, stat, uuid, shutil, json, requests
 from pathlib import Path
 from datetime import datetime
 import paramiko
+
 from scheduler.utils import zip, flatten, pkgformat
-from service import models
+
 from octopus.core import app
+from service import models
+
+# jper stuff - save the routing history
+from service.models.routing_history import RoutingHistory
 
 class publisher_files():
-    def __init__(self, publisher_id=None, publisher=None):
+    def __init__(self, publisher_id=None, publisher=None, routing_id=None):
         self.__init_constants__() # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
+        if routing_id:
+            self.__init_routing_id__(routing_id)
         self._is_scp = False
+
+    def __init_routing_id__(self, routing_id):
+        self.RoutingHistory = RoutingHistory()
+        print(f"Routing history id = {routing_id}")
+        self.RoutingHistory.id = routing_id
+        if not self.RoutingHistory.publisher_id:
+            self.RoutingHistory.publisher_id = self.id
+            self.RoutingHistory.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.RoutingHistory.save()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
@@ -65,7 +82,9 @@ class publisher_files():
         self.delete_unrouted = app.config.get("DELETE_UNROUTED", False)
         self.publishers = None
         self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+
         self.apiurl = app.config['API_URL']
+
         if not self.remote_basedir.endswith("/"):
             self.remote_basedir = self.remote_basedir + "/"
         if not self.remote_postdir.startswith("/"):
@@ -101,6 +120,9 @@ class publisher_files():
             self.username = uname
         else:
             self.username = self.id
+
+        self.acc = publisher
+        self.apiurl += '?api_key=' + self.acc['api_key']
 
         print(f"init_publisher> Initialised for publisher: {self.username}")
         print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
@@ -252,6 +274,8 @@ class publisher_files():
             return {"status": "Failed", "message": str(e)}
         # Get the file from the server
         remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
+        status = {}
+        final_location = ""
         try:
             local_file_path = unique_dir_path + "/" + l_file
             self.scp.get(remote_file, local_file_path)
@@ -262,16 +286,37 @@ class publisher_files():
             if os.path.dirname(remote_file) == self.remote_dir:
                 cleanUp = True
             self._moveFilesInServer(remote_item, self.remote_dir, self.remote_ok, cleanUp) # Move and clean up
+            final_location = self.remote_ok
             print(f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
-            return {"status": "Success", "linkPath": sym_link_path}
+            status = {"status": "Success", "linkPath": sym_link_path, "message": "File copied successfully."}
         except FileNotFoundError as e:
             print(f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
-            return {"status": "Failed", "message": str(e)}
+            status = {"status": "Failed", "message": str(e)}
         except Exception as e:
             print('getFile : sFTP could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
             print(f"getFile : Moving file {remote_item} to {self.remote_fail}")
             self._moveFilesInServer(remote_item, self.remote_dir, self.remote_fail, False)
-            return {"status": "Failed", "message": str(e)}
+            final_location = self.remote_fail
+            status = {"status": "Failed", "message": str(e)}
+
+        # Update routing history
+        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.RoutingHistory.sftp_server_url = self.sftp_server
+        self.RoutingHistory.sftp_server_port = self.sftp_port
+        self.RoutingHistory.sftp_username = self.username
+        self.RoutingHistory.original_file_location = remote_file
+        self.RoutingHistory.final_file_location = final_location
+        wfs = {
+            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            "action": "moveftp - getfile",
+            "file_location": remote_file,
+            "notification_id": remote_item,
+            "status": status["status"],
+            "message": status["message"] + " : " + sym_link_path,
+        }
+        self.RoutingHistory.workflow_states.append(wfs)
+        self.RoutingHistory.save()
+        return status
 
     ##### --- End moveftp. Begin copyftp ---
 
@@ -300,10 +345,24 @@ class publisher_files():
         print(f"copyftp: Copying finished. Cleaning up {src}")
         try:
             os.remove(src)  # try to take the pending symlink away
-            return {"status": "Success", 'pend_dir': dst}
+            status = {"status": "Success", 'pend_dir': dst, "message": "File copied successfully."}
         except Exception as e:
             print("copyftp - failed to delete pending entry: '{x}'".format(x=str(e)))
-            return {"status": "Failed", "message": str(e)}
+            status = {"status": "Failed", "message": str(e)}
+
+        # Update routing history
+        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        wfs = {
+            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            "action": "copyftp",
+            "file_location": fileName,
+            "notification_id": fileName,
+            "status": status["status"],
+            "message": status["message"] + " : " + dst,
+        }
+        self.RoutingHistory.workflow_states.append(wfs)
+        self.RoutingHistory.save()
+        return status
 
     ##### --- End copyftp. Begin processftp ---
 
@@ -311,14 +370,11 @@ class publisher_files():
     def processftp(self, thisdir):
         print(f"processftp - processing file {thisdir}")
         # configure for sending anything for the user of this dir
-        acc = models.Account().pull(self.id)
-        if acc is None:
+        if self.acc is None:
             print("No publisher account with name " + self.username + " is found. Not processing " + thisdir)
             return{"status":"Failed", "message": f"No publisher named {self.username}"}
-        self.apiurl += '?api_key=' + acc.data['api_key']
 
         # there is a uuid dir for each item moved in a given operation from the user jail
-        dirName = thisdir.split("/")[-1]
         dirList = os.listdir(thisdir)
         print(f'processftp - processing {thisdir} for Account: {self.username}')
         if len(dirList) > 1:
@@ -356,8 +412,23 @@ class publisher_files():
         pdir = thisdir
         if os.path.isdir(thisdir + '/' + nf + '/' + nf):
             pdir = thisdir + '/' + nf + '/' + nf
-        # Could have multiple directories. Process them individually.
-        return{'status':'Success', 'proc_dir':pdir}
+        # Could have multiple directories. Process them individually in the next step
+        dirList = os.listdir(pdir)
+        status = {'status':'Success', 'proc_dir':pdir}
+
+        # Update routing history
+        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        wfs = {
+            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            "action": "processftp - flatten",
+            "file_location": thisdir,
+            "notification_id": thisdir,
+            "status": status["status"],
+            "message": f"Directories found : {dirList}",
+        }
+        self.RoutingHistory.workflow_states.append(wfs)
+        self.RoutingHistory.save()
+        return status
 
 
     def processftp_dirs(self, pdir):
@@ -366,6 +437,7 @@ class publisher_files():
         dirList = os.listdir(pdir)
         print(f"Processing the directories : {dirList}")
         for singlepub in dirList:
+            status = {'status':'Success'}
             # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
             # 2019-11-18 TD : original path without loop where zip file is packed
             #                 from  source folder "thisdir + '/' + pub"
@@ -388,18 +460,33 @@ class publisher_files():
             resp = requests.post(self.apiurl, files=files, verify=False)
             log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {pdir} - {singlepub}"
             if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-                print(f"Scheduler - processing completed with POST failure to {log_data}")
+                message = f"Scheduler - processing completed with POST failure to {log_data}"
                 status = {'status':'Failed'}
             else:
                 resp_list.append(resp.json()['id'])
-                print(f"Scheduler - processing completed with POST to {log_data}")
+                message = f"Scheduler - processing completed with POST to {log_data}"
+
+            print(message)
+            # Update routing history
+            self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            wfs = {
+                "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+                "action": f"processftp - directory {pdir}",
+                "file_location": singlepub,
+                "notification_id": singlepub,
+                "status": status["status"],
+                "message": message,
+            }
+            self.RoutingHistory.workflow_states.append(wfs)
+            self.RoutingHistory.save()
+
         status['resp_ids'] = resp_list
         status["message"] = "Processing complete"
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
 
-    # Rough outline of what we expect to do.
+    # Rough outline of what we expect to do - this is always successful!
     def checkunrouted(self, uids):
         if app.config.get('DEEPGREEN_EZB_ROUTING', False):
             from service import routing_deepgreen as routing
@@ -417,17 +504,29 @@ class publisher_files():
             print(f"Routing sent the {kounter}-th notification for routing")
 
             if self.delete_routed and res:
-                print(f"Routing deleting {obj.id} unrouted notification that has been processed and routed")
-                # models.UnroutedNotification.bulk_delete(obj.id)
+                message = f"Routing deleting {obj.id} unrouted notification that has been processed and routed"
+                print(message)
                 obj.delete()
                 # time.sleep(2)  # 2 seconds grace time
 
             if self.delete_unrouted and not res:
-                print(f"Routing deleting {obj.id} unrouted notification that has been processed and was unrouted")
-                # models.UnroutedNotification.bulk_delete(obj.id)
+                message = f"Routing deleting {obj.id} unrouted notification that has been processed and was unrouted"
+                print(message)
                 obj.delete()
                 # time.sleep(2)  # again, 2 seconds grace
 
+            # Update routing history
+            self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            wfs = {
+                "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+                "action": f"processftp - UID: {uid}",
+                "file_location": "",
+                "notification_id": uid,
+                "status": "Success",
+                "message": message,
+            }
+            self.RoutingHistory.workflow_states.append(wfs)
+            self.RoutingHistory.save()
         return{'status':"Success"}
 
     ##### --- End checkunrouted. ---

@@ -1,12 +1,16 @@
+# Python stuff
+import uuid
 from datetime import datetime, timedelta
 from itertools import chain
 
+# Airflow stuff
 from airflow import AirflowException
 from airflow.exceptions import AirflowTaskTerminated
 from airflow.operators.python_operator import PythonOperator
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 
+# jper scheduler.py replacement
 from scheduler.publisher_transfer import publisher_files
 
 #-----
@@ -25,7 +29,8 @@ def move_from_server():
             b = publisher_files(publisher['id'], publisher=publisher)
             b.list_remote_dir(b.remote_dir)
             for f in b.file_list_publisher:
-                files_list.append((publisher['id'], f))
+                routing_id = uuid.uuid4().hex
+                files_list.append((publisher['id'], f, routing_id))
         print(f"Number of files to transfer : {len(files_list)}")
         f = [x[1] for x in files_list]
         print(f"List of files to transfer : {f}")
@@ -38,15 +43,16 @@ def move_from_server():
         ti = context['ti'] # TaskInstance
         publisher_id = file_tuple[0]
         file_name = file_tuple[1]
+        routing_id = file_tuple[2]
         ##
-        a = publisher_files(publisher_id)
+        a = publisher_files(publisher_id, routing_id=routing_id)
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.get_file(file_name)
         if result["status"] == "Success":
             print("Finished getting", file_name)
-            return (publisher_id, result['linkPath'])
+            return (publisher_id, result['linkPath'], routing_id)
         else:
             raise AirflowException(f"Failed to get {file_name} : {result['message']}")
     #=
@@ -57,15 +63,16 @@ def move_from_server():
         ti = context['ti'] # TaskInstance
         publisher_id = local_tuple[0]
         file_name = local_tuple[1]
+        routing_id = local_tuple[2]
         ##
-        a = publisher_files(publisher_id)
+        a = publisher_files(publisher_id, routing_id=routing_id)
         ff = file_name.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.copyftp(file_name)
         if result["status"] == "Success":
             print(f"Finished moving {file_name} to {a.tmpdir}")
-            return(publisher_id, result['pend_dir'])
+            return(publisher_id, result['pend_dir'], routing_id)
         else:
             raise AirflowException(f"copyftp - Failed to copy {file_name}, publisher id {publisher_id} : {result['message']}")
     #=
@@ -76,15 +83,16 @@ def move_from_server():
         ti = context['ti'] # TaskInstance
         publisher_id = pend_tuple[0]
         pend_dir  = pend_tuple[1]
+        routing_id = pend_tuple[2]
         ##
-        a = publisher_files(publisher_id)
+        a = publisher_files(publisher_id, routing_id=routing_id)
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.processftp(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            return(publisher_id, result['proc_dir'])
+            return(publisher_id, result['proc_dir'], routing_id)
         elif result["status"] == "Processed":
             print(result["message"])
             raise AirflowTaskTerminated(f"process_ftp - failed to process {pend_dir}, publisher id {publisher_id}. Already processed.")
@@ -98,15 +106,16 @@ def move_from_server():
         ti = context['ti'] # TaskInstance
         publisher_id = pend_dir[0]
         pend_dir  = pend_dir[1]
+        routing_id = pend_dir[2]
         ##
-        a = publisher_files(publisher_id)
+        a = publisher_files(publisher_id, routing_id=routing_id)
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
         result = a.processftp_dirs(pend_dir)
         if result["status"] == "Success":
             print(f"Finished processing {pend_dir}")
-            return(publisher_id, result['resp_ids'])
+            return(publisher_id, result['resp_ids'], routing_id)
         else:
             raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
     #=
@@ -116,8 +125,9 @@ def move_from_server():
         ti = context['ti'] # TaskInstance
         publisher_id = notif[0]
         chk_dir  = notif[1]
+        routing_id = notif[2]
         ##
-        a = publisher_files(publisher_id)
+        a = publisher_files(publisher_id, routing_id=routing_id)
         context["map_index_template"] = f"{ti.map_index} {chk_dir}"
         result = a.checkunrouted(chk_dir)
         if result["status"] == "Success":
@@ -138,7 +148,7 @@ def move_from_server():
     #
     # The first call + chaining of the tasks
     file_tuple=get_file_list()
-    pl = process_one_file.expand(file_tuple=file_tuple)
+    process_one_file.expand(file_tuple=file_tuple)
 
 #-----
 
