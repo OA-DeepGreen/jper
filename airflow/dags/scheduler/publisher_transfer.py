@@ -23,12 +23,18 @@ class publisher_files():
     def __init_routing_id__(self, routing_id):
         self.RoutingHistory = RoutingHistory()
         print(f"Routing history id = {routing_id}")
-        self.RoutingHistory.id = routing_id
-        if not self.RoutingHistory.publisher_id:
+        g = self.RoutingHistory.query(routing_id)['hits']['hits']
+        if len(g) == 1: # Found the routing history in OS
+            h = g[0]['_source']
+            for key in h.keys():
+                setattr(self.RoutingHistory, key, h[key])
+        else:
+            self.RoutingHistory.id = routing_id
             self.RoutingHistory.publisher_id = self.id
             self.RoutingHistory.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.RoutingHistory.save()
+        self.__print_routing_history__()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
@@ -70,6 +76,14 @@ class publisher_files():
         self.remote_failed = "xfer_failed"
         self.file_list_publisher = []
 
+    def __print_routing_history__(self):
+        app.logger.warning("Begin Routing History")
+        app.logger.warning(f'Routing History> {self.RoutingHistory.__dict__["data"]}')
+        app.logger.warning("Routing History> individual workflow states :")
+        for state in self.RoutingHistory.workflow_states:
+            app.logger.warning(f"{state['action']} > {state}")
+        app.logger.warning("END Routing History")
+
     def __init_from_app__(self):
         # Initialise the needed constants from the app
         self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
@@ -103,6 +117,7 @@ class publisher_files():
             self.__init_publisher__(publisher_id, publisher=publisher)
 
     def __init_publisher__(self, publisher_id, publisher=None):
+        print(f"init_publisher> Initialising for publisher {publisher_id}")
         # Initialise for a given publisher
         self.id = publisher_id
         if not publisher:
@@ -288,7 +303,7 @@ class publisher_files():
             self._moveFilesInServer(remote_item, self.remote_dir, self.remote_ok, cleanUp) # Move and clean up
             final_location = self.remote_ok
             print(f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
-            status = {"status": "Success", "linkPath": sym_link_path, "message": "File copied successfully."}
+            status = {"status": "Success", "linkPath": sym_link_path, "message": f"File copied successfully : {sym_link_path}"}
         except FileNotFoundError as e:
             print(f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
             status = {"status": "Failed", "message": str(e)}
@@ -310,12 +325,13 @@ class publisher_files():
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "moveftp - getfile",
             "file_location": remote_file,
-            "notification_id": remote_item,
+            "notification_id": "",
             "status": status["status"],
-            "message": status["message"] + " : " + sym_link_path,
+            "message": status["message"],
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
+        self.__print_routing_history__()
         return status
 
     ##### --- End moveftp. Begin copyftp ---
@@ -356,12 +372,13 @@ class publisher_files():
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "copyftp",
             "file_location": fileName,
-            "notification_id": fileName,
+            "notification_id": "",
             "status": status["status"],
             "message": status["message"] + " : " + dst,
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
+        self.__print_routing_history__()
         return status
 
     ##### --- End copyftp. Begin processftp ---
@@ -422,12 +439,13 @@ class publisher_files():
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "processftp - flatten",
             "file_location": thisdir,
-            "notification_id": thisdir,
+            "notification_id": "",
             "status": status["status"],
             "message": f"Directories found : {dirList}",
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
+        self.__print_routing_history__()
         return status
 
 
@@ -435,8 +453,9 @@ class publisher_files():
         resp_list = []
         status = {'status':'Success'}
         dirList = os.listdir(pdir)
-        print(f"Processing the directories : {dirList}")
-        for singlepub in dirList:
+        print(f"Processing {len(dirList)} directories : {dirList}")
+        for idx, singlepub in enumerate(dirList):
+            print(f"Processing directory {idx} : {singlepub}")
             status = {'status':'Success'}
             # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
             # 2019-11-18 TD : original path without loop where zip file is packed
@@ -456,29 +475,37 @@ class publisher_files():
                 ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
                 ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
             ]
-            print('Scheduler - processing POSTing ' + pkg + ' ' + json.dumps(notification))
+            print('processftp_dirs> processing POSTing ' + pkg + ' ' + json.dumps(notification))
+            print('processftp_dirs> request_files : ', files)
             resp = requests.post(self.apiurl, files=files, verify=False)
             log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {pdir} - {singlepub}"
             if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-                message = f"Scheduler - processing completed with POST failure to {log_data}"
+                message = f"processftp_dirs> processing completed with POST failure to {log_data}"
                 status = {'status':'Failed'}
             else:
-                resp_list.append(resp.json()['id'])
-                message = f"Scheduler - processing completed with POST to {log_data}"
+                notification_id = resp.json()['id']
+                app.logger.warning(f"processftp_dirs> The notification id for this series is {notification_id}")
+                resp_list.append(notification_id)
+                message = f"processftp_dirs> processing completed with POST to {log_data}"
 
             print(message)
             # Update routing history
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            for wfs in self.RoutingHistory.workflow_states:
+                if wfs["file_location"] == singlepub:
+                    wfs["status"] = status["status"]
+                    wfs["message"] = message
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
                 "action": f"processftp - directory {pdir}",
                 "file_location": singlepub,
-                "notification_id": singlepub,
+                "notification_id": notification_id,
                 "status": status["status"],
                 "message": message,
             }
             self.RoutingHistory.workflow_states.append(wfs)
             self.RoutingHistory.save()
+            self.__print_routing_history__()
 
         status['resp_ids'] = resp_list
         status["message"] = "Processing complete"
@@ -494,7 +521,9 @@ class publisher_files():
             from service import routing
 
         kounter = 0
-        for uid in uids:
+        print(f"Processing {len(uids)} notifications : {uids}")
+        for idx, uid in enumerate(uids):
+            print(f"Processing Notification {idx} : {uid}")
             kounter = kounter + 1
             mun = models.UnroutedNotification()
             obj = mun.pull(uid)
@@ -519,7 +548,7 @@ class publisher_files():
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                "action": f"processftp - UID: {uid}",
+                "action": f"checkunrouted - UID: {uid}",
                 "file_location": "",
                 "notification_id": uid,
                 "status": "Success",
@@ -527,6 +556,7 @@ class publisher_files():
             }
             self.RoutingHistory.workflow_states.append(wfs)
             self.RoutingHistory.save()
+            self.__print_routing_history__()
         return{'status':"Success"}
 
     ##### --- End checkunrouted. ---
