@@ -11,7 +11,7 @@ from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 
 # jper scheduler.py replacement
-from scheduler.publisher_transfer import publisher_files
+from jper_scheduler.publisher_transfer import publisher_files
 
 #-----
 

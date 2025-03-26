@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import paramiko
 
-from scheduler.utils import zip, flatten, pkgformat
+from jper_scheduler.utils import zip, flatten, pkgformat
 
 from octopus.core import app
 from service import models
