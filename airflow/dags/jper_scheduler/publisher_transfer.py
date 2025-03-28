@@ -452,7 +452,7 @@ class publisher_files():
 
     def processftp_dirs(self, pdir):
         resp_list = []
-        status = {'status':'Failed'}
+        status2 = {'status':'Failed'}
         dirList = os.listdir(pdir)
         print(f"Processing {len(dirList)} directories : {dirList}")
         for idx, singlepub in enumerate(dirList):
@@ -482,12 +482,15 @@ class publisher_files():
             log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {pdir} - {singlepub}"
             if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
                 message = f"processftp_dirs> processing completed with POST failure to {log_data}"
+                notification_id = ""
+                status = {'status':'Failed'}
             else:
                 notification_id = resp.json()['id']
                 app.logger.warning(f"processftp_dirs> The notification id for this series is {notification_id}")
                 resp_list.append(notification_id)
                 message = f"processftp_dirs> processing completed with POST to {log_data}"
                 status = {'status':'Success'}
+                status2 = {'status':'Success'}
 
             print(message)
             # Update routing history
@@ -510,6 +513,7 @@ class publisher_files():
 
         status['resp_ids'] = resp_list
         status["message"] = "Processing complete"
+        status["status"] = status2["status"]
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
