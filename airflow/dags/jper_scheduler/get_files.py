@@ -15,7 +15,7 @@ from jper_scheduler.publisher_transfer import publisher_files
 
 #-----
 
-@dag(dag_id="get_server_files", catchup=False, max_active_runs=1, tags=["teamCottageLabs", "Process Files from publishers"])
+@dag(dag_id="Process_Publisher_Deposits", catchup=False, max_active_runs=1, tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
 
     @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=1 )
