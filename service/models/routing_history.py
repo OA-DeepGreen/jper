@@ -1,7 +1,8 @@
 from octopus.lib import dataobj, dates
 from service import dao
 
-WORKFLOW_STATUS = ["started", "completed  successfully", "completed with errors", "stalled"]
+WORKFLOW_STATUS = ["started", "success", "failure"]
+STATUS = ["started", "success", "failure", "in progress"]
 
 
 class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
@@ -21,12 +22,12 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "sftp_server_port" : "<sftp_server_port>",
             "sftp_server_username" : "<sftp_server_username>",
             original_file_location : "<The location of the file, uploaded by publisher>",
-            final_file_location : "<The location of the file, after it was copied>",
-            deepgreen_file_locations : [{
-                jper_store_location : ["<The location of the file in the data store>"],
-                data_store_location : ["<The location of the file in the data store>"],
-                notification_id : ["The notification id from routing"],
+            final_file_locations : [{
+                "location_type": "<a descriptor for the file location>",
+                "location": "<the file location on disk>",
             }]
+            "notification_ids" : ["<notification_id>"],
+            "status": "started | success | failure | in progress",
             workflow_states: [{
                 "date": "<date action was performed>",
                 "action" : "title of action",
@@ -57,32 +58,31 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "sftp_server_url": {"coerce": "unicode"},
                 "sftp_username": {"coerce": "unicode"},
                 "original_file_location": {"coerce": "unicode"},
-                "final_file_location": {"coerce": "unicode"},
-                "status": {"coerce": "unicode", "allowed_values": ["succeeding", "failing", "problem"]},
-                "retries": {"coerce": "integer"},
-                "last_tried": {"coerce": "utcdatetime"}
+                "status": {"coerce": "unicode", "allowed_values": STATUS}
             },
             "lists": {
-                "deepgreen_file_locations": {"contains": "object"},
+                "final_file_locations":  {"contains": "object"},
+                "notification_ids": {"coerce": "unicode"},
                 "workflow_states": {"contains": "object"},
             },
-            "deepgreen_file_locations": {
-                "fields": {
-                    "jper_store_location": {"coerce": "unicode"},
-                    "data_store_location": {"coerce": "unicode"},
-                    "notification_id": {"coerce": "unicode"},
+            "structs": {
+                "final_file_locations": {
+                    "fields": {
+                        "location_type": {"coerce": "unicode"},
+                        "file_location": {"coerce": "unicode"},
+                    }
+                },
+                "workflow_states": {
+                    "fields": {
+                        "date": {"coerce": "utcdatetime"},
+                        "action": {"coerce": "unicode"},
+                        "file_location": {"coerce": "unicode"},
+                        "notification_id": {"coerce": "unicode"},
+                        "status": {"coerce": "unicode", "allowed_values": WORKFLOW_STATUS},
+                        "message": {"coerce": "unicode"}
+                    }
                 }
-            },
-            "workflow_states": {
-                "fields": {
-                    "date": {"coerce": "utcdatetime"},
-                    "action": {"coerce": "unicode"},
-                    "file_location": {"coerce": "unicode"},
-                    "notification_id": {"coerce": "unicode"},
-                    "status": {"coerce": "unicode", "allowed_values": WORKFLOW_STATUS},
-                    "message": {"coerce": "unicode"}
-                }
-            },
+            }
         }
         self._add_struct(struct)
         super(RoutingHistory, self).__init__(raw=raw)
@@ -183,74 +183,54 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         self._set_single("original_file_location", val, coerce=dataobj.to_unicode())
 
     @property
-    def final_file_location(self):
-        """
-        The final file location in the sftp server for the sftp username
+    def final_file_locations(self):
+        return self._get_list("final_file_locations")
 
-        :return: final_file_location
-        """
-        return self._get_single("final_file_location", coerce=dataobj.to_unicode())
+    @final_file_locations.setter
+    def final_file_locations(self, vals):
+        self._set_list("final_file_locations", vals)
 
-    @final_file_location.setter
-    def final_file_location(self, val):
+    def add_final_file_location(self, location_type, file_location):
         """
-        Set the final file location in the sftp server for the sftp username
-
-        :param val: final_file_location
-        :return:
+        {
+            "location_type": {"coerce": "unicode"},
+            "file_location": {"coerce": "unicode"},
+        }
         """
-        self._set_single("final_file_location", val, coerce=dataobj.to_unicode())
+        if not location_type:
+            raise dataobj.DataSchemaException("location type is missing")
+        if not file_location:
+            raise dataobj.DataSchemaException("file_location is missing")
+        val = {
+            'location_type': location_type,
+            'file_location': file_location
+        }
+        self._add_to_list("final_file_locations", val)
 
     @property
-    def deepgreen_file_locations(self):
-        return self._get_list("deepgreen_file_locations")
+    def notification_ids(self):
+        return self._get_list("notification_ids")
 
-    @deepgreen_file_locations.setter
-    def deepgreen_file_locations(self, vals):
-        self._set_list("deepgreen_file_locations", vals)
+    @notification_ids.setter
+    def notification_ids(self, vals):
+        self._set_list("notification_ids", vals)
 
-    def add_deepgreen_file_location(self, notification_id, data_store_location, jper_store_location=None):
+    def add_notification_ids(self, notification_id):
         """
-            "jper_store_location": {"coerce": "unicode"},
-            "data_store_location": {"coerce": "unicode"},
-            "notification_id": {"coerce": "unicode"},
+            "notification_ids": {"coerce": "unicode"},
         """
         if not notification_id:
             raise dataobj.DataSchemaException("notification_id is missing")
-        if not data_store_location:
-            raise dataobj.DataSchemaException("data_store_location is missing")
 
-        vals = {
-            'notification_id': notification_id,
-            'data_store_location': data_store_location
-        }
-        if jper_store_location:
-            vals['jper_store_location'] = jper_store_location
-        self._add_to_list("deepgreen_file_locations", vals)
+        self._add_to_list("notification_ids", notification_id)
 
     @property
-    def jper_store_location(self, notification_id):
-        """
-        The file location in the deepgreen jper server for the notification id
+    def status(self):
+        return self._get_single("status", coerce=dataobj.to_unicode())
 
-        :return: jper_store_location
-        """
-        for loc in self.deepgreen_file_locations():
-            if loc['notification_id'] == notification_id:
-                return loc['jper_store_location']
-        return None
-
-    @property
-    def data_store_location(self, notification_id):
-        """
-        The file location in the deepgreen store server for the notificatin id
-
-        :return: data_store_location
-        """
-        for loc in self.deepgreen_file_locations():
-            if loc['notification_id'] == notification_id:
-                return loc['data_store_location']
-        return None
+    @status.setter
+    def status(self, val):
+        self._set_single("status", val, coerce=dataobj.to_unicode(), allowed_values=STATUS)
 
     @property
     def workflow_states(self):
