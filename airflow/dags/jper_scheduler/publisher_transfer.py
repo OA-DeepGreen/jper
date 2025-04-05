@@ -449,7 +449,6 @@ class publisher_files():
         self.__print_routing_history__()
         return status
 
-
     def processftp_dirs(self, pdir):
         resp_list = []
         status2 = {'status':'Failed'}
@@ -528,22 +527,29 @@ class publisher_files():
             kounter = kounter + 1
             mun = models.UnroutedNotification()
             obj = mun.pull(uid)
-            print("Checking for unrouted notifications")
+            print(f"#{kounter} : Processing unrouted notification {obj.id}")
             res = routing.route(obj)
-            print(res)
-            print(f"Routing sent the {kounter}-th notification for routing")
+            message = f"#{kounter} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
+            print(message)
 
-            if self.delete_routed and res:
-                message = f"Routing deleting {obj.id} unrouted notification that has been processed and routed"
-                print(message)
-                obj.delete()
-                # time.sleep(2)  # 2 seconds grace time
+            if res:
+                if self.delete_routed:
+                    message += f". Deleting unrouted notification {obj.id} that has been processed and routed"
+                    print(message)
+                    obj.delete()
+                else:
+                    message += f". Not deleting unrouted notification {obj.id} that has been processed and routed"
+                    print(message)
 
-            if self.delete_unrouted and not res:
-                message = f"Routing deleting {obj.id} unrouted notification that has been processed and was unrouted"
-                print(message)
-                obj.delete()
-                # time.sleep(2)  # again, 2 seconds grace
+            if not res:
+                if self.delete_unrouted:
+                    message += f". Deleting unrouted notification {obj.id} that has been processed and was unrouted"
+                    print(message)
+                    obj.delete()
+                else:
+                    message = f". Not deleting unrouted notification {obj.id} that has been processed and was unrouted"
+                    print(message)
+
 
             # Update routing history
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
