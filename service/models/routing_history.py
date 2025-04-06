@@ -1,8 +1,9 @@
+from datetime import datetime
 from octopus.lib import dataobj, dates
 from service import dao
 
 WORKFLOW_STATUS = ["started", "success", "failure"]
-STATUS = ["started", "success", "failure", "in progress"]
+STATUS = ["started", "success", "failure"]
 
 
 class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
@@ -20,20 +21,22 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "publisher_id" : "<publisher id>",
             "sftp_server_url" : "<sftp_server>",
             "sftp_server_port" : "<sftp_server_port>",
-            "sftp_server_username" : "<sftp_server_username>",
+            "sftp_username" : "<sftp_username>",
             original_file_location : "<The location of the file, uploaded by publisher>",
             final_file_locations : [{
                 "location_type": "<a descriptor for the file location>",
                 "location": "<the file location on disk>",
             }]
-            "notification_ids" : ["<notification_id>"],
-            "status": "started | success | failure | in progress",
+            "notification_states" : [{
+                "status": "<one of STATUS>",,
+                "notification_id": "<notification_id>",
+            }],
             workflow_states: [{
                 "date": "<date action was performed>",
                 "action" : "title of action",
                 "file_location" : "<file for which notification was created>",
                 "notification_id" : "<file for which notification was created>",
-                "status": "<completed  successfully|completed with errors|started|stalled>",
+                "status": "<one of WORKFLOW_STATUS>",
                 "message": "Any message regarding action"
             }],
         }
@@ -52,17 +55,17 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         struct = {
             "fields": {
                 "id": {"coerce": "unicode"},
-                "last_updated": {"coerce": "utcdatetime"},
                 "created_date": {"coerce": "utcdatetime"},
+                "last_updated": {"coerce": "utcdatetime"},
                 "publisher_id": {"coerce": "unicode"},
                 "sftp_server_url": {"coerce": "unicode"},
+                "sftp_server_port": {"coerce": "unicode"},
                 "sftp_username": {"coerce": "unicode"},
-                "original_file_location": {"coerce": "unicode"},
-                "status": {"coerce": "unicode", "allowed_values": STATUS}
+                "original_file_location": {"coerce": "unicode"}
             },
             "lists": {
                 "final_file_locations":  {"contains": "object"},
-                "notification_ids": {"coerce": "unicode"},
+                "notification_states": {"contains": "object"},
                 "workflow_states": {"contains": "object"},
             },
             "structs": {
@@ -70,6 +73,12 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                     "fields": {
                         "location_type": {"coerce": "unicode"},
                         "file_location": {"coerce": "unicode"},
+                    }
+                },
+                "notification_states": {
+                    "fields": {
+                        "notification_id": {"coerce": "unicode"},
+                        "status": {"coerce": "unicode", "allowed_values": STATUS}
                     }
                 },
                 "workflow_states": {
@@ -145,23 +154,23 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         self._set_single("sftp_server_port", val, coerce=dataobj.to_unicode())
 
     @property
-    def sftp_server_username(self):
+    def sftp_username(self):
         """
         The sftp server username
 
-        :return: sftp_server_username
+        :return: sftp_username
         """
-        return self._get_single("sftp_server_username", coerce=dataobj.to_unicode())
+        return self._get_single("sftp_username", coerce=dataobj.to_unicode())
 
-    @sftp_server_username.setter
-    def sftp_server_username(self, val):
+    @sftp_username.setter
+    def sftp_username(self, val):
         """
         Set the sftp server username
 
-        :param val: sftp_server_username
+        :param val: sftp_username
         :return:
         """
-        self._set_single("sftp_server_username", val, coerce=dataobj.to_unicode())
+        self._set_single("sftp_username", val, coerce=dataobj.to_unicode())
 
     @property
     def original_file_location(self):
@@ -208,29 +217,37 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         self._add_to_list("final_file_locations", val)
 
     @property
-    def notification_ids(self):
-        return self._get_list("notification_ids")
+    def notification_states(self):
+        return self._get_list("notification_states")
 
-    @notification_ids.setter
-    def notification_ids(self, vals):
-        self._set_list("notification_ids", vals)
+    @notification_states.setter
+    def notification_states(self, vals):
+        self._set_list("notification_states", vals)
 
-    def add_notification_id(self, notification_id):
+    def add_notification_state(self, status, notification_id):
         """
-            "notification_ids": {"coerce": "unicode"},
+        {
+            "status": {"coerce": "unicode", "allowed_values": STATUS},
+            "notification_id": {"coerce": "unicode"}
+        }
         """
+        if not status:
+            raise dataobj.DataSchemaException("notification status is missing")
         if not notification_id:
-            raise dataobj.DataSchemaException("notification_id is missing")
-
-        self._add_to_list("notification_ids", notification_id, coerce=self._utf8_unicode(), unique=True)
-
-    @property
-    def status(self):
-        return self._get_single("status", coerce=dataobj.to_unicode())
-
-    @status.setter
-    def status(self, val):
-        self._set_single("status", val, coerce=dataobj.to_unicode(), allowed_values=STATUS)
+            raise dataobj.DataSchemaException("notification id is missing")
+        if status and status not in STATUS:
+            raise dataobj.DataSchemaException(
+                "status can only be one of: {x}".format(x=", ".join(STATUS)))
+        updated_states = []
+        for notification_state in self.notification_states:
+            if notification_state.get("notification_id", "") == notification_id:
+                updated_states.append({
+                    'status': status,
+                    'notification_id': notification_id
+                })
+            else:
+                updated_states.append(notification_state)
+        self._set_list("notification_states", updated_states)
 
     @property
     def workflow_states(self):

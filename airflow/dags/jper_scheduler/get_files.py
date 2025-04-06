@@ -11,7 +11,7 @@ from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 
 # jper scheduler.py replacement
-from jper_scheduler.publisher_transfer import publisher_files
+from jper_scheduler.publisher_transfer import PublisherFiles
 
 #-----
 
@@ -22,11 +22,11 @@ def move_from_server():
     def get_file_list():
         # Get File list
         files_list = []
-        a = publisher_files()
+        a = PublisherFiles()
         for publisher in a.publishers:
             if publisher['id'] != '1efe7d4b-97a8-4e9f-80d9-11d1edc5c70a':
                 continue
-            b = publisher_files(publisher['id'], publisher=publisher)
+            b = PublisherFiles(publisher['id'], publisher=publisher)
             b.list_remote_dir(b.remote_dir)
             for f in b.file_list_publisher:
                 routing_id = uuid.uuid4().hex
@@ -45,7 +45,7 @@ def move_from_server():
         file_name = pub_tuple[1]
         routing_id = pub_tuple[2]
         ##
-        a = publisher_files(publisher_id, routing_id=routing_id)
+        a = PublisherFiles(publisher_id, routing_id=routing_id)
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
@@ -87,7 +87,7 @@ def move_from_server():
         pend_dir  = pub_tuple[1]
         routing_id = pub_tuple[2]
         ##
-        a = publisher_files(publisher_id, routing_id=routing_id)
+        a = PublisherFiles(publisher_id, routing_id=routing_id)
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
@@ -115,7 +115,7 @@ def move_from_server():
         print(f"process_ftp_dirs> Route id {pub_dir}")
         print(f"process_ftp_dirs> Route id {routing_id}")
         ##
-        a = publisher_files(publisher_id, routing_id=routing_id)
+        a = PublisherFiles(publisher_id, routing_id=routing_id)
         ff = pub_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
@@ -137,7 +137,7 @@ def move_from_server():
         routing_id = pub_tuple[2]
         print(f"check_unrouted> Route id {routing_id}")
         ##
-        a = publisher_files(publisher_id, routing_id=routing_id)
+        a = PublisherFiles(publisher_id, routing_id=routing_id)
         context["map_index_template"] = f"{ti.map_index} {chk_dir}"
         result = a.checkunrouted(chk_dir)
         time.sleep(2) # Wait for OS to catch up

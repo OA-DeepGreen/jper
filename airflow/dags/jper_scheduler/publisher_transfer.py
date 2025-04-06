@@ -2,9 +2,7 @@ import os, stat, uuid, shutil, json, requests
 from pathlib import Path
 from datetime import datetime
 import paramiko
-
 from jper_scheduler.utils import zip, flatten, pkgformat
-
 from octopus.core import app
 from service import models
 from service import routing_deepgreen as routing
@@ -12,9 +10,10 @@ from service import routing_deepgreen as routing
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
 
-class publisher_files():
+
+class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
-        self.__init_constants__() # First to be done
+        self.__init_constants__()  # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         if routing_id:
@@ -23,9 +22,9 @@ class publisher_files():
 
     def __init_routing_id__(self, routing_id):
         self.RoutingHistory = RoutingHistory()
-        print(f"Routing history id = {routing_id}")
+        app.logger.debug(f"Routing history id: {routing_id}")
         g = self.RoutingHistory.query(routing_id)['hits']['hits']
-        if len(g) == 1: # Found the routing history in OS
+        if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
             for key in h.keys():
                 setattr(self.RoutingHistory, key, h[key])
@@ -35,7 +34,7 @@ class publisher_files():
             self.RoutingHistory.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.RoutingHistory.save()
-        self.__print_routing_history__()
+        # self.__print_routing_history__()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
@@ -63,10 +62,10 @@ class publisher_files():
 
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect( hostname=self.sftp_server, port=self.sftp_port,
-                        username=self.username, key_filename=self.dg_pubkey_file,
-                        # passphrase=self.dg_passphrase
-                        )
+        c.connect(hostname=self.sftp_server, port=self.sftp_port,
+                  username=self.username, key_filename=self.dg_pubkey_file,
+                  # passphrase=self.dg_passphrase
+                  )
         self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
         self._is_scp = True
 
@@ -78,12 +77,12 @@ class publisher_files():
         self.file_list_publisher = []
 
     def __print_routing_history__(self):
-        app.logger.warning("Begin Routing History")
-        app.logger.warning(f'Routing History> {self.RoutingHistory.__dict__["data"]}')
-        app.logger.warning("Routing History> individual workflow states :")
+        app.logger.debug("Begin Routing History")
+        app.logger.debug(f'Routing History> {self.RoutingHistory.__dict__["data"]}')
+        app.logger.debug("Routing History> individual workflow states :")
         for state in self.RoutingHistory.workflow_states:
-            app.logger.warning(f"{state['action']} > {state}")
-        app.logger.warning("END Routing History")
+            app.logger.debug(f"{state['action']} > {state}")
+        app.logger.debug("END Routing History")
 
     def __init_from_app__(self):
         # Initialise the needed constants from the app
@@ -109,16 +108,15 @@ class publisher_files():
         if not self.tmpdir.endswith("/"):
             self.tmpdir = self.tmpdir + "/"
 
-
     def __init_publishers__(self, publisher_id=None, publisher=None):
         if not publisher_id:
-            print("init_from_app> Retrieving all active publishers")
+            app.logger.info("Retrieving all active publishers")
             self.publishers = models.Account.pull_all_active_publishers()
         else:
             self.__init_publisher__(publisher_id, publisher=publisher)
 
     def __init_publisher__(self, publisher_id, publisher=None):
-        print(f"init_publisher> Initialising for publisher {publisher_id}")
+        app.logger.info(f"Initialising for publisher {publisher_id}")
         # Initialise for a given publisher
         self.id = publisher_id
         if not publisher:
@@ -130,7 +128,7 @@ class publisher_files():
         if port and port.strip():
             self.sftp_port = port
         else:
-            self.sftp_port = 22 # Default
+            self.sftp_port = 22  # Default
         uname = publisher.get('sftp_server', {}).get('username', '')
         if uname and uname.strip():
             self.username = uname
@@ -140,8 +138,7 @@ class publisher_files():
         self.acc = publisher
         self.apiurl += '?api_key=' + self.acc['api_key']
 
-        print(f"init_publisher> Initialised for publisher: {self.username}")
-        print(f"init_publisher> Using server/port: {self.sftp_server} / {self.sftp_port}")
+        app.logger.debug(f"Using sftp username: {self.username}, server: {self.sftp_server}, port: {self.sftp_port}")
         self.__define_directories__()
 
     def __define_directories__(self):
@@ -161,7 +158,7 @@ class publisher_files():
 
     ##### End Initialisations. Begin internal functions #####
 
-    def _makeDirInServer(self, r_dir):
+    def _make_dir_in_server(self, r_dir):
         # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
         # Loop over the path
         if not self._is_scp:
@@ -176,16 +173,18 @@ class publisher_files():
                     self.scp.mkdir(path)
                 except Exception as e:
                     # We do not care as most of these calls will fail as the directories already exist
-                    print(f"makeDirInServer : {str(e)} : Directory {path} probably exists already!")
+                    app.logger.warning(f"Error creating directory in ftp server. "
+                                       f"Directory {path} probably exists already. "
+                                       f"Error: {str(e)}")
 
-    def _moveFilesInServer(self, file, remote_path, r_new, cleanUp):
+    def _move_files_in_server(self, file, remote_path, r_new, cleanUp):
         # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
         # Get the file name and its parent directory in the remote server
         file_name = file
         file_dir = ""
         if "/" in file.strip():
-            file_dir = file.strip().rsplit("/",1)[0]
-            file_name = file.strip().rsplit("/",1)[1]
+            file_dir = file.strip().rsplit("/", 1)[0]
+            file_name = file.strip().rsplit("/", 1)[1]
         file_subdir = file_dir.replace(remote_path, '').strip()
         if file_subdir.startswith("/"):
             file_subdir = file_subdir[1:]
@@ -195,9 +194,10 @@ class publisher_files():
         if len(file_subdir.strip()) > 0:
             new_dir = f"{r_new}/{file_subdir}"
         try:
-            self._makeDirInServer(new_dir)
+            self._make_dir_in_server(new_dir)
         except Exception as e:
-            print(f'moveFilesInServer : Could not create destination directory {new_dir}. Error : {str(e)}')
+            app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
+                               f'Error: {str(e)}')
             return
 
         # Move the file to the destination
@@ -210,21 +210,19 @@ class publisher_files():
             if not self._is_scp:
                 self.__init_sftp_connection__()
             self.scp.rename(remote_path + '/' + file, new_file)
-            print(f'moveFilesInServer : Successfully moved {file} to {new_file}.')
+            app.logger.info(f"Successfully moved {file} to {new_file}.")
         except Exception as e:
-            print(f'moveFilesInServer : Failed to move {file} to {new_file}. Error : {str(e)}')
+            app.logger.error(f"Failed to move {file} to {new_file}. Error : {str(e)}")
             return
 
         # Clean up the server of empty directories (if any). A bit of unnecessary overhead, so avoid for subdirectories
         if cleanUp:
-            print(f"moveFilesInServer: Cleaning up parent directory {remote_path}")
             try:
                 self.scp.rmdir(remote_path)
-                print(f'moveFilesInServer : Successfully deleted directory {remote_path}.')
                 self.scp.mkdir(remote_path)
-                print(f'moveFilesInServer : Successfully re-created directory {remote_path}.')
+                app.logger.debug(f"Cleaned up parent directory {remote_path}")
             except Exception as e:
-                print(f'moveFilesInServer : Could not delete directory {remote_path}. Likely not empty. Error : {str(e)}')
+                app.logger.warning(f"Could not cleanup directory {remote_path}. Likely not empty. Error : {str(e)}")
 
     ##### End internal functions. Begin main (external) functions #####
 
@@ -238,9 +236,9 @@ class publisher_files():
         try:
             x = self.scp.stat(rdir)
         except Exception as e:
-            print(f"list_remote_dir : Failed to access directory {rdir}. Error : {str(e)}")
+            app.logger.error(f"Failed to access directory {rdir}. Error: {str(e)}")
             return []
-        
+
         folders = []
         for item in self.scp.listdir_attr(rdir):
             r_obj = rdir + '/' + item.filename
@@ -257,20 +255,21 @@ class publisher_files():
             self.list_remote_dir(folder)
         return self.file_list_publisher
 
-    def get_file(self, fileName): # Get one file and associated operations
+    # Get one file and associated operations
+    def get_file(self, filepath):
         # Initialise the sFTP connection if not already done
         if not self._is_scp:
             self.__init_sftp_connection__()
         # Some sanity check - do I have a full path or just a file name?
         print(f'self remote_dir : {self.remote_dir}')
-        print(f'filename : {fileName}')
-        if self.remote_dir in fileName:
-            remote_file = fileName
-            local_file = self.l_dir + fileName.removeprefix(self.remote_dir).lstrip("/")
+        print(f'filename : {filepath}')
+        if self.remote_dir in filepath:
+            remote_file = filepath
+            local_file = self.l_dir + filepath.removeprefix(self.remote_dir).lstrip("/")
         else:
-            remote_file = self.remote_basedir + self.username + "/" + fileName
-            local_file = self.l_dir + fileName
-        
+            remote_file = self.remote_basedir + self.username + "/" + filepath
+            local_file = self.l_dir + filepath
+
         print(f'remote file : {remote_file}')
         print(f'local file : {local_file}')
         # Retrieve the file
@@ -298,20 +297,23 @@ class publisher_files():
             # ln -sf $uniquedir $pendingdir/.
             sym_link_path = self.pending_dir + unique_dir
             Path(sym_link_path).symlink_to(unique_dir_path)
-            cleanUp = False # Clean up only for master path
+            cleanUp = False  # Clean up only for master path
             if os.path.dirname(remote_file) == self.remote_dir:
                 cleanUp = True
-            self._moveFilesInServer(remote_item, self.remote_dir, self.remote_ok, cleanUp) # Move and clean up
+            self._move_files_in_server(remote_item, self.remote_dir, self.remote_ok, cleanUp)  # Move and clean up
             final_location = self.remote_ok
-            print(f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
-            status = {"status": "Success", "linkPath": sym_link_path, "message": f"File copied successfully : {sym_link_path}"}
+            print(
+                f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
+            status = {"status": "Success", "linkPath": sym_link_path,
+                      "message": f"File copied successfully : {sym_link_path}"}
         except FileNotFoundError as e:
-            print(f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
+            print(
+                f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
             status = {"status": "Failed", "message": str(e)}
         except Exception as e:
             print('getFile : sFTP could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
             print(f"getFile : Moving file {remote_item} to {self.remote_fail}")
-            self._moveFilesInServer(remote_item, self.remote_dir, self.remote_fail, False)
+            self._move_files_in_server(remote_item, self.remote_dir, self.remote_fail, False)
             final_location = self.remote_fail
             status = {"status": "Failed", "message": str(e)}
 
@@ -334,7 +336,7 @@ class publisher_files():
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
-        self.__print_routing_history__()
+        # self.__print_routing_history__()
         return status
 
     ##### --- End moveftp. Begin copyftp ---
@@ -383,7 +385,7 @@ class publisher_files():
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
-        self.__print_routing_history__()
+        # self.__print_routing_history__()
         return status
 
     ##### --- End copyftp. Begin processftp ---
@@ -394,21 +396,21 @@ class publisher_files():
         # configure for sending anything for the user of this dir
         if self.acc is None:
             print("No publisher account with name " + self.username + " is found. Not processing " + thisdir)
-            return{"status":"Failed", "message": f"No publisher named {self.username}"}
+            return {"status": "Failed", "message": f"No publisher named {self.username}"}
 
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirList = os.listdir(thisdir)
         print(f'processftp - processing {thisdir} for Account: {self.username}')
         if len(dirList) > 1:
             print(f"processftp ERROR : Why are there multiple directories? {kount}")
-            return{"status":"Failed", "message": f"Too many directories : {dirList}"}
+            return {"status": "Failed", "message": f"Too many directories : {dirList}"}
 
         pub = dirList[0]
         print(f'processftp - found directory {pub}')
 
         thisfile = os.path.join(thisdir, pub)
         if not os.path.isfile(thisfile):
-            return{"status":"Processed", "message": f"Actual file probably already processed (with error?).\
+            return {"status": "Processed", "message": f"Actual file probably already processed (with error?).\
                     This is not a file : {thisfile}"}
         #
         nf = uuid.uuid4().hex
@@ -417,7 +419,7 @@ class publisher_files():
             os.makedirs(os.path.join(thisdir, nf))
             shutil.move(thisfile, newloc)
         except Exception as e:
-            return{"status":"Failed", "message": f"File system issue? : {str(e)}"}
+            return {"status": "Failed", "message": f"File system issue? : {str(e)}"}
         print('Moved ' + thisfile + ' to ' + newloc)
 
         # by now this should look like this:
@@ -429,14 +431,14 @@ class publisher_files():
         try:
             flatten(thisdir + '/' + nf)
         except Exception as e:
-            return{"status":"Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
+            return {"status": "Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
 
         pdir = thisdir
         if os.path.isdir(thisdir + '/' + nf + '/' + nf):
             pdir = thisdir + '/' + nf + '/' + nf
         # Could have multiple directories. Process them individually in the next step
         dirList = os.listdir(pdir)
-        status = {'status':'Success', 'proc_dir':pdir}
+        status = {'status': 'Success', 'proc_dir': pdir}
 
         # Update routing history
         self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
@@ -450,17 +452,17 @@ class publisher_files():
         }
         self.RoutingHistory.workflow_states.append(wfs)
         self.RoutingHistory.save()
-        self.__print_routing_history__()
+        # self.__print_routing_history__()
         return status
 
     def processftp_dirs(self, pdir):
         resp_list = []
-        status2 = {'status':'Failed'}
+        status2 = {'status': 'Failed'}
         dirList = os.listdir(pdir)
         print(f"Processing {len(dirList)} directories : {dirList}")
         for idx, singlepub in enumerate(dirList):
             print(f"Processing directory {idx} : {singlepub}")
-            status = {'status':'Success'}
+            status = {'status': 'Success'}
             # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
             # 2019-11-18 TD : original path without loop where zip file is packed
             #                 from  source folder "thisdir + '/' + pub"
@@ -486,14 +488,14 @@ class publisher_files():
             if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
                 message = f"processftp_dirs> processing completed with POST failure to {log_data}"
                 notification_id = ""
-                status = {'status':'Failed'}
+                status = {'status': 'Failed'}
             else:
                 notification_id = resp.json()['id']
                 app.logger.warning(f"processftp_dirs> The notification id for this series is {notification_id}")
                 resp_list.append(notification_id)
                 message = f"processftp_dirs> processing completed with POST to {log_data}"
-                status = {'status':'Success'}
-                status2 = {'status':'Success'}
+                status = {'status': 'Success'}
+                status2 = {'status': 'Success'}
 
             print(message)
             # Update routing history
@@ -511,7 +513,7 @@ class publisher_files():
             self.RoutingHistory.add_notification_id(notification_id)
             self.RoutingHistory.workflow_states.append(wfs)
             self.RoutingHistory.save()
-            self.__print_routing_history__()
+            # self.__print_routing_history__()
 
         status['resp_ids'] = resp_list
         status["message"] = "Processing complete"
@@ -553,7 +555,6 @@ class publisher_files():
                     message = f". Not deleting unrouted notification {obj.id} that has been processed and was unrouted"
                     print(message)
 
-
             # Update routing history
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             wfs = {
@@ -566,7 +567,7 @@ class publisher_files():
             }
             self.RoutingHistory.workflow_states.append(wfs)
             self.RoutingHistory.save()
-            self.__print_routing_history__()
-        return{'status':"Success"}
+            # self.__print_routing_history__()
+        return {'status': "Success"}
 
     ##### --- End checkunrouted. ---
