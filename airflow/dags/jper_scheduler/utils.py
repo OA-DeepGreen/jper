@@ -1,8 +1,11 @@
-import os, shutil, zipfile
+import os, shutil, zipfile, tarfile
+from octopus.core import app
+
 
 # Utility function for processftp
 # Function for the checkftp to unzip and move stuff up then zip again in incoming packages
 def zip(src, dst):
+    app.logger.debug(f"Creating zip file for {src} at {dst}")
     zf = zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED)
     abs_src = os.path.abspath(src)
     for dirname, subdirs, files in os.walk(src):
@@ -11,18 +14,20 @@ def zip(src, dst):
             arcname = absname[len(abs_src) + 1:]
             zf.write(absname, arcname)
     zf.close()
+    app.logger.info(f"Created zip file for {src} at {dst}")
+
 
 # Another utility function for processftp
 # 2016-11-30 TD : routine to peak in flattened packages, looking for a .xml file floating around
 def pkgformat(src):
     # our first best guess...
-    ### pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
+    # pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
+    app.logger.debug(f"Finding package format for source {src}")
     pkg_fmt = "unknown"
     for fl in os.listdir(src):
-        print('Pkgformat at ' + fl)
         if '.xml' in fl:
             filepath = os.path.join(src, fl)
-            print('Pkgformat tries to open ' + filepath)
+            app.logger.debug(f"Finding package format for file {filepath}")
             try:
                 with open(filepath, 'r') as f:
                     for line in f:
@@ -35,47 +40,49 @@ def pkgformat(src):
                         elif "//RSC//DTD RSC " in line:
                             pkg_fmt = "https://datahub.deepgreen.org/FilesAndRSC"
                             break
-
-            except:
-                print('Pkgformat could not open ' + src + '/' + fl)
+                app.logger.debug(f"File is of format {pkg_fmt}")
+            except Exception as e:
+                app.logger.warn(f"Error finding package format. Error: {str(e)}")
 
             # there shall only be *one* .xml as per package
             break
 
-    print('Pkgformat returns ' + pkg_fmt)
+    app.logger.info(f"Package format for {src} is {pkg_fmt}")
     return pkg_fmt
+
 
 # Utility function for processftp - called by flatten
 def extract(fl, path):
-    print('Extracting ' + fl)
+    app.logger.debug(f"Extracting file {fl} at {path}")
     try:
-        # TODO the tar method has not yet been tested...
         tar = tarfile.open(fl)
-        # 2019-11-18 TD : add the actual path for extraction here
         tar.extractall(path=path)
         tar.close()
-        print('Extracted tar ' + fl)
+        app.logger.debug(f"Extracted tar {fl} at {path}")
         return True
-    except:
+    except Exception as e:
         try:
             with zipfile.ZipFile(fl) as zf:
                 # 2019-11-18 TD : replace the 'hand made' routine by the library call
                 zf.extractall(path=path)
-            print('Extracted zip ' + fl)
+            app.logger.debug(f"Extracted zip {fl} at {path}")
             return True
         except Exception as e:
-            print('Scheduler - Extraction could not be done for ' + fl + ' : "{x}"'.format(x=str(e)))
+            app.logger.error(f"Could not extract the file {fl} as zip. Error: {str(e)}")
             return False
+
 
 # Another utility function for processftp
 def flatten(destination, depth=None):
     if depth is None:
         depth = destination
-    print('Flatten depth set ' + destination + ' ' + depth)
-    #
-    # 2019-11-18 TD : Introducing the '.xml' file as recursion stop. 
-    #                 If an .xml file is found in a folder in the .zip file then this 
-    #                 *is* a single publication to be separated from the enclosing .zip file
+        app.logger.debug(f"Flattening dir {depth}")
+    else:
+        app.logger.debug(f"Flattening dir {depth} within {destination}")
+
+    # Introducing the '.xml' file as recursion stop.
+    # If an .xml file is found in a folder in the .zip file then this
+    # *is* a single publication to be separated from the enclosing .zip file
     has_xml = False
     stem = None
     for fl in os.listdir(depth):
@@ -84,30 +91,31 @@ def flatten(destination, depth=None):
             os.remove(depth + '/' + fl)
             continue
         if not has_xml and '.xml' in fl:
-            print('Flatten ' + fl + ' found in folder')
+            app.logger.debug(f"Flattening xml file {fl} found in dir {depth} as a new notification")
             has_xml = True
             words = destination.split('/')
             stem = words[-1] + '/' + os.path.splitext(fl)[0]
-            if not os.path.exists(destination + '/' + stem):
-                os.makedirs(destination + '/' + stem)
-                print('Flatten new ' + destination + '/' + stem + ' created')
+            new_loc = destination + '/' + stem
+            if not os.path.exists(new_loc):
+                os.makedirs(new_loc)
+                app.logger.debug(f"Created new location {new_loc} within {destination} for file {fl}")
     # 2019-11-18 TD : end of recursion stop marker search
     #
     for fl in os.listdir(depth):
-        print('Flatten at ' + fl)
         # 2019-11-18 TD : Additional check for 'has_xml' (the stop marker)
         # if '.zip' in fl: # or '.tar' in fl:
         if not has_xml and '.zip' in fl:  # or '.tar' in fl:
-            print('Flatten ' + fl + ' is an archive')
+            app.logger.debug(f"Extracting zip file {fl} found in dir {depth}")
             extracted = extract(depth + '/' + fl, depth)
             if extracted:
-                print('Flatten ' + fl + ' is extracted')
                 os.remove(depth + '/' + fl)
+                app.logger.debug(f"Calling flatten to extract notification from {depth + '/' + fl}")
                 flatten(destination, depth)
         # 2019-11-18 TD : Additional check for 'has_xml' (the stop marker)
         # elif os.path.isdir(depth + '/' + fl):
         elif os.path.isdir(depth + '/' + fl) and not has_xml:
-            print('Flatten ' + fl + ' is not a file, flattening')
+            app.logger.debug(f"Found directory at {depth + '/' + fl}")
+            app.logger.debug(f"Calling flatten to extract notification from {depth + '/' + fl}")
             flatten(destination, depth + '/' + fl)
         else:
             try:
@@ -117,10 +125,11 @@ def flatten(destination, depth=None):
                 if stem:
                     destpath = os.path.join(destination, stem)
                 originpath = os.path.join(depth, fl)
-                print('Moving file #{a} to {b}'.format(a=originpath, b=destpath) )
                 if stem and os.path.isdir(destpath):
                     shutil.move(originpath, destpath)
+                    app.logger.debug(f"Moved file {originpath} to {destpath}")
                 else:
                     shutil.move(originpath, destination)
+                    app.logger.debug(f"Moved file {originpath} to {destination}")
             except:
                 pass

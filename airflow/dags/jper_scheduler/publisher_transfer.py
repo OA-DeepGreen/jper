@@ -21,20 +21,20 @@ class PublisherFiles:
         self._is_scp = False
 
     def __init_routing_id__(self, routing_id):
-        self.RoutingHistory = RoutingHistory()
+        self.routing_history = RoutingHistory()
         app.logger.debug(f"Routing history id: {routing_id}")
-        g = self.RoutingHistory.query(routing_id)['hits']['hits']
+        g = self.routing_history.query(routing_id)['hits']['hits']
         if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
             for key in h.keys():
-                setattr(self.RoutingHistory, key, h[key])
+                setattr(self.routing_history, key, h[key])
         else:
-            self.RoutingHistory.id = routing_id
-            self.RoutingHistory.publisher_id = self.id
-            self.RoutingHistory.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        self.RoutingHistory.save()
-        # self.__print_routing_history__()
+            self.routing_history.id = routing_id
+            self.routing_history.publisher_id = self.id
+            self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.save()
+        # self.__log_routing_history__()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
@@ -76,11 +76,11 @@ class PublisherFiles:
         self.remote_failed = "xfer_failed"
         self.file_list_publisher = []
 
-    def __print_routing_history__(self):
+    def __log_routing_history__(self):
         app.logger.debug("Begin Routing History")
-        app.logger.debug(f'Routing History> {self.RoutingHistory.__dict__["data"]}')
+        app.logger.debug(f'Routing History> {self.routing_history.__dict__["data"]}')
         app.logger.debug("Routing History> individual workflow states :")
-        for state in self.RoutingHistory.workflow_states:
+        for state in self.routing_history.workflow_states:
             app.logger.debug(f"{state['action']} > {state}")
         app.logger.debug("END Routing History")
 
@@ -155,6 +155,8 @@ class PublisherFiles:
         self.l_dir = self.local_dir + self.username
         if not self.l_dir.endswith("/"):
             self.l_dir = self.l_dir + "/"
+
+        self.p_dir = self.l_dir + 'pending/'
 
     ##### End Initialisations. Begin internal functions #####
 
@@ -256,87 +258,131 @@ class PublisherFiles:
         return self.file_list_publisher
 
     # Get one file and associated operations
-    def get_file(self, filepath):
+    def get_file(self, remote_file):
         # Initialise the sFTP connection if not already done
         if not self._is_scp:
             self.__init_sftp_connection__()
-        # Some sanity check - do I have a full path or just a file name?
-        print(f'self remote_dir : {self.remote_dir}')
-        print(f'filename : {filepath}')
-        if self.remote_dir in filepath:
-            remote_file = filepath
-            local_file = self.l_dir + filepath.removeprefix(self.remote_dir).lstrip("/")
-        else:
-            remote_file = self.remote_basedir + self.username + "/" + filepath
-            local_file = self.l_dir + filepath
+        remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
+        local_file = self.l_dir + remote_item
+        l_filename = os.path.basename(local_file)
 
-        print(f'remote file : {remote_file}')
-        print(f'local file : {local_file}')
-        # Retrieve the file
-        # First get the local and pending directories and file name
-        l_dir = os.path.dirname(local_file)
-        l_file = os.path.basename(local_file)
+        # Get the local directories
+        l_dirs = os.path.dirname(local_file)
         unique_dir = uuid.uuid4().hex
-        unique_dir_path = l_dir + "/" + unique_dir
-        self.pending_dir = self.l_dir + "pending" + l_dir.removeprefix(self.l_dir.rstrip("/"))
-        if not self.pending_dir.endswith("/"):
-            self.pending_dir = self.pending_dir + "/"
+        unique_dir_path = l_dirs + "/" + unique_dir
+        local_file_path = unique_dir_path + "/" + l_filename
+
+        # Get the pending directory path to symlink file
+        pending_dirs = self.p_dir + l_dirs.removeprefix(self.l_dir.lstrip("/"))
+        if not pending_dirs.endswith("/"):
+            pending_dirs = pending_dirs + "/"
+        sym_link_path = pending_dirs + unique_dir
+        # Do we need to clean up (clean up only for master path)
+        clean_up = False
+        if os.path.dirname(remote_file) == self.remote_dir:
+            clean_up = True
+        app.logger.debug(f"Starting transfer of file from {remote_file} to {local_file_path}")
+
+        # Create local directory
+        app.logger.debug(f"Creating local directory {unique_dir_path}")
         try:
             Path(unique_dir_path).mkdir(parents=True, exist_ok=True)
-            Path(self.pending_dir).mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            print('moveftp/recursiveCopy : Stopping. Error creating directories in {local_dir} "{x}"'.format(x=str(e)))
+            app.logger.error(f"Error creating local directory needed to transfer file "
+                             f"{unique_dir_path}. Error: {str(e)}")
             return {"status": "Failed", "message": str(e)}
-        # Get the file from the server
-        remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
+
+        # Create pending directory path to symlink file
+        app.logger.debug(f"Creating local pending directory {pending_dirs}")
+        try:
+            Path(pending_dirs).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            app.logger.error(f"Error creating local pending directory needed to transfer file "
+                             f"{pending_dirs}. Error: {str(e)}")
+            return {"status": "Failed", "message": str(e)}
+
+        # Track status and messages
         status = {}
         final_location = ""
+        step_status = True
+
+        # Transfer the file from the server
         try:
-            local_file_path = unique_dir_path + "/" + l_file
             self.scp.get(remote_file, local_file_path)
-            # ln -sf $uniquedir $pendingdir/.
-            sym_link_path = self.pending_dir + unique_dir
-            Path(sym_link_path).symlink_to(unique_dir_path)
-            cleanUp = False  # Clean up only for master path
-            if os.path.dirname(remote_file) == self.remote_dir:
-                cleanUp = True
-            self._move_files_in_server(remote_item, self.remote_dir, self.remote_ok, cleanUp)  # Move and clean up
-            final_location = self.remote_ok
-            print(
-                f"getFile : Remote file {remote_item} has been copied successfully to {local_file}. Move to {self.remote_ok}")
-            status = {"status": "Success", "linkPath": sym_link_path,
-                      "message": f"File copied successfully : {sym_link_path}"}
-        except FileNotFoundError as e:
-            print(
-                f"getFile : Remote file {remote_file} is missing or local file {local_file} cannot be written (file system issue?).")
-            status = {"status": "Failed", "message": str(e)}
+            message = f"File transferred from {remote_file} to {local_file_path}"
+            app.logger.info(message)
         except Exception as e:
-            print('getFile : sFTP could not be done for ' + remote_file + ' : "{x}"'.format(x=str(e)))
-            print(f"getFile : Moving file {remote_item} to {self.remote_fail}")
-            self._move_files_in_server(remote_item, self.remote_dir, self.remote_fail, False)
-            final_location = self.remote_fail
-            status = {"status": "Failed", "message": str(e)}
+            step_status = False
+            message = f"Error transferring file from {remote_file} to {local_file_path}. Error: {str(e)}"
+            app.logger.error(message)
+            status = {"status": "Failed", "message": message}
+
+        # Create symlink
+        if step_status:
+            try:
+                Path(sym_link_path).symlink_to(unique_dir_path)
+                msg2 = f"Local file symlinked to {sym_link_path}"
+                app.logger.info(msg2)
+            except Exception as e:
+                # ToDo: Delete the file in local_file_path?
+                step_status = False
+                msg2 = f"Error creating symlink to {unique_dir_path} at {sym_link_path}. Error: {str(e)}"
+                app.logger.error(msg2)
+                status = {"status": "Failed", "message": message + "\n" + msg2}
+            message = message + "\n" + msg2
+
+        # Move the file in the server
+        if step_status:
+            try:
+                self._move_files_in_server(remote_item, self.remote_dir, self.remote_ok, clean_up)  # Move and clean up
+                final_location = self.remote_ok
+                msg3 = f"Remote file has been moved to {self.remote_ok}"
+                app.logger.info(msg3)
+            except Exception as e:
+                # ToDo: Delete the file in local_file_path and sym_link?
+                step_status = False
+                msg3 = f"Error moving files in remote from {remote_file} to #{self.remote_ok}. Error: {str(e)}"
+                app.logger.error(msg3)
+                status = {"status": "Failed", "message": message + "\n" + msg3}
+            message = message + "\n" + msg3
+
+        # Finally, set the success status or cleanup files
+        if step_status:
+            status = {"status": "Success", "linkPath": sym_link_path,
+                      "message": message}
+        else:
+            try:
+                self._move_files_in_server(remote_item, self.remote_dir, self.remote_fail, False)
+                final_location = self.remote_fail
+                msg4 = f"Remote file has been moved to {self.remote_fail}"
+                app.logger.info(msg4)
+            except Exception as e:
+                # At this point no other cleanup needed
+                msg4 = f"Error moving files in remote from {remote_file} to #{self.remote_fail}. Error: {str(e)}"
+                app.logger.error(msg4)
+            message = message + "\n" + msg4
+            status = {"status": "Failed", "message": message + "\n" + msg4}
 
         # Update routing history
-        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        self.RoutingHistory.sftp_server_url = self.sftp_server
-        self.RoutingHistory.sftp_server_port = self.sftp_port
-        self.RoutingHistory.sftp_username = self.username
-        self.RoutingHistory.original_file_location = remote_file
-        self.RoutingHistory.add_final_file_location("get_file_local", local_file_path)
-        self.RoutingHistory.add_final_file_location("get_file_symlink", sym_link_path)
-        self.RoutingHistory.add_final_file_location("sftp_server", final_location)
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.sftp_server_url = self.sftp_server
+        self.routing_history.sftp_server_port = self.sftp_port
+        self.routing_history.sftp_username = self.username
+        self.routing_history.original_file_location = remote_file
+        self.routing_history.add_final_file_location("get_file_local", local_file_path)
+        self.routing_history.add_final_file_location("get_file_symlink", sym_link_path)
+        self.routing_history.add_final_file_location("sftp_server", final_location)
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "moveftp - getfile",
-            "file_location": remote_file,
+            "file_location": sym_link_path,
             "notification_id": "",
             "status": status["status"],
             "message": status["message"],
         }
-        self.RoutingHistory.workflow_states.append(wfs)
-        self.RoutingHistory.save()
-        # self.__print_routing_history__()
+        self.routing_history.workflow_states.append(wfs)
+        self.routing_history.save()
+        # self.__log_routing_history__()
         return status
 
     ##### --- End moveftp. Begin copyftp ---
@@ -347,71 +393,78 @@ class PublisherFiles:
         try:
             Path(os.path.join(self.tmpdir, self.username)).mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            print('copyftp : Stopping. Error creating directories in {self.tmpdir}? : "{x}"'.format(x=str(e)))
+            app.logger.error(f"Error creating directories for copyftp in {self.tmpdir}. Error: {str(e)}")
             return {"status": "Failed", "message": str(e)}
         # Do the copy
-        print('copyftp - copying file ' + sym_link_path + ' for Account:' + self.username)
         partial_path = sym_link_path.removeprefix(self.l_dir + 'pending').rstrip("/")
-        # src = self.local_dir + self.username + '/pending/' + partial_path
         src = sym_link_path
         dst = self.tmpdir + self.username + "/" + partial_path
-        print(f'source : {src}')
-        print(f'destination : {dst}')
+        app.logger.debug(f"Copying files from {sym_link_path} to {dst} for account {self.username}")
+        msg = ""
         try:
             shutil.rmtree(dst, ignore_errors=True)  # target MUST NOT exist!
             shutil.copytree(src, dst)
+            msg = f"File copied from {sym_link_path} to {dst}"
+            app.logger.info(msg)
         except Exception as e:
-            print()
-            return {"status": "Failed", "message": str(e)}
+            msg = f"Error copying file from {sym_link_path} to {dst}. Error: {str(e)}"
+            app.logger.error(msg)
+            return {"status": "Failed", "message": msg}
+
         # Cleanup
-        print(f"copyftp: Copying finished. Cleaning up {src}")
+        app.logger.debug(f"Cleaning up {src}")
         try:
             os.remove(src)  # try to take the pending symlink away
-            status = {"status": "Success", 'pend_dir': dst, "message": "File copied successfully."}
+            msg2 = f"Cleaned up the source. Deleted {src}"
+            app.logger.info(msg2)
         except Exception as e:
-            print("copyftp - failed to delete pending entry: '{x}'".format(x=str(e)))
-            status = {"status": "Failed", "message": str(e)}
+            # We don't need to return a failure here. We have the file.
+            # Not being able to delete a source s no reason to stop.
+            msg2 = f"Failed to cleanup the source {src}. Error: {str(e)}"
+            app.logger.warn(msg2)
 
+        status = {"status": "Success", 'pend_dir': dst, "message": msg + ". " + msg2}
         # Update routing history
-        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        self.RoutingHistory.add_final_file_location("", dst)
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.add_final_file_location("copyftp-tmp", dst)
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "copyftp",
-            "file_location": sym_link_path,
+            "file_location": dst,
             "notification_id": "",
             "status": status["status"],
-            "message": status["message"] + " : " + dst,
+            "message": status["message"],
         }
-        self.RoutingHistory.workflow_states.append(wfs)
-        self.RoutingHistory.save()
-        # self.__print_routing_history__()
+        self.routing_history.workflow_states.append(wfs)
+        self.routing_history.save()
+        # self.__log_routing_history__()
         return status
 
     ##### --- End copyftp. Begin processftp ---
 
     # Rough outline of what we expect to do.
     def processftp(self, thisdir):
-        print(f"processftp - processing file {thisdir}")
+        app.logger.info(f"Processing file in {thisdir} for account: {self.username}")
         # configure for sending anything for the user of this dir
         if self.acc is None:
-            print("No publisher account with name " + self.username + " is found. Not processing " + thisdir)
-            return {"status": "Failed", "message": f"No publisher named {self.username}"}
+            msg = f"Could not find publisher account {self.username}. Not processing file {thisdir}"
+            app.logger.error(msg)
+            return {"status": "Failed", "message": msg}
 
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirList = os.listdir(thisdir)
-        print(f'processftp - processing {thisdir} for Account: {self.username}')
         if len(dirList) > 1:
-            print(f"processftp ERROR : Why are there multiple directories? {kount}")
-            return {"status": "Failed", "message": f"Too many directories : {dirList}"}
+            msg = f"Found {len(dirList)} directories, expected one. Not processing."
+            os.logger.error(msg)
+            return {"status": "Failed", "message": msg}
 
         pub = dirList[0]
-        print(f'processftp - found directory {pub}')
-
         thisfile = os.path.join(thisdir, pub)
+        app.logger.debug(f'Processing file {pub}')
         if not os.path.isfile(thisfile):
-            return {"status": "Processed", "message": f"Actual file probably already processed (with error?).\
-                    This is not a file : {thisfile}"}
+            msg = f"{thisfile} is not a file. Nothing to process further."
+            app.logger.warning(msg)
+            return {"status": "Processed", "message": msg}
         #
         nf = uuid.uuid4().hex
         newloc = os.path.join(thisdir, nf, '')
@@ -419,8 +472,11 @@ class PublisherFiles:
             os.makedirs(os.path.join(thisdir, nf))
             shutil.move(thisfile, newloc)
         except Exception as e:
-            return {"status": "Failed", "message": f"File system issue? : {str(e)}"}
-        print('Moved ' + thisfile + ' to ' + newloc)
+            msg = f"Could not move {thisfile} to {newloc}. Error: {str(e)}"
+            app.logger.error(msg)
+            return {"status": "Failed", "message": msg}
+        msg = f"Moved {thisfile} to {newloc}"
+        app.logger.debug(msg)
 
         # by now this should look like this:
         # /Incoming/ftptmp/<useruuid>/<transactionuuid>/<uploadeddirORuuiddir>/<thingthatwasuploaded>
@@ -428,8 +484,10 @@ class PublisherFiles:
         # they should provide a directory of files or a zip, but it could just be one file
         # but we don't know the hierarchy of the content, so we have to unpack and flatten it all
         # unzip and pull all docs to the top level then zip again. Should be jats file at top now
+
         try:
             flatten(thisdir + '/' + nf)
+
         except Exception as e:
             return {"status": "Failed", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
 
@@ -441,7 +499,7 @@ class PublisherFiles:
         status = {'status': 'Success', 'proc_dir': pdir}
 
         # Update routing history
-        self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "processftp - flatten",
@@ -450,28 +508,27 @@ class PublisherFiles:
             "status": status["status"],
             "message": f"Directories found : {dirList}",
         }
-        self.RoutingHistory.workflow_states.append(wfs)
-        self.RoutingHistory.save()
-        # self.__print_routing_history__()
+        self.routing_history.workflow_states.append(wfs)
+        self.routing_history.save()
+        # self.__log_routing_history__()
         return status
 
     def processftp_dirs(self, pdir):
         resp_list = []
-        status2 = {'status': 'Failed'}
-        dirList = os.listdir(pdir)
-        print(f"Processing {len(dirList)} directories : {dirList}")
-        for idx, singlepub in enumerate(dirList):
-            print(f"Processing directory {idx} : {singlepub}")
-            status = {'status': 'Success'}
-            # 2016-11-30 TD : Since there are (at least!?) 2 formats now available, we have to find out
-            # 2019-11-18 TD : original path without loop where zip file is packed
-            #                 from  source folder "thisdir + '/' + pub"
-            pkg_fmt = pkgformat(os.path.join(pdir, singlepub))
+        final_status = 'Failed'
+        dir_list = os.listdir(pdir)
+        app.logger.debug(f"Processing {len(dir_list)} items in {pdir}")
+        for idx, singlepub in enumerate(dir_list):
+            fp = os.path.join(pdir, singlepub)
+            app.logger.debug(f"Processing item #{idx}: {fp}")
+            notification_status = 'Success'
+            pkg_fmt = pkgformat(fp)
             pkg = os.path.join(pdir, singlepub + '.zip')
             try:
-                zip(os.path.join(pdir, singlepub), pkg)
+                zip(fp, pkg)
+                app.logger.debug(f"Creating zip for {fp} at {pkg}")
             except Exception as e:
-                print(f"Zip failed for {os.path.join(pdir, singlepub)}, {pkg} : {str(e)}")
+                app.logger.warn(f"Zip failed for {fp} at {pkg}. Error: {str(e)}")
 
             # create a notification and send to the API to join the unroutednotification index
             notification = {
@@ -481,82 +538,100 @@ class PublisherFiles:
                 ("metadata", ("metadata.json", json.dumps(notification), "application/json")),
                 ("content", ("content.zip", open(pkg, "rb"), "application/zip"))
             ]
-            print('processftp_dirs> processing POSTing ' + pkg + ' ' + json.dumps(notification))
-            print('processftp_dirs> request_files : ', files)
+            app.logger.debug(f"Creating notification and saving files in store using api")
             resp = requests.post(self.apiurl, files=files, verify=False)
-            log_data = f"{self.apiurl} - {resp.status_code} - {resp.text} - {pkg} - {pdir} - {singlepub}"
-            if str(resp.status_code).startswith('4') or str(resp.status_code).startswith('5'):
-                message = f"processftp_dirs> processing completed with POST failure to {log_data}"
-                notification_id = ""
-                status = {'status': 'Failed'}
+            try:
+                resp_data = resp.json()
+            except:
+                resp_data = {}
+            notification_id = resp_data.get('id', '')
+            message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
+            if resp.status_code < 200 or resp.status_code > 299:
+                app.logger.error(message)
+                app.logger.warn(f"No notification id for {fp}")
+                notification_status = 'Failed'
             else:
-                notification_id = resp.json()['id']
-                app.logger.warning(f"processftp_dirs> The notification id for this series is {notification_id}")
+                app.logger.info(message)
+                app.logger.info(f"The notification id for {fp} is {notification_id}")
                 resp_list.append(notification_id)
-                message = f"processftp_dirs> processing completed with POST to {log_data}"
-                status = {'status': 'Success'}
-                status2 = {'status': 'Success'}
-
-            print(message)
+                notification_status = 'Success'
+                final_status = 'Success'
             # Update routing history
-            self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
                 "action": "processftp - directory",
                 "file_location": pkg,
                 "notification_id": notification_id,
-                "status": status["status"],
+                "status": notification_status,
                 "message": message,
             }
-            self.RoutingHistory.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
-            self.RoutingHistory.add_final_file_location("processftp dir zip", pkg)
-            self.RoutingHistory.add_notification_id(notification_id)
-            self.RoutingHistory.workflow_states.append(wfs)
-            self.RoutingHistory.save()
-            # self.__print_routing_history__()
-
-        status['resp_ids'] = resp_list
-        status["message"] = "Processing complete"
-        status["status"] = status2["status"]
+            self.routing_history.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
+            self.routing_history.add_final_file_location("processftp dir zip", pkg)
+            self.routing_history.add_notification_id(notification_id)
+            self.routing_history.workflow_states.append(wfs)
+            self.routing_history.save()
+            # self.__log_routing_history__()
+        status = {
+            'resp_ids': resp_list,
+            "message": "Processing complete",
+            "status": final_status
+        }
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
 
     # Rough outline of what we expect to do - this is always successful!
     def checkunrouted(self, uids):
-
-        kounter = 0
-        print(f"Processing {len(uids)} notifications : {uids}")
+        total_number_of_notification = len(uids)
+        notification_states = []
+        app.logger.info(f"Processing {len(uids)} notifications")
         for idx, uid in enumerate(uids):
-            print(f"Processing Notification {idx} : {uid}")
-            kounter = kounter + 1
+            app.logger.info(f"Processing unrouted notification {idx} : {uid}")
             mun = models.UnroutedNotification()
             obj = mun.pull(uid)
-            print(f"#{kounter} : Processing unrouted notification {obj.id}")
+            if not obj:
+                app.logger.warn(f"#{idx} :Notification {uid} not found")
+                wfs = {
+                    "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+                    "action": "checkunrouted",
+                    "file_location": "",
+                    "notification_id": uid,
+                    "status": "Failure",
+                    "message": "Notification not found",
+                }
+                self.routing_history.workflow_states.append(wfs)
+                self.routing_history.add_notification_state("Failure", uid)
+                self.routing_history.save()
+                continue
+            app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res = routing.route(obj)
-            message = f"#{kounter} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
-            print(message)
+            message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
+
 
             if res:
+                app.logger.info(message)
+                self.routing_history.add_notification_state("Success", uid)
                 if self.delete_routed:
-                    message += f". Deleting unrouted notification {obj.id} that has been processed and routed"
-                    print(message)
+                    msg = f"Deleting unrouted notification {obj.id}"
+                    app.logger.info(msg)
                     obj.delete()
                 else:
-                    message += f". Not deleting unrouted notification {obj.id} that has been processed and routed"
-                    print(message)
-
-            if not res:
+                    msg = f"Not deleting unrouted notification {obj.id}"
+                    app.logger.debug(msg)
+            else:
+                app.logger.warn(message)
+                self.routing_history.add_notification_state("Failure", uid)
                 if self.delete_unrouted:
-                    message += f". Deleting unrouted notification {obj.id} that has been processed and was unrouted"
-                    print(message)
+                    msg = f"Deleting unrouted notification {obj.id}"
+                    app.logger.info(msg)
                     obj.delete()
                 else:
-                    message = f". Not deleting unrouted notification {obj.id} that has been processed and was unrouted"
-                    print(message)
-
+                    msg = f"Not deleting unrouted notification {obj.id}"
+                    app.logger.debug(msg)
+            message = message + ". " + msg
             # Update routing history
-            self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
                 "action": "checkunrouted",
@@ -565,9 +640,8 @@ class PublisherFiles:
                 "status": "Success",
                 "message": message,
             }
-            self.RoutingHistory.workflow_states.append(wfs)
-            self.RoutingHistory.save()
-            # self.__print_routing_history__()
+            self.routing_history.workflow_states.append(wfs)
+            self.routing_history.save()
+            # self.__log_routing_history__()
         return {'status': "Success"}
 
-    ##### --- End checkunrouted. ---
