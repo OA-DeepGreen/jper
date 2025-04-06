@@ -63,20 +63,20 @@ def move_from_server():
         context = get_current_context()
         ti = context['ti'] # TaskInstance
         publisher_id = pub_tuple[0]
-        file_name = pub_tuple[1]
+        sym_link_path = pub_tuple[1]
         routing_id = pub_tuple[2]
         ##
         a = publisher_files(publisher_id, routing_id=routing_id)
-        ff = file_name.removeprefix(a.l_dir)
+        ff = sym_link_path.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
-        result = a.copyftp(file_name)
+        result = a.copyftp(sym_link_path)
         time.sleep(2) # Wait for OS to catch up
         if result["status"] == "Success":
-            print(f"Finished moving {file_name} to {a.tmpdir}")
+            print(f"Finished moving {sym_link_path} to {a.tmpdir}")
             return(publisher_id, result['pend_dir'], routing_id)
         else:
-            raise AirflowException(f"copyftp - Failed to copy {file_name}, publisher id {publisher_id} : {result['message']}")
+            raise AirflowException(f"Failed to copy {sym_link_path}, publisher id {publisher_id} : {result['message']}")
     #=
     @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=1 )
     def process_ftp(pub_tuple):
@@ -98,9 +98,9 @@ def move_from_server():
             return(publisher_id, result['proc_dir'], routing_id)
         elif result["status"] == "Processed":
             print(result["message"])
-            raise AirflowTaskTerminated(f"process_ftp - failed to process {pend_dir}, publisher id {publisher_id}. Already processed.")
+            raise AirflowTaskTerminated(f"Failed to process {pend_dir}, publisher id {publisher_id}. Already processed.")
         else:
-            raise AirflowException(f"process_ftp - Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
+            raise AirflowException(f"Failed to process {pend_dir}, publisher id {publisher_id} : {result['message']}")
     #=
     @task(task_id="process_ftp_dirs", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=1 )
     def process_ftp_dirs(pub_tuple):
@@ -125,7 +125,7 @@ def move_from_server():
             print(f"Finished processing {pub_dir}")
             return(publisher_id, result['resp_ids'], routing_id)
         else:
-            raise AirflowException(f"process_ftp - Failed to process {pub_tuple}, publisher id {publisher_id} : {result['message']}")
+            raise AirflowException(f"Failed to process {pub_tuple}, publisher id {publisher_id} : {result['message']}")
     #=
     @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=1 )
     def check_unrouted(pub_tuple):
@@ -145,7 +145,7 @@ def move_from_server():
             print(f"Finished processing {chk_dir}")
             return
         else:
-            raise AirflowException(f"process_ftp - Failed to process {chk_dir}, publisher id {publisher_id} : {result['message']}")
+            raise AirflowException(f"Failed to process {chk_dir}, publisher id {publisher_id} : {result['message']}")
     ##
     @task_group(group_id='ProcessFileFromPublisher')
     def process_one_file(pub_tuple, **context):

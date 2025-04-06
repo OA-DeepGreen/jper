@@ -279,12 +279,12 @@ class publisher_files():
         l_file = os.path.basename(local_file)
         unique_dir = uuid.uuid4().hex
         unique_dir_path = l_dir + "/" + unique_dir
-        pending_dir = self.l_dir + "pending" + l_dir.removeprefix(self.l_dir.rstrip("/"))
-        if not pending_dir.endswith("/"):
-            pending_dir = pending_dir + "/"
+        self.pending_dir = self.l_dir + "pending" + l_dir.removeprefix(self.l_dir.rstrip("/"))
+        if not self.pending_dir.endswith("/"):
+            self.pending_dir = self.pending_dir + "/"
         try:
             Path(unique_dir_path).mkdir(parents=True, exist_ok=True)
-            Path(pending_dir).mkdir(parents=True, exist_ok=True)
+            Path(self.pending_dir).mkdir(parents=True, exist_ok=True)
         except Exception as e:
             print('moveftp/recursiveCopy : Stopping. Error creating directories in {local_dir} "{x}"'.format(x=str(e)))
             return {"status": "Failed", "message": str(e)}
@@ -296,7 +296,7 @@ class publisher_files():
             local_file_path = unique_dir_path + "/" + l_file
             self.scp.get(remote_file, local_file_path)
             # ln -sf $uniquedir $pendingdir/.
-            sym_link_path = pending_dir + unique_dir
+            sym_link_path = self.pending_dir + unique_dir
             Path(sym_link_path).symlink_to(unique_dir_path)
             cleanUp = False # Clean up only for master path
             if os.path.dirname(remote_file) == self.remote_dir:
@@ -321,7 +321,9 @@ class publisher_files():
         self.RoutingHistory.sftp_server_port = self.sftp_port
         self.RoutingHistory.sftp_username = self.username
         self.RoutingHistory.original_file_location = remote_file
-        self.RoutingHistory.final_file_location = final_location
+        self.RoutingHistory.add_final_file_location("get_file_local", local_file_path)
+        self.RoutingHistory.add_final_file_location("get_file_symlink", sym_link_path)
+        self.RoutingHistory.add_final_file_location("sftp_server", final_location)
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "moveftp - getfile",
@@ -337,7 +339,7 @@ class publisher_files():
 
     ##### --- End moveftp. Begin copyftp ---
 
-    def copyftp(self, fileName):
+    def copyftp(self, sym_link_path):
         # copy one pending file from the big delivery/publisher dg_storage into the temp dir for processing
         # Make the tmpdir
         try:
@@ -346,9 +348,10 @@ class publisher_files():
             print('copyftp : Stopping. Error creating directories in {self.tmpdir}? : "{x}"'.format(x=str(e)))
             return {"status": "Failed", "message": str(e)}
         # Do the copy
-        print('copyftp - copying file ' + fileName + ' for Account:' + self.username)
-        partial_path = fileName.removeprefix(self.l_dir + 'pending').rstrip("/")
-        src = self.local_dir + self.username + '/pending/' + partial_path
+        print('copyftp - copying file ' + sym_link_path + ' for Account:' + self.username)
+        partial_path = sym_link_path.removeprefix(self.l_dir + 'pending').rstrip("/")
+        # src = self.local_dir + self.username + '/pending/' + partial_path
+        src = sym_link_path
         dst = self.tmpdir + self.username + "/" + partial_path
         print(f'source : {src}')
         print(f'destination : {dst}')
@@ -369,10 +372,11 @@ class publisher_files():
 
         # Update routing history
         self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.RoutingHistory.add_final_file_location("", dst)
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
             "action": "copyftp",
-            "file_location": fileName,
+            "file_location": sym_link_path,
             "notification_id": "",
             "status": status["status"],
             "message": status["message"] + " : " + dst,
@@ -494,18 +498,17 @@ class publisher_files():
             print(message)
             # Update routing history
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-            for wfs in self.RoutingHistory.workflow_states:
-                if wfs["file_location"] == singlepub:
-                    wfs["status"] = status["status"]
-                    wfs["message"] = message
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                "action": f"processftp - directory {pdir}",
-                "file_location": singlepub,
+                "action": "processftp - directory",
+                "file_location": pkg,
                 "notification_id": notification_id,
                 "status": status["status"],
                 "message": message,
             }
+            self.RoutingHistory.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
+            self.RoutingHistory.add_final_file_location("processftp dir zip", pkg)
+            self.RoutingHistory.add_notification_id(notification_id)
             self.RoutingHistory.workflow_states.append(wfs)
             self.RoutingHistory.save()
             self.__print_routing_history__()
@@ -555,7 +558,7 @@ class publisher_files():
             self.RoutingHistory.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             wfs = {
                 "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                "action": f"checkunrouted - UID: {uid}",
+                "action": "checkunrouted",
                 "file_location": "",
                 "notification_id": uid,
                 "status": "Success",
