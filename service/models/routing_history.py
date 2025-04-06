@@ -215,14 +215,14 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
     def notification_ids(self, vals):
         self._set_list("notification_ids", vals)
 
-    def add_notification_ids(self, notification_id):
+    def add_notification_id(self, notification_id):
         """
             "notification_ids": {"coerce": "unicode"},
         """
         if not notification_id:
             raise dataobj.DataSchemaException("notification_id is missing")
 
-        self._add_to_list("notification_ids", notification_id)
+        self._add_to_list("notification_ids", notification_id, coerce=self._utf8_unicode(), unique=True)
 
     @property
     def status(self):
