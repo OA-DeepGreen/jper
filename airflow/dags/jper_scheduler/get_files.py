@@ -48,7 +48,7 @@ def move_from_server():
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
         context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.get_file(file_name)
-        if result["status"] == "Success":
+        if result["status"] == "success":
             app.logger.info(f"Sftp file transfer complete for file name: {file_name}")
             return publisher_id, result['linkPath'], routing_id
         else:
@@ -71,7 +71,7 @@ def move_from_server():
 
         result = a.copyftp(sym_link_path)
 
-        if result["status"] == "Success":
+        if result["status"] == "success":
             app.logger.info(f"Finished moving {sym_link_path} to {a.tmpdir}")
             return publisher_id, result['pend_dir'], routing_id
         else:
@@ -92,7 +92,7 @@ def move_from_server():
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.processftp(pend_dir)
-        if result["status"] == "Success":
+        if result["status"] == "success":
             app.logger.info(f"Successfully processed {pend_dir}")
             return publisher_id, result['proc_dir'], routing_id
         elif result["status"] == "Processed":
@@ -120,7 +120,7 @@ def move_from_server():
         ##
         result = a.processftp_dirs(pub_dir)
         time.sleep(2)  # Wait for OS to catch up
-        if result["status"] == "Success":
+        if result["status"] == "success":
             app.logger.info(f"Finished processing {pub_dir}")
             return publisher_id, result['resp_ids'], routing_id
         else:
@@ -140,7 +140,7 @@ def move_from_server():
         context["map_index_template"] = f"{ti.map_index} {unrouted_id}"
         result = a.checkunrouted(unrouted_id)
         time.sleep(2)  # Wait for OS to catch up
-        if result["status"] == "Success":
+        if result["status"] == "success":
             app.logger.info(f"Finished processing {unrouted_id}")
             return
         else:
