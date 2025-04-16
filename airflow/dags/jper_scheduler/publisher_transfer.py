@@ -10,6 +10,10 @@ from service import routing_deepgreen as routing
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
 
+import sys
+sys.path.append('/home/cloo/store/src/store')
+from store.lib.storage_tree import StorageTree
+
 
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
@@ -83,6 +87,18 @@ class PublisherFiles:
         for state in self.routing_history.workflow_states:
             app.logger.debug(f"{state['action']} > {state}")
         app.logger.debug("END Routing History")
+
+    def __update_routing_history__(self, action="", file_location="",
+            notification_id="", status="", message=""):
+        wfs = {
+            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            "action": action,
+            "file_location": file_location,
+            "notification_id": notification_id,
+            "status": status,
+            "message": message,
+        }
+        self.routing_history.workflow_states.append(wfs)
 
     def __init_from_app__(self):
         # Initialise the needed constants from the app
@@ -273,7 +289,7 @@ class PublisherFiles:
         local_file_path = unique_dir_path + "/" + l_filename
 
         # Get the pending directory path to symlink file
-        pending_dirs = self.p_dir + l_dirs.removeprefix(self.l_dir.lstrip("/"))
+        pending_dirs = self.p_dir + l_dirs.removeprefix(self.l_dir.rstrip("/"))
         if not pending_dirs.endswith("/"):
             pending_dirs = pending_dirs + "/"
         sym_link_path = pending_dirs + unique_dir
@@ -345,9 +361,7 @@ class PublisherFiles:
                 app.logger.error(msg3)
                 status = {"status": "failure", "message": message + "\n" + msg3}
             message = message + "\n" + msg3
-
-        # Finally, set the success status or cleanup files
-        if step_status:
+            # Finally, set the success status or cleanup files
             status = {"status": "success", "linkPath": sym_link_path,
                       "message": message}
         else:
@@ -363,6 +377,9 @@ class PublisherFiles:
             message = message + "\n" + msg4
             status = {"status": "failure", "message": message + "\n" + msg4}
 
+        file_plus_subdir = remote_item.removeprefix(self.remote_dir).lstrip("/")
+        final_location = final_location + "/" + file_plus_subdir
+
         # Update routing history
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.routing_history.sftp_server_url = self.sftp_server
@@ -372,15 +389,8 @@ class PublisherFiles:
         self.routing_history.add_final_file_location("get_file_local", local_file_path)
         self.routing_history.add_final_file_location("get_file_symlink", sym_link_path)
         self.routing_history.add_final_file_location("sftp_server", final_location)
-        wfs = {
-            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-            "action": "moveftp - getfile",
-            "file_location": sym_link_path,
-            "notification_id": "",
-            "status": status["status"],
-            "message": status["message"],
-        }
-        self.routing_history.workflow_states.append(wfs)
+        self.__update_routing_history__(action="moveftp - getfile", file_location=sym_link_path,
+                notification_id="", status=status["status"], message=status["message"])
         self.routing_history.save()
         # self.__log_routing_history__()
         return status
@@ -397,8 +407,10 @@ class PublisherFiles:
             return {"status": "failure", "message": str(e)}
         # Do the copy
         partial_path = sym_link_path.removeprefix(self.l_dir + 'pending').rstrip("/")
+        if not partial_path.startswith("/"):
+            partial_path = "/" + partial_path
         src = sym_link_path
-        dst = self.tmpdir + self.username + "/" + partial_path
+        dst = self.tmpdir + self.username + partial_path
         app.logger.debug(f"Copying files from {sym_link_path} to {dst} for account {self.username}")
         msg = ""
         try:
@@ -427,15 +439,8 @@ class PublisherFiles:
         # Update routing history
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.routing_history.add_final_file_location("copyftp-tmp", dst)
-        wfs = {
-            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-            "action": "copyftp",
-            "file_location": dst,
-            "notification_id": "",
-            "status": status["status"],
-            "message": status["message"],
-        }
-        self.routing_history.workflow_states.append(wfs)
+        self.__update_routing_history__(action="copyftp", file_location=dst,
+                notification_id="", status=status["status"], message=status["message"])
         self.routing_history.save()
         # self.__log_routing_history__()
         return status
@@ -500,15 +505,8 @@ class PublisherFiles:
 
         # Update routing history
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        wfs = {
-            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-            "action": "processftp - flatten",
-            "file_location": thisdir,
-            "notification_id": "",
-            "status": status["status"],
-            "message": f"Directories found : {dirList}",
-        }
-        self.routing_history.workflow_states.append(wfs)
+        self.__update_routing_history__(action="processftp - flatten", file_location=thisdir,
+                notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
         # self.__log_routing_history__()
         return status
@@ -556,20 +554,24 @@ class PublisherFiles:
                 resp_list.append(notification_id)
                 notification_status = 'success'
                 final_status = 'success'
+
+            #####
+            st = StorageTree('/home/cloo/jperstore')
+            tree_path = st.tree_path(notification_id)
+            from pathlib import Path
+            store_files = list(Path(tree_path).rglob("*"))
+            print(f"Files in store are for {notification_id} are {store_files}")
+            for s_file in store_files:
+                self.routing_history.add_final_file_location("store", str(s_file))
+            #####
+
             # Update routing history
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-            wfs = {
-                "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                "action": "processftp - directory",
-                "file_location": pkg,
-                "notification_id": notification_id,
-                "status": notification_status,
-                "message": message,
-            }
+            self.__update_routing_history__(action="processftp - directory", file_location=pkg,
+                    notification_id=notification_id, status=notification_status, message=message)
             self.routing_history.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
             self.routing_history.add_final_file_location("processftp dir zip", pkg)
-            self.routing_history.add_notification_state(notification_status.lower(), notification_id)
-            self.routing_history.workflow_states.append(wfs)
+            self.routing_history.add_notification_state(notification_status, notification_id)
             self.routing_history.save()
             # self.__log_routing_history__()
         status = {
@@ -592,22 +594,14 @@ class PublisherFiles:
             obj = mun.pull(uid)
             if not obj:
                 app.logger.warn(f"#{idx} :Notification {uid} not found")
-                wfs = {
-                    "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                    "action": "checkunrouted",
-                    "file_location": "",
-                    "notification_id": uid,
-                    "status": "failure",
-                    "message": "Notification not found",
-                }
-                self.routing_history.workflow_states.append(wfs)
+                self.__update_routing_history__(action="checkunrouted", file_location="",
+                        notification_id=uid, status="failure", message="Notification not found")
                 self.routing_history.add_notification_state("failure", uid)
                 self.routing_history.save()
                 continue
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
-
 
             if res:
                 app.logger.info(message)
@@ -632,16 +626,8 @@ class PublisherFiles:
             message = message + ". " + msg
             # Update routing history
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-            wfs = {
-                "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
-                "action": "checkunrouted",
-                "file_location": "",
-                "notification_id": uid,
-                "status": "success",
-                "message": message,
-            }
-            self.routing_history.workflow_states.append(wfs)
+            self.__update_routing_history__(action="checkunrouted", file_location="",
+                    notification_id=uid, status="success", message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
         return {'status': "success"}
-
