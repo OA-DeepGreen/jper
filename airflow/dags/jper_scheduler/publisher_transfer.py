@@ -10,10 +10,7 @@ from service import routing_deepgreen as routing
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
 
-import sys
-sys.path.append('/home/cloo/store/src/store')
-from store.lib.storage_tree import StorageTree
-
+# from octopus.modules.store import store
 
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
@@ -555,15 +552,11 @@ class PublisherFiles:
                 notification_status = 'success'
                 final_status = 'success'
 
-            #####
-            st = StorageTree('/home/cloo/jperstore')
-            tree_path = st.tree_path(notification_id)
-            from pathlib import Path
-            store_files = list(Path(tree_path).rglob("*"))
-            print(f"Files in store are for {notification_id} are {store_files}")
-            for s_file in store_files:
-                self.routing_history.add_final_file_location("store", str(s_file))
-            #####
+            # #####
+            # store_files = store.StoreFactory.get().list_file_paths(notification_id)
+            # for s_file in store_files:
+            #     self.routing_history.add_final_file_location("store", s_file)
+            # #####
 
             # Update routing history
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
@@ -631,3 +624,49 @@ class PublisherFiles:
             self.routing_history.save()
             # self.__log_routing_history__()
         return {'status': "success"}
+
+    ##### --- End checkunrouted. Clean up temporary files. ---
+
+    def clean_temp_files(self):
+        # Only look at the "final file location" in the routing history
+        # We only clean up the physical files. We do not touch routing history itself in OpenSearch
+        for location in self.routing_history.final_file_locations:
+            file_name = location["file_location"]
+            file_location = location["location_type"]
+
+            if file_location in ["get_file_local", "sftp_server", "store"]:
+                # retain files in the above locations. They are precious.
+                app.logger.debug(f'Retain file {file_name} from {file_location}')
+                continue
+
+            # If I come here, the files / directory should be removed
+            app.logger.debug(f"Looking at file {file_name} in location {file_location}")
+            if file_location == "copyftp-tmp":
+                # Temporary path (ftptmp?). Remove the whole tree for this location
+                #    - stuff created by flatten called by copyftp.
+                if len(file_name) > 40 and file_name.count("/") > 3: # Minor sanity check
+                    app.logger.debug(f'Deleting directory {file_name} from {file_location}')
+                    shutil.rmtree(file_name, ignore_errors=True)
+
+            # Essentially what should come here will be the pending directory
+            if os.path.isfile(file_name) or os.path.islink(file_name):
+                app.logger.debug(f'Deleting file {file_name} from {file_location}')
+                os.remove(file_name)
+
+            # Clean up parent directories also if empty
+            dir_name = os.path.dirname(file_name)
+            if not os.path.isdir(dir_name): # Directory has been cleaned already. Good.
+                continue
+            try:
+                app.logger.debug(f'Finally attempting to clean directory {dir_name}')
+                os.removedirs(dir_name)
+            except OSError as e:
+                # Pending directory?
+                if "pending" in dir_name: # Don't even message ...
+                    pass
+                app.logger.debug(f"Could not remove directory {dir_name}. Error: {str(e)}")
+                pass
+
+        return { 'status': "success", 'message': "Temporary files cleaned up" }
+
+    ##### --- End clean_temp_files. ---

@@ -142,9 +142,29 @@ def move_from_server():
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
             app.logger.info(f"Finished processing {unrouted_id}")
-            return
+            return publisher_id, routing_id
         else:
             raise AirflowException(f"Failed to process {unrouted_id}. {result['message']}")
+
+    @task(task_id="clean_temp_files", map_index_template="{{ map_index_template }}",
+          retries=3, max_active_tis_per_dag=1)
+    def clean_temp_files(pub_tuple):
+        context = get_current_context()
+        ti = context['ti']  # TaskInstance
+        publisher_id = pub_tuple[0]
+        routing_id = pub_tuple[1]
+        app.logger.debug(
+            f"Starting clean_temp_files. Publisher: {publisher_id}. Routing id: {routing_id}")
+        a = PublisherFiles(publisher_id, routing_id=routing_id)
+        context["map_index_template"] = f"{ti.map_index} {routing_id}"
+        result = a.clean_temp_files()
+        time.sleep(2)  # Wait for OS to catch up
+        if result["status"] == "success":
+            app.logger.info(f"Finished cleaning temporary files")
+            return
+        else:
+            raise AirflowException(f"Failed to clean temp files. {result['message']}")
+
 
     @task_group(group_id='ProcessFileFromPublisher')
     def process_one_file(pub_tuple, **context):
@@ -153,7 +173,8 @@ def move_from_server():
         local_tuple = copy_ftp(local_tuple)
         local_tuple = process_ftp(local_tuple)
         local_tuple = process_ftp_dirs(local_tuple)
-        check_unrouted(local_tuple)
+        local_tuple = check_unrouted(local_tuple)
+        clean_temp_files(local_tuple)
 
     # The first call + chaining of the tasks
     file_tuple = get_file_list()
