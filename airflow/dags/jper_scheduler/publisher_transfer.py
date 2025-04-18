@@ -10,7 +10,7 @@ from service import routing_deepgreen as routing
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
 
-# from octopus.modules.store import store
+from octopus.modules.store import store
 
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
@@ -552,11 +552,11 @@ class PublisherFiles:
                 notification_status = 'success'
                 final_status = 'success'
 
-            # #####
-            # store_files = store.StoreFactory.get().list_file_paths(notification_id)
-            # for s_file in store_files:
-            #     self.routing_history.add_final_file_location("store", s_file)
-            # #####
+            #####
+            store_files = store.StoreFactory.get().list_file_paths(notification_id)
+            for s_file in store_files:
+                self.routing_history.add_final_file_location("store", s_file)
+            #####
 
             # Update routing history
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
