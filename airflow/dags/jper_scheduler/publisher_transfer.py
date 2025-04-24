@@ -39,28 +39,6 @@ class PublisherFiles:
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
-        ### ONLY FOR TESTING ###
-        if self.username == 'cottagelabs':
-            key_filename = '/home/cloo/.ssh/deepgreen_id_rsa'
-            c1 = paramiko.SSHClient()
-            c1.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            c1.connect('sftp.kobv.de', 22, 'jumpcottagelabs', key_filename=key_filename)
-
-            transport = c1.get_transport()
-
-            host2 = 'vl90.kobv.de'
-            dest_addr = (host2, 22)
-            local_addr = ('127.0.0.1', 22)
-            channel = transport.open_channel("direct-tcpip", dest_addr, local_addr)
-
-            c2 = paramiko.SSHClient()
-            c2.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            c2.connect(host2, username='cottagelabs', key_filename=key_filename, sock=channel)
-
-            self.scp = paramiko.SFTPClient.from_transport(c2.get_transport())
-            self._is_scp = True
-            return
-
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         c.connect(hostname=self.sftp_server, port=self.sftp_port,

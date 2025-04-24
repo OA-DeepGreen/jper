@@ -20,8 +20,6 @@ def move_from_server():
         files_list = []
         a = PublisherFiles()
         for publisher in a.publishers:
-            if publisher['id'] != '1efe7d4b-97a8-4e9f-80d9-11d1edc5c70a':
-                continue
             b = PublisherFiles(publisher['id'], publisher=publisher)
             b.list_remote_dir(b.remote_dir)
             number_of_files = 0
