@@ -3,7 +3,7 @@ import uuid, time
 from octopus.core import app
 
 # Airflow stuff
-from airflow import AirflowException
+from airflow import AirflowException, AirflowFailException
 from airflow.exceptions import AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
@@ -19,6 +19,8 @@ def move_from_server():
         # Get File list
         files_list = []
         a = PublisherFiles()
+        if len(a.publishers) < 1:
+            raise AirflowFailException(f"No publishers active found. Stopping DAG run")
         for publisher in a.publishers:
             b = PublisherFiles(publisher['id'], publisher=publisher)
             b.list_remote_dir(b.remote_dir)
