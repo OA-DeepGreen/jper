@@ -3,8 +3,8 @@ import uuid, time
 from octopus.core import app
 
 # Airflow stuff
-from airflow import AirflowException, AirflowFailException
-from airflow.exceptions import AirflowTaskTerminated
+from airflow import AirflowException
+from airflow.exceptions import AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
