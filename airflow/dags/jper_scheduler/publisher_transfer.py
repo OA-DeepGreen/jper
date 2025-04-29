@@ -356,6 +356,7 @@ class PublisherFiles:
         final_location = final_location + "/" + file_plus_subdir
 
         # Update routing history
+        app.logger.info("Updating routing history")
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.routing_history.sftp_server_url = self.sftp_server
         self.routing_history.sftp_server_port = self.sftp_port
@@ -412,6 +413,7 @@ class PublisherFiles:
 
         status = {"status": "success", 'pend_dir': dst, "message": msg + ". " + msg2}
         # Update routing history
+        app.logger.info("Updating routing history")
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.routing_history.add_final_file_location("copyftp-tmp", dst)
         self.__update_routing_history__(action="copyftp", file_location=dst,
@@ -479,6 +481,7 @@ class PublisherFiles:
         status = {'status': 'success', 'proc_dir': pdir}
 
         # Update routing history
+        app.logger.info("Updating routing history")
         self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         self.__update_routing_history__(action="processftp - flatten", file_location=thisdir,
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
@@ -537,6 +540,7 @@ class PublisherFiles:
             #####
 
             # Update routing history
+            app.logger.info("Updating routing history")
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             self.__update_routing_history__(action="processftp - directory", file_location=pkg,
                     notification_id=notification_id, status=notification_status, message=message)
@@ -596,6 +600,7 @@ class PublisherFiles:
                     app.logger.debug(msg)
             message = message + ". " + msg
             # Update routing history
+            app.logger.info("Updating routing history")
             self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
             self.__update_routing_history__(action="checkunrouted", file_location="",
                     notification_id=uid, status="success", message=message)
@@ -630,20 +635,6 @@ class PublisherFiles:
             if os.path.isfile(file_name) or os.path.islink(file_name):
                 app.logger.debug(f'Deleting file {file_name} from {file_location}')
                 os.remove(file_name)
-
-            # Clean up parent directories also if empty
-            dir_name = os.path.dirname(file_name)
-            if not os.path.isdir(dir_name): # Directory has been cleaned already. Good.
-                continue
-            try:
-                app.logger.debug(f'Finally attempting to clean directory {dir_name}')
-                os.removedirs(dir_name)
-            except OSError as e:
-                # Pending directory?
-                if "pending" in dir_name: # Don't even message ...
-                    pass
-                app.logger.debug(f"Could not remove directory {dir_name}. Error: {str(e)}")
-                pass
 
         return { 'status': "success", 'message': "Temporary files cleaned up" }
 
