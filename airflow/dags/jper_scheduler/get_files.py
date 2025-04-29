@@ -10,10 +10,11 @@ from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
 
 
-@dag(dag_id="Process_Publisher_Deposits", catchup=False, max_active_runs=1,
+@dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
+     schedule=None, catchup=False,
      tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
-    @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=1)
+    @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
     def get_file_list():
         app.logger.debug("Starting get list of files")
         # Get File list
@@ -34,7 +35,7 @@ def move_from_server():
         return files_list  # This is visible in the xcom tab
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",
-          retries=3, max_active_tis_per_dag=1)
+          retries=3, max_active_tis_per_dag=4)
     def get_single_file(pub_tuple):
         # Transfer one file over to local bulk storage
         context = get_current_context()
@@ -55,7 +56,7 @@ def move_from_server():
             raise AirflowException(f"Failed to get {file_name} : {result['message']}")
 
     @task(task_id="copy_ftp", map_index_template="{{ map_index_template }}",
-          retries=3, max_active_tis_per_dag=1)
+          retries=3, max_active_tis_per_dag=4)
     def copy_ftp(pub_tuple):
         # Copy file to temp area for further processing
         context = get_current_context()
@@ -78,7 +79,7 @@ def move_from_server():
             raise AirflowException(f"Failed to copy {sym_link_path}, publisher id {publisher_id} : {result['message']}")
 
     # =
-    @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=1)
+    @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=4)
     def process_ftp(pub_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
@@ -103,7 +104,7 @@ def move_from_server():
             raise AirflowException(f"Failed to process {pend_dir}. {result['message']}")
 
     @task(task_id="process_ftp_dirs", map_index_template="{{ map_index_template }}",
-          retries=3, max_active_tis_per_dag=1)
+          retries=3, max_active_tis_per_dag=4)
     def process_ftp_dirs(pub_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
@@ -127,7 +128,7 @@ def move_from_server():
             raise AirflowException(f"Failed to process {pub_dir}. {result['message']}")
 
     @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}",
-          retries=3, max_active_tis_per_dag=1)
+          retries=3, max_active_tis_per_dag=4)
     def check_unrouted(pub_tuple):
         context = get_current_context()
         ti = context['ti']  # TaskInstance
@@ -147,7 +148,7 @@ def move_from_server():
             raise AirflowException(f"Failed to process {unrouted_id}. {result['message']}")
 
     @task(task_id="clean_temp_files", map_index_template="{{ map_index_template }}",
-          retries=3, max_active_tis_per_dag=1)
+          retries=3, max_active_tis_per_dag=4)
     def clean_temp_files(pub_tuple):
         context = get_current_context()
         ti = context['ti']  # TaskInstance
