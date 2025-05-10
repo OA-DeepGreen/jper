@@ -1,0 +1,131 @@
+{% extends "search_objs/_base.html" %}
+
+{% block title %} Logs for Matching process Search {% endblock %}
+
+{% block search_content %}
+<script>
+  function format_result_row_pre(val) {
+        return '<div class="search-result-label">' + val + '</div><div class="search-result-value">';
+    }
+
+    function format_result_row_post() {
+        return '</div>';
+    }
+
+    function format_date(val) {
+        let options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        let dt = new Date(parseInt(Date.parse(val)))
+        return dt.toLocaleString("en-GB", options);
+    }
+
+    function displayWorkflowState(value, index, array) {
+      let row = "";
+      if (value['action']) {
+          row = "<dt>" + value['action'] + "</dt>";
+          if (value['status']) {
+              row = row + "<dd>" + value['status'] + "</dd>";
+          }
+      }
+      return row
+    }
+
+    let fieldRender = {
+        titleField: function (val, resultobj, renderer) {
+            if (resultobj.email) {
+                display = "<a href='/matching_process_log/" + resultobj.id + "'>" + resultobj.id + "</a>";
+                return display;
+            } else {
+                return false;
+            }
+        },
+        workflowField: function (val, resultobj, renderer) {
+            if (resultobj.workflow_states.len > 0) {
+                rows = resultobj.workflow_states.forEach(displayWorkflowState);
+                display = "<dl>" + rows + "</dl>";
+                return display;
+            } else {
+                return false;
+            }
+        },
+        updatedDateField: function (val, resultobj, renderer) {
+            if (resultobj.last_updated) {
+                return format_date(resultobj.last_updated);
+            } else {
+                return false;
+            }
+        }
+    }
+
+    let searchSetting = {
+        search_url: "{{ url_for('query-edges.query', path='RoutingHistory') }}",
+        result_display: edges.newResultsDisplay({
+            id: "results",
+            category: "results",
+            renderer: edges.bs3.newResultsFieldsByRowRenderer({
+                rowDisplay: [
+                    [{
+                        "pre" : format_result_row_pre("id"),
+                        valueFunction: fieldRender.titleField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Publisher"),
+                        field: "publisher_id",
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Workflow"),
+                        valueFunction: fieldRender.workflowField,
+                        "post": format_result_row_post(),
+                    }],
+                    [{
+                        "pre" : format_result_row_pre("Date last updated"),
+                        valueFunction: fieldRender.updatedDateField,
+                        "post": format_result_row_post(),
+                    }],
+                ]
+            })
+        }),
+        opt_components: [
+            edges.newFullSearchController({
+                id: "search-controller",
+                category: "controller",
+                sortOptions: [],
+                fieldOptions: [
+                    {field: "id.exact", display: "Id"},
+                    {field: "publisher_id.exact", display: "Publisher Id"},
+                    {field: "workflow_states.notification_id.exact", display: "Notification Id"}
+                ]
+            }),
+
+            edges.newRefiningANDTermSelector({
+                id: "publisher",
+                field: "publisher_id.exact",
+                display: "Publisher",
+                size: 10,
+                category: "facet"
+            }),
+
+            edges.newRefiningANDTermSelector({
+                id: "workflow_actions",
+                field: "workflow_states.action.exact",
+                display: "Workflow actions",
+                size: 10,
+                category: "facet"
+            }),
+
+            edges.newRefiningANDTermSelector({
+                id: "workflow_status",
+                field: "workflow_states.status.exact",
+                display: "Workflow status",
+                size: 10,
+                category: "facet"
+            }),
+        ],
+    }
+
+    jQuery(document).ready(function ($) {
+        dgcore.initCommonSearchUi(searchSetting);
+    })
+</script>
+{% endblock %}
