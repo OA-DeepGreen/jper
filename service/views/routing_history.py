@@ -69,7 +69,7 @@ def view_routing_history(record_id):
 
 
 @blueprint.route('/view_notification/<notification_id>')
-def view_routing_history(notification_id):
+def view_routing_history_by_nid(notification_id):
     format = request.values.get('format', 'html')
     if not notification_id:
         abort(404)
