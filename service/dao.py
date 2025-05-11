@@ -985,3 +985,20 @@ class RoutingHistoryDAO(dao.ESDAO):
         ans = cls.query(q=query)
         return ans
 
+    def pull_record(cls, rec_id):
+        query = {
+            "query": {
+                "bool": {
+                    "must": {
+                        "term": {
+                            "id.exact": rec_id,
+                        }
+                    }
+                }
+            },
+            "sort": [{"last_updated": {"order": "desc"}}]
+        }
+        ans = cls.object_query(q=query)
+        if len(ans) == 1:
+            return ans[0]
+        return None
