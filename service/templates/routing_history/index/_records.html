@@ -20,7 +20,7 @@
                 <a href="/account/{{ record['publisher_id'] }}">
                   {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
               {% endif %}
-              {% for nid in notificiation_ids[record['id']] %}
+              {% for nid in notification_ids[record['id']] %}
                 <a href="/api/v1/notification/{{ nid }}">Notification</a><br/>
               {% endfor %}
           </td>
