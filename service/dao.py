@@ -985,6 +985,7 @@ class RoutingHistoryDAO(dao.ESDAO):
         ans = cls.query(q=query)
         return ans
 
+    @classmethod
     def pull_record(cls, rec_id):
         query = {
             "query": {
