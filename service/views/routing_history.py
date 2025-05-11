@@ -65,7 +65,7 @@ def view_routing_history(record_id):
     format = request.values.get('format', 'html')
     if not record_id:
         abort(404)
-    rec = RoutingHistory.pull_record(record_id)
+    rec = RoutingHistory.pull(record_id)
     if not rec:
         abort(404)
     if format == 'json':

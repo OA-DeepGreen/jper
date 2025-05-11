@@ -1,25 +1,26 @@
 <button class="accordion">{{ title }}</button>
 <div class="panel">
-  <table id="{{ id }}">">
+  <table id="{{ id }}">
     <tr>
       <th>Date</th>
       <th>Action</th>
-      <th>Status</th>
       <th>Message</th>
     </tr>
-    {% for wf in rec.workflow_states %}
+    {% for workflow in rec.workflow_states %}
       <td>
-        {% set dts = wf['date'].split('T') %}
-        <span title="{{ wf['date'] }}">{{ dts[-1] }}</span>
+        {% set dts = workflow['date'].split('T') %}
+        <span title="{{ workflow['date'] }}">{{ dts[-1].strip('Z') }}</span>
       </td>
       <td>
-        {{ wf.get('action', '') }}
+        {% if workflow['status'] == 'success' %}
+          <span style="color:green">{{"&check;" | safe }}</span>
+        {% else %}
+          <span style="color:red">x</span>
+        {% endif %}
+        {{ workflow['action']}}
       </td>
       <td>
-        {{ wf.get('status', '') }}
-      </td>
-      <td>
-        {{ wf.get('message', '') }}
+        {{ workflow.get('message', '') }}
       </td>
     {% endfor %}
   </table>
