@@ -2,7 +2,7 @@
 <div class="panel">
   <table id="{{ id }}">
     <tr>
-      <th>Date</th>
+      <th>Time</th>
       <th>Action</th>
       <th>Message</th>
     </tr>
@@ -10,7 +10,11 @@
       <tr>
         <td>
           {% set dts = workflow['date'].split('T') %}
-          <span title="{{ workflow['date'] }}">{{ dts[-1].strip('Z') }}</span>
+          {% if len(dts) == 2 %}
+            <span title="{{ workflow['date'] }}">{{ dts[0] }}<br/>{{ dts[1].strip('Z') }}</span>
+          {% else %}
+            <span title="{{ workflow['date'] }}">{{ workflow['date'] }}</span>
+          {% end %}
         </td>
         <td>
           {% if workflow['status'] == 'success' %}
