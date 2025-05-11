@@ -959,3 +959,30 @@ class RoutingHistoryDAO(dao.ESDAO):
     DAO for RoutingHistoryDAO
     """
     __type__ = "routing_history"
+
+    def pull_records(cls, since, upto, page, page_size, publisher_id=None):
+        size = page_size
+
+        q = {
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "last_updated": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
+                    }
+                }
+            },
+            "sort": [{"last_updated": {"order": "desc"}}],
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
+
+        if publisher_id is not None:
+            q['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
+
+        return cls.pull_all(q, size=page_size, return_as_object=False)
+

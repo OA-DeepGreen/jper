@@ -1,0 +1,48 @@
+{%  if total > 0 %}
+<div class="row line-space">
+  <div class="col span-12">
+    <table id="routingHistoryTable" class="tablesorter-green">
+      <thead>
+        <tr>
+          <th>Id</th>
+          <th class="sorter-iso8601date">Date Updated</th>
+          {% if publisher_id == None %}
+            <th>Publisher</th>
+          {% endif %}
+          <th>Notification Id</th>
+          <th>Workflow</th>
+        </tr>
+      </thead>
+      {% for record in records['hits']['hits'] %}
+        {#  First row of results is header. So getting notifications from 2nd row #}
+        {#  First column is id #}
+        <tr class="tablesorter">
+          <td><a href="/routing_history/view/{{ record_id }}">{{ record['id'] | safe }}</a></td>
+          <td>{{ notification['last_updated'] | safe }}</td>
+          {% if publisher_id == None %}
+              <td><a href="/account/{{ record['publisher_id'] }}">
+                  {{ record['publisher_id'] | safe }}</a></td>
+          {% endif %}
+          <td>
+            {% for notificiation_id in notificiation_ids %}
+              {% if notificiation_id %}
+                <a href="/api/v1/notification/{{ notificiation_id }}">{{ notificiation_id }}</a><br/>
+              {% else %}
+                {{ notificiation_id }}<br/>
+              {% endif %}
+            {% endfor %}
+          </td>
+          <dl><dl>
+            {% for workflow in record['workflow_states'] %}
+              <dt>Action</dt>
+              <dd>{{ workflow['action']}}</dd>
+              <dt>Status</dt>
+              <dd>{{ workflow['status']}}</dd>
+            {% endfor %}
+          </dl></td>
+          </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}

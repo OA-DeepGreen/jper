@@ -289,3 +289,13 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         if message:
             vals['message'] = message
         self._add_to_list("workflow_states", vals)
+
+    @property
+    def notification_ids(self):
+        notification_ids = []
+        for ws in self._get_list("workflow_states"):
+            nid = ws.get('notification_id', '')
+            if nid and not nid in notification_ids:
+                notification_ids.append(nid)
+        return notification_ids
+
