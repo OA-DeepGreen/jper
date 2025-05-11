@@ -18,7 +18,7 @@
               <a href="/routing_history/view/{{ record_id }}">record</a><br/>
               {% if publisher_id == None %}
                 <a href="/account/{{ record['publisher_id'] }}">
-                  {{ publisher_ids[record['publisher_id']] | safe }}</a><br/>
+                  {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
               {% endif %}
               {% for nid in notificiation_ids[record['id']] %}
                 <a href="/api/v1/notification/{{ nid }}">Notification</a><br/>
