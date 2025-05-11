@@ -15,20 +15,19 @@
         {#  First column is id #}
         <tr class="tablesorter">
           <td>
-              <a href="/routing_history/view/{{ record_id }}">record</a><br/>
+              <a href="/routing_history/view/{{ record['id'] }}">record</a><br/>
               {% if publisher_id == None %}
                 <a href="/account/{{ record['publisher_id'] }}">
                   {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
               {% endif %}
               {% for nid in notification_ids[record['id']] %}
-                <a href="/api/v1/notification/{{ nid }}">Notification</a><br/>
+                <a href="/api/v1/notification/{{ nid }}">{{ nid }}</a><br/>
               {% endfor %}
           </td>
           <td>{{ record['last_updated'] | safe }}</td>
           <td><dl>
             {% for workflow in record['workflow_states'] %}
-              <dt>{{ workflow['action']}}</dt>
-              <dd>{{ workflow['status']}}</dd>
+              <div><b>{{ workflow['action']}}</b>: {{ workflow['status']}}</div>
             {% endfor %}
           </dl></td>
           </tr>
