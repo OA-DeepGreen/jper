@@ -956,6 +956,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         ans = cls.pull_all_by_key("role.exact", "repository", return_as_object=False)
         return _extract_bibids(ans)
 
+    @classmethod
     def pull_all_publishers(cls, only_names=True):
         ans = cls.pull_all_by_key("role.exact", "publisher", return_as_object=False)
         if only_names:
