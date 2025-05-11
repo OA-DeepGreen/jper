@@ -27,7 +27,14 @@
           <td>{{ record['last_updated'] | safe }}</td>
           <td><dl>
             {% for workflow in record['workflow_states'] %}
-              <div><b>{{ workflow['action']}}</b>: {{ workflow['status']}}</div>
+              <div>
+                {% if workflow['status'] == 'success' %}
+                  <span style="color:green">{{"&check;" | safe }}</span>
+                {% else %}
+                  <span style="color:red">x</span>
+                {% endif %}
+                {{ workflow['action']}}
+              </div>
             {% endfor %}
           </dl></td>
           </tr>
