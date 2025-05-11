@@ -42,17 +42,8 @@ def index():
     link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
     if publisher_id:
         link = link + f"&publisher_id={publisher_id}"
-    notification_ids = {}
     publishers = Account.pull_all_publishers()
-    for data in records.get('hits', {}).get('hits', []):
-        record = data.get('_source', {})
-        nids = []
-        for ws in record['workflow_states']:
-            nid = ws.get('notification_id', '')
-            if nid and nid not in nids:
-                nids.append(nid)
-        notification_ids[record['id']] = nids
-
+    notification_ids = _gather_notification_ids(records)
     return render_template('routing_history/index.html', records=records,
                            publisher_id=publisher_id, publishers=publishers,
                            notification_ids=notification_ids, page_size=page_size,
@@ -72,23 +63,58 @@ def view_routing_history(record_id):
         title = f"Routing history record {record_id} in JSON"
         return render_template('manage_license/view_json.html', title=title, rec=rec)
     else:
-        file_locations = {'original_file_location': rec.original_file_location}
-        for fl in rec.final_file_locations:
-            file_locations[fl['location_type']] = fl['file_location']
-
-        workflow_states = []
-        for workflow in rec.workflow_states:
-            msg = workflow.get('message', '')
-            for fk, fl in file_locations.items():
-                if f" {fl} " in msg or \
-                        f"{fl}\n" in msg or \
-                        f"\n{fl}" in msg or \
-                        f"{fl}." in msg or \
-                        msg.startswith(fl) or msg.endswith(fl):
-                    msg = msg.replace(fl, f"<{fk}>")
-            workflow['short_message'] = msg
-            workflow_states.append(workflow)
+        workflow_states = _shorten_workflow_message(rec)
         rec.workflow_states = workflow_states
-
         return render_template('routing_history/view.html', rec=rec)
 
+
+@blueprint.route('/view_notification/<notification_id>')
+def view_routing_history(notification_id):
+    format = request.values.get('format', 'html')
+    if not notification_id:
+        abort(404)
+
+    rec = RoutingHistory.pull_record_for_notification(notification_id)
+    if not rec:
+        abort(404)
+    record_id = rec.id
+    if format == 'json':
+        title = f"Routing history record {record_id} in JSON"
+        return render_template('manage_license/view_json.html', title=title, rec=rec)
+    else:
+        workflow_states = _shorten_workflow_message(rec)
+        rec.workflow_states = workflow_states
+        return render_template('routing_history/view.html', rec=rec)
+
+
+def _gather_notification_ids(records):
+    notification_ids = {}
+    for data in records.get('hits', {}).get('hits', []):
+        record = data.get('_source', {})
+        nids = []
+        for ws in record['workflow_states']:
+            nid = ws.get('notification_id', '')
+            if nid and nid not in nids:
+                nids.append(nid)
+        notification_ids[record['id']] = nids
+    return notification_ids
+
+
+def _shorten_workflow_message(rec):
+    file_locations = {'original_file_location': rec.original_file_location}
+    for fl in rec.final_file_locations:
+        file_locations[fl['location_type']] = fl['file_location']
+
+    workflow_states = []
+    for workflow in rec.workflow_states:
+        msg = workflow.get('message', '')
+        for fk, fl in file_locations.items():
+            if f" {fl} " in msg or \
+                    f"{fl}\n" in msg or \
+                    f"\n{fl}" in msg or \
+                    f"{fl}." in msg or \
+                    msg.startswith(fl) or msg.endswith(fl):
+                msg = msg.replace(fl, f"<{fk}>")
+        workflow['short_message'] = msg
+        workflow_states.append(workflow)
+    return workflow_states
