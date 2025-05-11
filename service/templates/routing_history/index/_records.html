@@ -4,39 +4,30 @@
     <table id="routingHistoryTable" class="tablesorter-green">
       <thead>
         <tr>
-          <th>Id</th>
+          <th>Ids</th>
           <th class="sorter-iso8601date">Date Updated</th>
-          {% if publisher_id == None %}
-            <th>Publisher</th>
-          {% endif %}
-          <th>Notification Id</th>
           <th>Workflow</th>
         </tr>
       </thead>
-      {% for record in records['hits']['hits'] %}
+      {% for data in records['hits']['hits'] %}
+        {% set record = data['_source'] %}
         {#  First row of results is header. So getting notifications from 2nd row #}
         {#  First column is id #}
         <tr class="tablesorter">
-          <td><a href="/routing_history/view/{{ record_id }}">{{ record['id'] | safe }}</a></td>
-          <td>{{ notification['last_updated'] | safe }}</td>
-          {% if publisher_id == None %}
-              <td><a href="/account/{{ record['publisher_id'] }}">
-                  {{ record['publisher_id'] | safe }}</a></td>
-          {% endif %}
           <td>
-            {% for notificiation_id in notificiation_ids %}
-              {% if notificiation_id %}
-                <a href="/api/v1/notification/{{ notificiation_id }}">{{ notificiation_id }}</a><br/>
-              {% else %}
-                {{ notificiation_id }}<br/>
+              <a href="/routing_history/view/{{ record_id }}">record</a><br/>
+              {% if publisher_id == None %}
+                <a href="/account/{{ record['publisher_id'] }}">
+                  {{ publisher_ids[record['publisher_id']] | safe }}</a><br/>
               {% endif %}
-            {% endfor %}
+              {% for nid in notificiation_ids[record['id']] %}
+                <a href="/api/v1/notification/{{ nid }}">Notification</a><br/>
+              {% endfor %}
           </td>
-          <dl><dl>
+          <td>{{ record['last_updated'] | safe }}</td>
+          <td><dl>
             {% for workflow in record['workflow_states'] %}
-              <dt>Action</dt>
-              <dd>{{ workflow['action']}}</dd>
-              <dt>Status</dt>
+              <dt>{{ workflow['action']}}</dt>
               <dd>{{ workflow['status']}}</dd>
             {% endfor %}
           </dl></td>

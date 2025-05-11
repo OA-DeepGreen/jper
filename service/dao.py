@@ -960,10 +960,9 @@ class RoutingHistoryDAO(dao.ESDAO):
     """
     __type__ = "routing_history"
 
+    @classmethod
     def pull_records(cls, since, upto, page, page_size, publisher_id=None):
-        size = page_size
-
-        q = {
+        query = {
             "query": {
                 "bool": {
                     "filter": {
@@ -982,7 +981,7 @@ class RoutingHistoryDAO(dao.ESDAO):
         }
 
         if publisher_id is not None:
-            q['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
-
-        return cls.pull_all(q, size=page_size, return_as_object=False)
+            query['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
+        ans = cls.query(q=query)
+        return ans
 

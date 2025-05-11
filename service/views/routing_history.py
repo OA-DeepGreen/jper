@@ -1,11 +1,10 @@
 from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file
 from flask_login import current_user
-from datetime import timedelta, datetime
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import math
-from octopus.lib import dates
 from service.lib.validation_helper import validate_date, validate_page, validate_page_size, bad_request
-from service.models import RoutingHistory
+from service.models import RoutingHistory, Account
 
 
 blueprint = Blueprint('routing_history', __name__)
@@ -26,20 +25,12 @@ def index():
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     since = validate_date(since, param='since')
-    try:
-        since_dt = dates.parse(since)
-    except ValueError:
-        return bad_request(f"Unable to understand since date '{since}'")
 
     # Get upto
     upto = request.args.get('upto')
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     upto = validate_date(upto, param='upto')
-    try:
-        upto_dt = dates.parse(upto)
-    except ValueError:
-        return bad_request(f"Unable to understand since date '{upto}'")
 
     # get page and page size
     page = validate_page()
@@ -48,16 +39,25 @@ def index():
     records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id)
     total = records.get('hits', {}).get('total', {}).get('value', 0)
     num_pages = int(math.ceil(total / page_size))
-    link = '/routing-history'
+    link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
     if publisher_id:
-        link = link + f"?publisher_id={publisher_id}"
-    notification_ids = []
-    for record in records.get('hits', {}).get('gits', []):
-        for ws in record.get('workflow_states', []):
-            notification_ids.append(ws.get('notification_id', ''))
-    return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
-                           notification_ids=notification_ids, page_size=page_size, link=link,
-                           page=page, num_pages=num_pages, total=total, since=since, upto=upto)
+        link = link + f"&publisher_id={publisher_id}"
+    notification_ids = {}
+    publishers = Account.pull_all_publishers()
+    for data in records.get('hits', {}).get('hits', []):
+        record = data.get('_source', {})
+        nids = []
+        for ws in record['workflow_states']:
+            nid = ws.get('notification_id', '')
+            if nid and nid not in nids:
+                nids.append(nid)
+        notification_ids[record['id']] = nids
+
+    return render_template('routing_history/index.html', records=records,
+                           publisher_id=publisher_id, publishers=publishers,
+                           notification_ids=notification_ids, page_size=page_size,
+                           link=link,page=page, num_pages=num_pages, total=total,
+                           since=since, upto=upto)
 
 
 @blueprint.route('/view/<record_id>')
