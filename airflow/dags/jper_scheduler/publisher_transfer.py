@@ -32,8 +32,8 @@ class PublisherFiles:
         else:
             self.routing_history.id = routing_id
             self.routing_history.publisher_id = self.id
-            self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.save()
         # self.__log_routing_history__()
 
@@ -66,7 +66,7 @@ class PublisherFiles:
     def __update_routing_history__(self, action="", file_location="",
             notification_id="", status="", message=""):
         wfs = {
-            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ'),
             "action": action,
             "file_location": file_location,
             "notification_id": notification_id,
@@ -357,7 +357,7 @@ class PublisherFiles:
 
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.sftp_server_url = self.sftp_server
         self.routing_history.sftp_server_port = self.sftp_port
         self.routing_history.sftp_username = self.username
@@ -414,7 +414,7 @@ class PublisherFiles:
         status = {"status": "success", 'pend_dir': dst, "message": msg + ". " + msg2}
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.add_final_file_location("copyftp-tmp", dst)
         self.__update_routing_history__(action="copyftp", file_location=dst,
                 notification_id="", status=status["status"], message=status["message"])
@@ -482,7 +482,7 @@ class PublisherFiles:
 
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.__update_routing_history__(action="processftp - flatten", file_location=thisdir,
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
@@ -541,7 +541,7 @@ class PublisherFiles:
 
             # Update routing history
             app.logger.info("Updating routing history")
-            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
             self.__update_routing_history__(action="processftp - directory", file_location=pkg,
                     notification_id=notification_id, status=notification_status, message=message)
             self.routing_history.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
@@ -601,7 +601,7 @@ class PublisherFiles:
             message = message + ". " + msg
             # Update routing history
             app.logger.info("Updating routing history")
-            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
             self.__update_routing_history__(action="checkunrouted", file_location="",
                     notification_id=uid, status="success", message=message)
             self.routing_history.save()
