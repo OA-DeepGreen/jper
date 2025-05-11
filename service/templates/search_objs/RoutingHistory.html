@@ -1,6 +1,6 @@
 {% extends "search_objs/_base.html" %}
 
-{% block title %} Logs for Matching process Search {% endblock %}
+{% block title %} Routing History Search {% endblock %}
 
 {% block search_content %}
 <script>
@@ -32,7 +32,7 @@
     let fieldRender = {
         titleField: function (val, resultobj, renderer) {
             if (resultobj.email) {
-                display = "<a href='/matching_process_log/" + resultobj.id + "'>" + resultobj.id + "</a>";
+                display = "<a href='/routing_history/" + resultobj.id + "'>" + resultobj.id + "</a>";
                 return display;
             } else {
                 return false;
