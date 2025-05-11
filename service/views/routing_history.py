@@ -72,5 +72,23 @@ def view_routing_history(record_id):
         title = f"Routing history record {record_id} in JSON"
         return render_template('manage_license/view_json.html', title=title, rec=rec)
     else:
+        file_locations = {'original_file_location': rec.original_file_location}
+        for fl in rec.final_file_locations:
+            file_locations[fl['location_type']] = fl['file_location']
+
+        workflow_states = []
+        for workflow in rec.workflow_states:
+            msg = workflow.get('message', '')
+            for fk, fl in file_locations.items():
+                if f" {fl} " in msg or \
+                        f"{fl}\n" in msg or \
+                        f"\n{fl}" in msg or \
+                        f"{fl}." in msg or \
+                        msg.startswith(fl) or msg.endswith(fl):
+                    msg = msg.replace(fl, f"<{fk}>")
+            workflow['short_message'] = msg
+            workflow_states.append(workflow)
+        rec.workflow_states = workflow_states
+
         return render_template('routing_history/view.html', rec=rec)
 
