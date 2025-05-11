@@ -986,18 +986,22 @@ class RoutingHistoryDAO(dao.ESDAO):
         return ans
 
     @classmethod
-    def pull_record(cls, rec_id):
+    def pull_record_for_notification(cls, nid):
         query = {
             "query": {
-                "bool": {
-                    "must": {
-                        "term": {
-                            "id.exact": rec_id,
+                "nested": {
+                    "path": "workflow_states",
+                    "query": {
+                        "bool": {
+                            "must": [{
+                                "match": {
+                                    "workflow_states.notification_id.exact": nid
+                                }
+                            }]
                         }
                     }
                 }
-            },
-            "sort": [{"last_updated": {"order": "desc"}}]
+            }
         }
         ans = cls.object_query(q=query)
         if len(ans) == 1:
