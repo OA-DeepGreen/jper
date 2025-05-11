@@ -7,21 +7,23 @@
       <th>Message</th>
     </tr>
     {% for workflow in rec.workflow_states %}
-      <td>
-        {% set dts = workflow['date'].split('T') %}
-        <span title="{{ workflow['date'] }}">{{ dts[-1].strip('Z') }}</span>
-      </td>
-      <td>
-        {% if workflow['status'] == 'success' %}
-          <span style="color:green">{{"&check;" | safe }}</span>
-        {% else %}
-          <span style="color:red">x</span>
-        {% endif %}
-        {{ workflow['action']}}
-      </td>
-      <td>
-        {{ workflow.get('message', '') }}
-      </td>
+      <tr>
+        <td>
+          {% set dts = workflow['date'].split('T') %}
+          <span title="{{ workflow['date'] }}">{{ dts[-1].strip('Z') }}</span>
+        </td>
+        <td>
+          {% if workflow['status'] == 'success' %}
+            <span style="color:green">{{"&check;" | safe }}</span>
+          {% else %}
+            <span style="color:red">x</span>
+          {% endif %}
+          {{ workflow['action']}}
+        </td>
+        <td>
+          {{ workflow.get('message', '') }}
+        </td>
+      </tr>
     {% endfor %}
   </table>
 </div>
