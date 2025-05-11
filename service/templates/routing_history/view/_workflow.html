@@ -14,7 +14,7 @@
             <span title="{{ workflow['date'] }}">{{ dts[0] }}<br/>{{ dts[1].strip('Z') }}</span>
           {% else %}
             <span title="{{ workflow['date'] }}">{{ workflow['date'] }}</span>
-          {% end %}
+          {% endif %}
         </td>
         <td>
           {% if workflow['status'] == 'success' %}
