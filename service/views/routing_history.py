@@ -68,7 +68,7 @@ def view_routing_history(record_id):
         return render_template('routing_history/view.html', rec=rec)
 
 
-@blueprint.route('/view_notification/<notification_id>')
+@blueprint.route('/notification/<notification_id>')
 def view_routing_history_by_nid(notification_id):
     format = request.values.get('format', 'html')
     if not notification_id:

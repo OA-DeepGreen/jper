@@ -11,6 +11,7 @@
           <th>Forwarded to</th>
           <th>Term</th>
           <th>Appears in</th>
+          <th>Routing history</th>
         </tr>
       </thead>
       {%  for notification in results[1:] %}
@@ -19,11 +20,14 @@
         <tr class="tablesorter">
           <td>{{ notification['analysis_date'] | safe }}</td>
           <td>{{ notification['issn_or_eissn'] | safe }}</td>
-          <td>{{ notification['doi'] | safe }}</td>
+          <td>
+              {{ notification['doi'] | safe }} <br/>
+          </td>
           <td>{{ notification['license'] | safe }}</td>
           <td>{{notification['forwarded_to']}}</td>
           <td>{{ notification['term'] | safe }}</td>
           <td>{{ notification['appears_in'] | safe }}</td>
+          <td><a href="/routing_history/notification/{{ notification['id'] }}">view</a></td>
         </tr>
       {% endfor %}
     </table>
