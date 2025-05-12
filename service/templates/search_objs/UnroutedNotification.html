@@ -28,7 +28,8 @@
         titleField: function (val, resultobj, renderer) {
             var field = '<div><h3>';
             if (resultobj.id) {
-                display = "<a href='/api/v1/notification/" + resultobj.id + "'>" + resultobj.id + "</a>";
+                display = "<a href='/api/v1/notification/" + resultobj.id + "'>" + resultobj.id + "</a> | ";
+                display = display + "<a href='/routing_history/notification/" + resultobj.id + "'>(view routing history)</a>";
                 return display;
             } else {
                 return false;
