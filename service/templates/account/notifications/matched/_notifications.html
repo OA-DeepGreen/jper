@@ -26,7 +26,6 @@
           <td>{{notification['forwarded_to']}}</td>
           <td>{{ notification['term'] | safe }}</td>
           <td>{{ notification['appears_in'] | safe }}</td>
-          <td><a href="/routing_history/notification/{{ notification['id'] }}">view</a></td>
         </tr>
       {% endfor %}
     </table>
