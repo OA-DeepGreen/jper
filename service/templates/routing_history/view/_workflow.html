@@ -1,0 +1,33 @@
+<button class="accordion" id="accordion-workflow">{{ title }}</button>
+<div class="panel">
+  <table id="{{ id }}">
+    <tr>
+      <th>Time</th>
+      <th>Action</th>
+      <th>Message</th>
+    </tr>
+    {% for workflow in rec.workflow_states %}
+      <tr>
+        <td>
+          {% set dts = workflow['date'].split('T') %}
+          {% if dts|length == 2 %}
+            <span title="{{ workflow['date'] }}">{{ dts[0] }}<br/>{{ dts[1].strip('Z') }}</span>
+          {% else %}
+            <span title="{{ workflow['date'] }}">{{ workflow['date'] }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if workflow['status'] == 'success' %}
+            <span style="color:green">{{"&check;" | safe }}</span>
+          {% else %}
+            <span style="color:red">x</span>
+          {% endif %}
+          {{ workflow['action']}}
+        </td>
+        <td>
+          {{ workflow.get('short_message', '') }}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>

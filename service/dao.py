@@ -959,3 +959,51 @@ class RoutingHistoryDAO(dao.ESDAO):
     DAO for RoutingHistoryDAO
     """
     __type__ = "routing_history"
+
+    @classmethod
+    def pull_records(cls, since, upto, page, page_size, publisher_id=None):
+        query = {
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "last_updated": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
+                    }
+                }
+            },
+            "sort": [{"last_updated": {"order": "desc"}}],
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
+
+        if publisher_id is not None:
+            query['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
+        ans = cls.query(q=query)
+        return ans
+
+    @classmethod
+    def pull_record_for_notification(cls, nid):
+        query = {
+            "query": {
+                "nested": {
+                    "path": "workflow_states",
+                    "query": {
+                        "bool": {
+                            "must": [{
+                                "match": {
+                                    "workflow_states.notification_id.exact": nid
+                                }
+                            }]
+                        }
+                    }
+                }
+            }
+        }
+        ans = cls.object_query(q=query)
+        if len(ans) == 1:
+            return ans[0]
+        return None

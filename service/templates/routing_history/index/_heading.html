@@ -1,0 +1,15 @@
+<div class="row line-space">
+	<div class="col span-6">
+		<div class="cms" id="form_alert">
+			<h1>Routing History</h1>
+		</div>
+    </div>
+    {% if publisher_id %}
+    <div class="col span-6">
+        <div class="float: right">
+			<h2>{{ publisher_id }}</h2>
+            <a href="/account/{{ publisher_id }}">Account home</a>
+        </div>
+    </div>
+    {% endif %}
+</div>

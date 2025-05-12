@@ -30,3 +30,4 @@ from service.models.xslt import XSLT
 from service.models.sword import RepositoryStatus, DepositRecord, RepositoryDepositLog
 from service.models.requestnotification import RequestNotification
 from service.models.license_management import LicenseManagement
+from service.models.routing_history import RoutingHistory

@@ -19,7 +19,9 @@
         <tr class="tablesorter">
           <td>{{ notification['analysis_date'] | safe }}</td>
           <td>{{ notification['issn_or_eissn'] | safe }}</td>
-          <td>{{ notification['doi'] | safe }}</td>
+          <td>
+              {{ notification['doi'] | safe }} <br/>
+          </td>
           <td>{{ notification['license'] | safe }}</td>
           <td>{{notification['forwarded_to']}}</td>
           <td>{{ notification['term'] | safe }}</td>

@@ -957,6 +957,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         return _extract_bibids(ans)
 
     @classmethod
+    def pull_all_publishers(cls, only_names=True):
+        ans = cls.pull_all_by_key("role.exact", "publisher", return_as_object=False)
+        if only_names:
+            return _extract_names(ans)
+        return ans
+
+    @classmethod
     def pull_all_subject_repositories(cls):
         size = 1000
         q = {
@@ -1170,3 +1177,12 @@ def _extract_bibids(ans):
         if bibid:
             bibids[bibid] = rec['id']
     return bibids
+
+
+def _extract_names(ans):
+    names = {}
+    for rec in ans:
+        email = rec.get('email', '')
+        if email:
+            names[rec['id']] = email
+    return names
