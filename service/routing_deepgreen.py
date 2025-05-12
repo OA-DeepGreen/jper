@@ -901,7 +901,7 @@ def _is_article_license_gold(metadata, provider_id):
         if not provider:
             return False
         gold_license = []
-        if provider.license and provider.license.get('gold_license', []):
+        if provider and provider.license and provider.license.get('gold_license', []):
             gold_license = provider.license.get('gold_license')
         if license_typ in gold_license or license_url in gold_license:
             app.logger.debug(" -- license is gold")
