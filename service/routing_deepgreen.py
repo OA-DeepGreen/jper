@@ -899,7 +899,7 @@ def _is_article_license_gold(metadata, provider_id):
         app.logger.debug(" -- license url: {x}".format(x=license_url))
         provider = models.Account.pull(provider_id)
         gold_license = []
-        if provider.license and provider.license.get('gold_license', []):
+        if provider and provider.license and provider.license.get('gold_license', []):
             gold_license = provider.license.get('gold_license')
         if license_typ in gold_license or license_url in gold_license:
             app.logger.debug(" -- license is gold")
