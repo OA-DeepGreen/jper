@@ -34,8 +34,8 @@
                   <span style="color:red">x</span>
                 {% endif %}
                 {{ workflow['action'] }}
-                {%  if worflow.get('log_url', '') %}
-                  <a href="{{ worflow['log_url'] }}"> (log)</a>
+                {%  if workflow.get('log_url', '') %}
+                  <a href="{{ workflow['log_url'] }}"> (log)</a>
                 {% endif %}
               </div>
             {% endfor %}
