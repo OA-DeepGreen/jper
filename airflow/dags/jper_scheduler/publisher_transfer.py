@@ -65,6 +65,7 @@ class PublisherFiles:
 
     def __update_routing_history__(self, action="", file_location="",
             notification_id="", status="", message=""):
+        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ'),
             "action": action,
@@ -357,7 +358,6 @@ class PublisherFiles:
 
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.sftp_server_url = self.sftp_server
         self.routing_history.sftp_server_port = self.sftp_port
         self.routing_history.sftp_username = self.username
@@ -414,7 +414,6 @@ class PublisherFiles:
         status = {"status": "success", 'pend_dir': dst, "message": msg + ". " + msg2}
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.add_final_file_location("copyftp-tmp", dst)
         self.__update_routing_history__(action="copyftp", file_location=dst,
                 notification_id="", status=status["status"], message=status["message"])
@@ -469,9 +468,12 @@ class PublisherFiles:
 
         try:
             flatten(thisdir + '/' + nf)
-
         except Exception as e:
-            return {"status": "failure", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
+            status = {"status": "failure", "message": f"Flatten failed for {thisdir + '/' + nf} : {str(e)}"}
+            self.__update_routing_history__(action="processftp - flatten", file_location=thisdir,
+                    notification_id="", status=status["status"], message=status["message"])
+            self.routing_history.save()
+            return status
 
         pdir = thisdir
         if os.path.isdir(thisdir + '/' + nf + '/' + nf):
@@ -482,7 +484,6 @@ class PublisherFiles:
 
         # Update routing history
         app.logger.info("Updating routing history")
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.__update_routing_history__(action="processftp - flatten", file_location=thisdir,
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
@@ -520,7 +521,8 @@ class PublisherFiles:
                 resp_data = resp.json()
             except:
                 resp_data = {}
-            notification_id = resp_data.get('id', '')
+            # Give default notificaiton of 00...00 for the case where the post failed
+            notification_id = resp_data.get('id', 32*'0')
             message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
             if resp.status_code < 200 or resp.status_code > 299:
                 app.logger.error(message)
@@ -541,11 +543,10 @@ class PublisherFiles:
 
             # Update routing history
             app.logger.info("Updating routing history")
-            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
-            self.__update_routing_history__(action="processftp - directory", file_location=pkg,
-                    notification_id=notification_id, status=notification_status, message=message)
             self.routing_history.add_final_file_location("processftp dir", os.path.join(pdir, singlepub))
             self.routing_history.add_final_file_location("processftp dir zip", pkg)
+            self.__update_routing_history__(action="processftp - directory", file_location=pkg,
+                    notification_id=notification_id, status=notification_status, message=message)
             self.routing_history.add_notification_state(notification_status, notification_id)
             self.routing_history.save()
             # self.__log_routing_history__()
@@ -601,7 +602,6 @@ class PublisherFiles:
             message = message + ". " + msg
             # Update routing history
             app.logger.info("Updating routing history")
-            self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
             self.__update_routing_history__(action="checkunrouted", file_location="",
                     notification_id=uid, status="success", message=message)
             self.routing_history.save()
