@@ -9,6 +9,16 @@ from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
 
+def get_log_url(context):
+    full_log_url = context['task_instance'].log_url
+    query_params = full_log_url.split("&")
+    query_params_filtered = []
+    for q in query_params:
+        if not 'base_date' in q:
+            query_params_filtered.append(q)
+    log_url = "&".join(query_params_filtered)
+    app.logger.info(f"Log for this job : {log_url}")
+    return log_url
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
      schedule=None, schedule_interval=None, catchup=False,
@@ -16,21 +26,25 @@ from jper_scheduler.publisher_transfer import PublisherFiles
 def move_from_server():
     @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
     def get_file_list():
+        context = get_current_context()
+        log_url = get_log_url(context)
         app.logger.debug("Starting get list of files")
         # Get File list
         files_list = []
         a = PublisherFiles()
+        a.airflow_log_location = log_url
         if len(a.publishers) < 1:
             raise AirflowFailException(f"No publishers active found. Stopping DAG run")
         for publisher in a.publishers:
             b = PublisherFiles(publisher['id'], publisher=publisher)
+            b.airflow_log_location = log_url
             b.list_remote_dir(b.remote_dir)
             number_of_files = 0
             for f in b.file_list_publisher:
                 number_of_files += 1
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
-            app.logger.info(f"Found {number_of_files} for publisher {publisher}")
+            app.logger.info(f"Found {number_of_files} files for publisher {publisher}")
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
         return files_list  # This is visible in the xcom tab
 
@@ -39,6 +53,7 @@ def move_from_server():
     def get_single_file(pub_tuple):
         # Transfer one file over to local bulk storage
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         file_name = pub_tuple[1]
@@ -46,6 +61,7 @@ def move_from_server():
         app.logger.debug(
             f"Starting sftp file transfer. Publisher: {publisher_id}. File name: {file_name}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
         context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.get_file(file_name)
@@ -60,6 +76,7 @@ def move_from_server():
     def copy_ftp(pub_tuple):
         # Copy file to temp area for further processing
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         sym_link_path = pub_tuple[1]
@@ -67,6 +84,7 @@ def move_from_server():
         app.logger.debug(
             f"Starting copy file. Publisher: {publisher_id}. sym_link_path: {sym_link_path}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         ff = sym_link_path.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
 
@@ -83,6 +101,7 @@ def move_from_server():
     def process_ftp(pub_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         pend_dir = pub_tuple[1]
@@ -90,6 +109,7 @@ def move_from_server():
         app.logger.debug(
             f"Starting process ftp. Publisher: {publisher_id}. pending_dir: {pend_dir}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         ff = pend_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.processftp(pend_dir)
@@ -108,6 +128,7 @@ def move_from_server():
     def process_ftp_dirs(pub_tuple):
         # Process the file - unzip and flatten it
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         pub_dir = pub_tuple[1]
@@ -116,6 +137,7 @@ def move_from_server():
             f"Starting process dirs. Publisher: {publisher_id}. pub_dir: {pub_dir}. Routing id: {routing_id}")
 
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         ff = pub_dir.removeprefix(a.l_dir)
         context["map_index_template"] = f"{ti.map_index} {ff}"
         ##
@@ -131,6 +153,7 @@ def move_from_server():
           retries=3, max_active_tis_per_dag=4)
     def check_unrouted(pub_tuple):
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         unrouted_id = pub_tuple[1]
@@ -138,6 +161,7 @@ def move_from_server():
         app.logger.debug(
             f"Starting check unrouted. Publisher: {publisher_id}. Unrouted id: {unrouted_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         context["map_index_template"] = f"{ti.map_index} {unrouted_id}"
         result = a.checkunrouted(unrouted_id)
         time.sleep(2)  # Wait for OS to catch up
@@ -151,12 +175,14 @@ def move_from_server():
           retries=3, max_active_tis_per_dag=4)
     def clean_temp_files(pub_tuple):
         context = get_current_context()
+        log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         routing_id = pub_tuple[1]
         app.logger.debug(
             f"Starting clean_temp_files. Publisher: {publisher_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
+        a.airflow_log_location = log_url
         context["map_index_template"] = f"{ti.map_index} {routing_id}"
         result = a.clean_temp_files()
         time.sleep(2)  # Wait for OS to catch up

@@ -54,6 +54,7 @@ class PublisherFiles:
         self.remote_processed = "xfer_processed"
         self.remote_failed = "xfer_failed"
         self.file_list_publisher = []
+        self.airflow_log_location = ""
 
     def __log_routing_history__(self):
         app.logger.debug("Begin Routing History")
