@@ -518,7 +518,7 @@ class PublisherFiles:
             except:
                 resp_data = {}
             # Give default notificaiton of 00...00 for the case where the post failed
-            notification_id = resp_data.get('id', 32*'0')
+            notification_id = resp_data.get('id',None)
             message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
             if resp.status_code < 200 or resp.status_code > 299:
                 app.logger.error(message)
