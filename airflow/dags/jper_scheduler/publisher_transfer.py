@@ -32,8 +32,8 @@ class PublisherFiles:
         else:
             self.routing_history.id = routing_id
             self.routing_history.publisher_id = self.id
-            self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
+            # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
+        # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.save()
         # self.__log_routing_history__()
 
@@ -66,7 +66,7 @@ class PublisherFiles:
 
     def __update_routing_history__(self, action="", file_location="",
             notification_id="", status="", message=""):
-        self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
+        # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         wfs = {
             "date": datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ'),
             "action": action,
