@@ -26,6 +26,9 @@
         </td>
         <td>
           {{ workflow.get('short_message', '') }}
+            {% if workflow.get('log_url', '') %}
+               <br/><a href="{{ worflow['log_url'] }}">View task log</a>
+            {% endif %}
         </td>
       </tr>
     {% endfor %}

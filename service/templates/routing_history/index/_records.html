@@ -21,7 +21,7 @@
                   {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
               {% endif %}
               {% for nid in notification_ids[record['id']] %}
-                <a href="/api/v1/notification/{{ nid }}">{{ nid }}</a><br/>
+                Notification: <a href="/api/v1/notification/{{ nid }}">{{ nid }}</a><br/>
               {% endfor %}
           </td>
           <td>{{ record['last_updated'] | safe }}</td>
@@ -33,7 +33,10 @@
                 {% else %}
                   <span style="color:red">x</span>
                 {% endif %}
-                {{ workflow['action']}}
+                {{ workflow['action'] }}
+                {%  if worflow.get('log_url', '') %}
+                  <a href="{{ worflow['log_url'] }}"> (log)</a>
+                {% endif %}
               </div>
             {% endfor %}
           </dl></td>
