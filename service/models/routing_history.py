@@ -259,7 +259,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
     def workflow_states(self, vals):
         self._set_list("workflow_states", vals)
 
-    def add_workflow_state(self, action, file_location, notification_id,
+    def add_workflow_state(self, action, file_location, notification_id=None,
                            status=None, message=None, log_url=None):
         """
         {
@@ -276,8 +276,6 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             raise dataobj.DataSchemaException("workflow action is missing")
         if not file_location:
             raise dataobj.DataSchemaException("file_location is missing")
-        if not notification_id:
-            raise dataobj.DataSchemaException("notification_id is missing")
         if status and status not in WORKFLOW_STATUS:
             raise dataobj.DataSchemaException(
                 "status can only be one of: {x}".format(x=", ".join(WORKFLOW_STATUS)))
@@ -285,9 +283,10 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         vals = {
             'date': current_date,
             'action': action,
-            'file_location': file_location,
-            'notification_id': notification_id
+            'file_location': file_location
         }
+        if notification_id:
+            vals['notification_id'] = notification_id
         if status:
             vals['status'] = status
         if message:

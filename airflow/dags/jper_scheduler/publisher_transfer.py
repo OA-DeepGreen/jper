@@ -67,7 +67,8 @@ class PublisherFiles:
     def __update_routing_history__(self, action="", file_location="",
             notification_id="", status="", message=""):
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
-        self.routing_history.add_workflow_state(action, file_location, notification_id,
+        self.routing_history.add_workflow_state(action, file_location,
+                                                notification_id=notification_id,
                                                 status=status, message=message,
                                                 log_url=self.airflow_log_location)
 
