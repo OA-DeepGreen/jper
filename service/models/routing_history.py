@@ -37,7 +37,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "file_location" : "<file for which notification was created>",
                 "notification_id" : "<file for which notification was created>",
                 "status": "<one of WORKFLOW_STATUS>",
-                "message": "Any message regarding action"
+                "message": "<Any message regarding action>",
+                "log_url": "<The url for the logs in airflow for this task>"
             }],
         }
     """
@@ -88,7 +89,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                         "file_location": {"coerce": "unicode"},
                         "notification_id": {"coerce": "unicode"},
                         "status": {"coerce": "unicode", "allowed_values": WORKFLOW_STATUS},
-                        "message": {"coerce": "unicode"}
+                        "message": {"coerce": "unicode"},
+                        "log_url": {"coerce": "unicode"}
                     }
                 }
             }
@@ -257,7 +259,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
     def workflow_states(self, vals):
         self._set_list("workflow_states", vals)
 
-    def add_workflow_state(self, action, file_location, notification_id, status=None, message=None):
+    def add_workflow_state(self, action, file_location, notification_id,
+                           status=None, message=None, log_url=None):
         """
         {
             "date": {"coerce": "utcdatetime"},
@@ -265,7 +268,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "file_location": {"coerce": "unicode"},
             "notification_id": {"coerce": "unicode"},
             "status": {"coerce": "unicode", "allowed_values": WORKFLOW_STATUS},
-            "message": {"coerce": "unicode"}
+            "message": {"coerce": "unicode"},
+            "log_url": {"coerce": "unicode"}
         }
         """
         if not action:
@@ -288,6 +292,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             vals['status'] = status
         if message:
             vals['message'] = message
+        if log_url:
+            vals['log_url'] = log_url
         self._add_to_list("workflow_states", vals)
 
     @property
