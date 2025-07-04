@@ -575,12 +575,15 @@ class PublisherFiles:
             res = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
 
+            # This is now a routed notification. I need the repositories matched.
+            notification_obj = models.RoutedNotification.pull(uid)
+
             if res:
-                if len(obj.repositories) > 0:
-                    app.logger.info(f"Notification {obj.id} matched to {len(obj.repositories)} repositories - adding to request notification queue")
-                    request_deposit_helper.request_deposit_for_notification(obj.id, obj.repositories)
+                if len(notification_obj.repositories) > 0:
+                    app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
+                    request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
                 else:
-                    app.logger.debug(f"There were no repositories to deposit to for notification {obj.id}")
+                    app.logger.debug(f"There were no repositories to deposit to for notification {notification_obj.id}")
                 app.logger.info(message)
                 self.routing_history.add_notification_state("success", uid)
                 if self.delete_routed:
