@@ -28,7 +28,7 @@ setup(
         "Jinja2~=3.1",
         "esprit",
         "octopus",
-        "apache-airflow>=2.10",
+        "apache-airflow~=2.10",
         "psycopg2-binary>=2.9",
         "paramiko>=3.5",
         "graphviz"
