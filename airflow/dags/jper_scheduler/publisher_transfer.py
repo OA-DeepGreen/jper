@@ -6,6 +6,7 @@ from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
 from service import routing_deepgreen as routing
+from service.lib import request_deposit_helper
 
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
@@ -575,6 +576,11 @@ class PublisherFiles:
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
 
             if res:
+                if len(obj.repositories) > 0:
+                    app.logger.info(f"Notification {obj.id} matched to {len(obj.repositories)} repositories - adding to request notification queue")
+                    request_deposit_helper.request_deposit_for_notification(obj.id, obj.repositories)
+                else:
+                    app.logger.debug(f"There were no repositories to deposit to for notification {obj.id}")
                 app.logger.info(message)
                 self.routing_history.add_notification_state("success", uid)
                 if self.delete_routed:
