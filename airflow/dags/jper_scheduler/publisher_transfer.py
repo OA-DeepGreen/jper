@@ -606,7 +606,7 @@ class PublisherFiles:
             message = message + ". " + msg
             # Update routing history
             app.logger.info("Updating routing history")
-            self.__update_routing_history__(action="checkunrouted", file_location="",
+            self.__update_routing_history__(action="checkunrouted", file_location="None",
                     notification_id=uid, status="success", message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
