@@ -776,7 +776,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
             raise dataobj.DataSchemaException("SSH public key is missing")
         current_date = dates.format(datetime.now())
         vals = {
-            'id': str(uuid.uuid4()),
+            'id': uuid.uuid4().hex,
             'title': title,
             'public_key': public_key,
             'status': 'new',
@@ -1100,7 +1100,7 @@ def _coerce_account_hash(account_hash):
         account_hash = account_hash.to_dict()
     # set api_key if missing
     if not account_hash.get('api_key', None):
-        account_hash['api_key'] = str(uuid.uuid4())
+        account_hash['api_key'] = uuid.uuid4().hex
     # nested properties
     nested_properties = {
         'repository': ['repository_name', 'repository_software', 'repository_url', 'repository_bibid', 'repository_sigel'],

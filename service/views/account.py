@@ -791,7 +791,7 @@ def apikey(username):
         abort(401)
     acc = models.Account.pull(username)
     try:
-        acc.api_key = str(uuid.uuid4())
+        acc.api_key = uuid.uuid4().hex
         acc.save()
         flash('Thank you. Your API key has been updated.', "success")
     except Exception as e:
@@ -1151,7 +1151,7 @@ def register():
         vals = request.values.to_dict()
         role = vals.get('radio', None)
         if not vals.get('id', None):
-            vals['id'] = str(uuid.uuid4())
+            vals['id'] = uuid.uuid4().hex
         account = models.Account()
         try:
             account.add_account(vals)
