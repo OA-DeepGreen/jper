@@ -517,6 +517,22 @@ class DepositRecordDAO(dao.ESDAO):
         obs = cls.query(q=q.query())
         return obs
 
+    @classmethod
+    def pull_old_deposit_logs(cls, repo_id, to_date):
+        """Get all deposit logs older than the specified date"""
+        q = DepositRecordQuery(None, repo_id)
+        obs = cls.query(q=q.get_old_logs_query(to_date))
+        return obs
+
+    @classmethod
+    def pull_latest_deposit_for_repo(cls, repo_id):
+        """Get latest deposit log for the repository"""
+        q = DepositRecordQuery(None, repo_id)
+        obs = cls.object_query(q=q.get_latest_record_for_repo_query())
+        if obs and len(obs) > 0:
+            return obs[0]
+        return obs
+
 
 class DepositRecordQuery(object):
     """
@@ -538,10 +554,6 @@ class DepositRecordQuery(object):
             "query": {
                 "bool": {
                     "must": [
-                        # {"term" : {"repository.exact" : self.repository_id}},
-                        # 2018-03-07 TD : as of fix 2016-08-26 in models/sword.py
-                        #                 this has to match 'repo.exact' instead!
-                        #                 What a bug, good grief!
                         {"term": {"repo.exact": self.repository_id}},
                         {"term": {"notification.exact": self.notification_id}}
                     ]
@@ -552,6 +564,46 @@ class DepositRecordQuery(object):
         if self.size:
             q['size'] = self.size
         return q
+
+
+    def get_latest_record_for_repo_query(self):
+        """
+        Return the query as a python dict suitable for json serialisation
+
+        :return: elasticsearch query
+        """
+        return {
+            "query": {
+                "bool": {
+                    "must": {
+                        "term": {"repo.exact": self.repository_id}
+                    }
+                }
+            },
+            "sort": {"last_updated": {"order": "desc"}},
+            "size": 1
+        }
+
+    def get_old_logs_query(self, to_date):
+        query = {
+            "query": {
+                "bool": {
+                    "must": [{
+                        "range": {
+                            "last_updated": {
+                                "lt": to_date
+                            }
+                        }
+                    }]
+
+                }
+            },
+            "sort": {"last_updated": {"order": "desc"}},
+            "size": 10000
+        }
+        if self.repository_id:
+            query['query']['bool']['must'].append({ "term": {"repo.exact": self.repository_id}})
+        return query
 
 
 class RequestNotification(dao.ESDAO):
