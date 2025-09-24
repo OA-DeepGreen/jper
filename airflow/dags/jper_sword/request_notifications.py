@@ -72,6 +72,7 @@ def sword_request_deposit():
             app.logger.info(f"Notification {note} for repo {repo} successfully processed.")
             return repo, result["value"]
         else:
+            app.logger.debug(f"Tasked failed with message {result['value']}")
             raise AirflowException(f"Failed to process notification {note} for repository {repo}")
 
     # Process the notifications - stuff that gets called on demand
