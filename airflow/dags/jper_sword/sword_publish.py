@@ -44,7 +44,7 @@ class SendNotifications:
 
     def process_request_notification(self, notification_id):
         note = self.j.get_notification(notification_id)
-        rn = models.RequestNotification.pull(notification_id)
+        rn = models.RequestNotification.pull_by_ids(notification_id, self.repo)
         if not note:
             print({f"RequestNotification : {rn}"})
             print(f"No body for notification {notification_id}")
