@@ -531,6 +531,20 @@ class DepositRecordDAO(dao.ESDAO):
         obs = cls.query(q=q.query())
         return obs
 
+    @classmethod
+    def pull_count_by_ids(cls, notification_id, repository_id):
+        """
+        Get count of deposit records associated with the notification_id and the repository_id
+
+        :param notification_id:
+        :param repository_id:
+        :return:
+        """
+        q = DepositRecordQuery(notification_id, repository_id)
+        res = cls.query(q.query())
+        total = res.get('hits', {}).get('total', {}).get('value', 0)
+        return total
+
 
 class DepositRecordQuery(object):
     """

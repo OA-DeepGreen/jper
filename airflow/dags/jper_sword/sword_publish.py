@@ -104,11 +104,11 @@ class SendNotifications:
 
     def process_repository_notification(self, notification_id):
         app.logger.info(f"Processing Account:{self.repo}")
-        repo_deposit_status, from_date = deposit.get_deposit_status_and_date()
+        repo_deposit_status, from_date = deposit.get_deposit_status_and_date(self.acc)
         if not repo_deposit_status:
             return{"status":"failed", "value":"Repository failing or problem"}
         note = self.j.get_notification(notification_id)
-        deposit_notification = should_notification_be_deposited(note, acc)
+        deposit_notification = deposit.should_notification_be_deposited(note, self.acc)
         status = "success"
         if deposit_notification:
             deposit_done, retry, deposit_record = deposit.process_notification(self.acc, note)
