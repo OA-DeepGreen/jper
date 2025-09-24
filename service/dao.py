@@ -150,6 +150,20 @@ class AccountDAO(dao.ESDAO):
     __type__ = "account"
     """ The index type to use to store these objects """
 
+    @classmethod
+    def with_sword_activated(cls):
+        """
+        List all accounts in JPER that have sword deposit activated
+
+        :return: list of sword enabled accounts
+        """
+        q = SwordAccountQuery()
+        all = []
+        for acc in cls.scroll(q=q.query()):
+            # we need to do this because of the scroll keep-alive
+            all.append(acc)
+        return all
+
 
 class LicRelatedFileDAO(dao.ESDAO):
     """
@@ -598,17 +612,34 @@ class RequestNotification(dao.ESDAO):
         if len(obs) > 0:
             return obs
 
+    @classmethod
+    def pull_by_repository_status(cls, repo_id, status, size=100, from_count=0):
+        """
+        Get all request notifications matching repository and status
+
+        :param repo_id:
+        :param status:
+        :param size:
+        :param from_count:
+        :return:
+        """
+        q = RequestNotificationQuery(None, repo_id, status, size, from_count)
+        obs = cls.query(q=q.query())
+        if len(obs) > 0:
+            return obs
+
 
 class RequestNotificationQuery(object):
     """
     Query generator for retrieving deposit records by notification id and repository id
     """
 
-    def __init__(self, notification_id, repository_id, status=None, size=None):
+    def __init__(self, notification_id, repository_id, status=None, size=None, from_count=None):
         self.notification_id = notification_id
         self.repository_id = repository_id
         self.status = status
         self.size = size
+        self.from_count = from_count
 
     def query(self):
         """
@@ -632,6 +663,8 @@ class RequestNotificationQuery(object):
             q["query"]["bool"]["must"].append({"term": {"status.exact": self.status}})
         if self.size:
             q['size'] = self.size
+        if self.from_count:
+            q['from'] = self.from_count
         return q
 
 
