@@ -843,11 +843,27 @@ class XSLT(object):
                           </xsl:if>
 
                           <!-- if the current contrib element contains the affiliation itself, without any rids: -->
-                          <xsl:if test=".//aff">
-                              <mods:affiliation>
-                                  <xsl:value-of select="normalize-space(.//aff)"/>
-                              </mods:affiliation>
-                          </xsl:if>
+                          <xsl:choose>
+                            <xsl:when test=".//aff">
+                                <mods:affiliation>
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select=".//aff"/>
+                                      <xsl:with-param name="combined_string" select="''"/>
+                                      <xsl:with-param name="current_position" select="1"/>
+                                    </xsl:call-template>
+                                </mods:affiliation>
+                            </xsl:when>
+                            <!-- if nothing has worked so far, take whatever aff element can be found in the whole document -->
+                            <xsl:when test="not(xref[@ref-type='aff']) and not(@rid) and //aff">
+                                <mods:affiliation>
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select="//aff"/>
+                                      <xsl:with-param name="combined_string" select="''"/>
+                                      <xsl:with-param name="current_position" select="1"/>
+                                    </xsl:call-template>
+                                </mods:affiliation>
+                            </xsl:when>
+                            </xsl:choose>
                       </mods:name>
                     </xsl:when>
 
