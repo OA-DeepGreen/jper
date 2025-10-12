@@ -112,7 +112,7 @@ class SendNotifications:
         status = "success"
         if deposit_notification:
             deposit_done, retry, deposit_record = deposit.process_notification(self.acc, note)
-            set_repository_status(self.acc, note, deposit_done, retry)
+            deposit.set_repository_status(self.acc, note, deposit_done, retry)
 
             print(f"Status : {deposit_done}, retry: {retry}")
             if not deposit_done and retry:
