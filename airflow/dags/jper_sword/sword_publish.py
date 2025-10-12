@@ -45,8 +45,8 @@ class SendNotifications:
     def process_request_notification(self, notification_id):
         note = self.j.get_notification(notification_id)
         rn = models.RequestNotification.pull_by_ids(notification_id, self.repo)
+        print(f"Request notification : {rn}")
         if not note:
-            print({f"RequestNotification : {rn}"})
             print(f"No body for notification {notification_id}")
             rn.status = 'failed'
             rn.save()
@@ -81,7 +81,7 @@ class SendNotifications:
         repository_status = models.RepositoryStatus.pull(self.repo)
         if repository_status is None:
             app.logger.debug(f"Account:{self.repo} has no previous deposits - creating repository status record")
-            repository_status = deposit.create_repo_status(acc)
+            repository_status = deposit.create_repo_status(self.acc)
             deposit_log.add_message('debug', "First deposit for account {x}".format(x=self.repo), None, None)
         print(f"Repository status:{repository_status.status}")
 
