@@ -23,7 +23,7 @@ def get_log_url(context):
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
      schedule=None, schedule_interval="@hourly",
-     start_date=datetime(2025, 10, 22),
+     start_date=datetime.datetime(2025, 10, 22),
      catchup=False,
      tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
