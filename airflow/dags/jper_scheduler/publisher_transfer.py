@@ -526,6 +526,7 @@ class PublisherFiles:
                 app.logger.error(message)
                 app.logger.warn(f"No notification id for {fp}")
                 notification_status = 'failure'
+                self.routing_history.add_notification_state(notification_status, "none")
             else:
                 app.logger.info(message)
                 app.logger.info(f"The notification id for {fp} is {notification_id}")
@@ -533,11 +534,10 @@ class PublisherFiles:
                 notification_status = 'success'
                 final_status = 'success'
 
-            #####
-            store_files = store.StoreFactory.get().list_file_paths(notification_id)
-            for s_file in store_files:
-                self.routing_history.add_final_file_location("store", s_file)
-            #####
+                store_files = store.StoreFactory.get().list_file_paths(notification_id)
+                for s_file in store_files:
+                    self.routing_history.add_final_file_location("store", s_file)
+                self.routing_history.add_notification_state(notification_status, notification_id)
 
             # Update routing history
             app.logger.info("Updating routing history")
@@ -545,7 +545,6 @@ class PublisherFiles:
             self.routing_history.add_final_file_location("processftp dir zip", pkg)
             self.__update_routing_history__(action="processftp - directory", file_location=pkg,
                     notification_id=notification_id, status=notification_status, message=message)
-            self.routing_history.add_notification_state(notification_status, notification_id)
             self.routing_history.save()
             # self.__log_routing_history__()
         status = {
