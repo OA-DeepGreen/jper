@@ -4,11 +4,14 @@ from octopus.core import app
 from datetime import timedelta
 
 # Airflow stuff
-from airflow import AirflowException
-from airflow.exceptions import AirflowFailException, AirflowTaskTerminated
+from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
+
+donot_rerun_processftp_dirs = [
+    "No handler for package format unknown"
+]
 
 def get_log_url(context):
     full_log_url = context['task_instance'].log_url
@@ -150,6 +153,10 @@ def move_from_server():
             app.logger.info(f"Finished processing {pub_dir}")
             return publisher_id, result['resp_ids'], routing_id
         else:
+            for message in donot_rerun_processftp_dirs:
+                if message in result["erlog"]:
+                    app.logger.error(f"Processftp_dirs failed with message : {result['erlog']}")
+                    raise AirflowFailException(f"Failed to process {pub_dir}. Will not rerun this task")
             raise AirflowException(f"Failed to process {pub_dir}. {result['message']}")
 
     @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}",
