@@ -112,8 +112,8 @@ def _gather_notification_ids(records):
     for data in records.get('hits', {}).get('hits', []):
         record = data.get('_source', {})
         nids = []
-        for ws in record['workflow_states']:
-            nid = ws.get('notification_id', '')
+        for ws in record.get('workflow_states', []):
+            nid = ws.get('notification_id', 'None')
             if nid and nid not in nids:
                 nids.append(nid)
         notification_ids[record['id']] = nids
