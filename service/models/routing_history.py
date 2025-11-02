@@ -19,6 +19,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "created_date" : "<date this record was created>",
             "last_updated" : "<date this record was last updated>",
             "publisher_id" : "<publisher id>",
+            "publisher_email" : "<publisher email>",
             "sftp_server_url" : "<sftp_server>",
             "sftp_server_port" : "<sftp_server_port>",
             "sftp_username" : "<sftp_username>",
@@ -59,6 +60,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "created_date": {"coerce": "utcdatetime"},
                 "last_updated": {"coerce": "utcdatetime"},
                 "publisher_id": {"coerce": "unicode"},
+                "publisher_email": {"coerce": "unicode"},
                 "sftp_server_url": {"coerce": "unicode"},
                 "sftp_server_port": {"coerce": "unicode"},
                 "sftp_username": {"coerce": "unicode"},
@@ -116,6 +118,25 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         :return:
         """
         self._set_single("publisher_id", val, coerce=dataobj.to_unicode())
+
+    @property
+    def publisher_email(self):
+        """
+        The publisher email related to the file
+
+        :return: account email
+        """
+        return self._get_single("publisher_email", coerce=dataobj.to_unicode())
+
+    @publisher_email.setter
+    def publisher_email(self, val):
+        """
+        Set the publisher email
+
+        :param val: publisher_email
+        :return: account email
+        """
+        self._set_single("publisher_email", val, coerce=dataobj.to_unicode())
 
     @property
     def sftp_server_url(self):

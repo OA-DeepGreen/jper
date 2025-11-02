@@ -19,10 +19,10 @@ class PublisherFiles:
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         if routing_id:
-            self.__init_routing_id__(routing_id)
+            self.__init_routing_id__(routing_id, publisher=publisher)
         self._is_scp = False
 
-    def __init_routing_id__(self, routing_id):
+    def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
         app.logger.debug(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
@@ -33,6 +33,8 @@ class PublisherFiles:
         else:
             self.routing_history.id = routing_id
             self.routing_history.publisher_id = self.id
+            if publisher and publisher.get('email', None):
+                self.routing_history.publisher_email = publisher['email']
             # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.save()

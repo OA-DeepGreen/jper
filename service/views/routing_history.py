@@ -15,10 +15,10 @@ def index():
     if not current_user.is_super:
         abort(401)
 
-    # Get publisher_id
-    publisher_id = request.args.get('publisher_id')
-    if publisher_id == '':
-        publisher_id = None
+    # # Get publisher_id
+    # publisher_id = request.args.get('publisher_id')
+    # if publisher_id == '':
+    #     publisher_id = None
 
     # Get since
     since = request.args.get('since')
@@ -36,7 +36,28 @@ def index():
     page = validate_page()
     page_size = validate_page_size()
 
-    records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id)
+    publisher_id = None
+    publisher_email = None
+    doi = None
+    notification_id = None
+    search_val = request.args.get('search_value', None)
+    search_term = request.args.get('search_term', None)
+    if search_term == 'publisher_id':
+        publisher_id = search_val
+    elif search_term == 'publisher_email':
+        publisher_email = search_val
+    elif search_term == 'notification_id':
+        notification_id = search_val
+    elif search_term == 'doi':
+        doi = search_val
+
+    status = request.args.get('status', None)
+    if status == '':
+        status = None
+
+    records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id,
+                                          publisher_email=publisher_email, doi=doi,
+                                          notification_id=notification_id, status=status)
     total = records.get('hits', {}).get('total', {}).get('value', 0)
     num_pages = int(math.ceil(total / page_size))
     link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
@@ -44,11 +65,10 @@ def index():
         link = link + f"&publisher_id={publisher_id}"
     publishers = Account.pull_all_publishers()
     notification_ids = _gather_notification_ids(records)
-    return render_template('routing_history/index.html', records=records,
-                           publisher_id=publisher_id, publishers=publishers,
-                           notification_ids=notification_ids, page_size=page_size,
-                           link=link,page=page, num_pages=num_pages, total=total,
-                           since=since, upto=upto)
+    return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
+                           publishers=publishers, notification_ids=notification_ids, page_size=page_size,
+                           link=link, page=page, num_pages=num_pages, total=total, since=since,
+                           upto=upto, status=status, search_term=search_term, search_val=search_val)
 
 
 @blueprint.route('/view/<record_id>')
