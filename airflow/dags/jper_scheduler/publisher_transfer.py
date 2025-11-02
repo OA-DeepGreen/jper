@@ -492,6 +492,7 @@ class PublisherFiles:
         final_status = 'failure'
         dir_list = next(os.walk(pdir))[1]
         app.logger.debug(f"Processing {len(dir_list)} items in {pdir}")
+        erlog = ''
         for idx, singlepub in enumerate(dir_list):
             fp = os.path.join(pdir, singlepub)
             app.logger.debug(f"Processing item #{idx}: {fp}")
@@ -520,6 +521,8 @@ class PublisherFiles:
                 resp_data = {}
             notification_id = resp_data.get('id',None)
             message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
+            if "error" in resp.text:
+                erlog = resp.text["error"]
             if resp.status_code < 200 or resp.status_code > 299:
                 app.logger.error(message)
                 app.logger.warn(f"No notification id for {fp}")
@@ -548,8 +551,9 @@ class PublisherFiles:
         status = {
             'resp_ids': resp_list,
             "message": "Processing complete",
-            "status": final_status
-        }
+            "status": final_status,
+            "erlog": erlog
+     }
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
