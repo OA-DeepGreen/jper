@@ -1,41 +1,25 @@
 <form class="form" action="" method="GET">
     <div class="row line-space">
-        <div class="col span-6">
+        <div class="col span-12">
             <ul class="form-fields">
                 <li>
                     <label>Show routing history</label>
                 </li>
                 <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text">From:</span>
+                        <span class="form-fields__label-text forty">From:</span>
                         <input type="text" name="since" value="{{since}}"/>
                     </label>
                 </li>
                 <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text">To:</span>
+                        <span class="form-fields__label-text forty">To:</span>
                         <input type="text" name="upto" value="{{upto}}"/>
                     </label>
                 </li>
-            </ul>
-        </div>
-        <div class="col span-6">
-            <ul class="form-fields">
-                <li>
-                    <label>Filter routing history</label>
-                </li>
-                <li class="form-fields__item--text">
-                    <select name="search_term">
-                        <option value="publisher_id" {% if search_term == "publisher_id" %}selected{% endif %}>Publisher ID</option>
-                        <option value="publisher_email" {% if search_term == "publisher_email" %}selected{% endif %}>Publisher Email</option>
-                        <option value="notification_id" {% if search_term == "notification_id" %}selected{% endif %}>Notification ID</option>
-                        <option value="doi" {% if search_term == "doi" %}selected{% endif %}>DOI</option>
-                    </select>
-                    <input type="text" name="search_val" value="{{search_val}}"/>
-                </li>
                <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text">Status:</span>
+                        <span class="form-fields__label-text forty">Status:</span>
                         <select name="status">
                             <option value="all" {% if status != "failure" and status != "success" %}selected{% endif %}>All</option>
                             <option value="success" {% if status == "success" %}selected{% endif %}>Success</option>
@@ -43,12 +27,19 @@
                         </select>
                     </label>
                 </li>
+                <li>
+                    <label>Filter options</label>
+                </li>
                 <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">Show only failures</span>
-                        <input type="checkbox" name="status2" value="failure"
-                        {% if status == "failure" %}checked{% endif %}>
-                    </label>
+                    <span class="form-fields__label-text forty">
+                    <select name="search_term">
+                        <option value="publisher_id" {% if search_term == "publisher_id" %}selected{% endif %}>Publisher ID</option>
+                        <option value="publisher_email" {% if search_term == "publisher_email" %}selected{% endif %}>Publisher Email</option>
+                        <option value="notification_id" {% if search_term == "notification_id" %}selected{% endif %}>Notification ID</option>
+                        <option value="doi" {% if search_term == "doi" %}selected{% endif %}>DOI</option>
+                    </select>
+                    </span>
+                    <input type="text" name="search_val" value="{{search_val}}"/>
                 </li>
             </ul>
         </div>

@@ -574,4 +574,12 @@ dl.dl-details dd {
 .default {
     background-color: #e7e7e7;
     color: black;
-} /* Grey
+} /* Grey */
+
+.fifty {
+  width: 50%;
+}
+
+.forty {
+  width: 40%;
+}

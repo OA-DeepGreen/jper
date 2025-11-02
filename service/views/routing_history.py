@@ -51,9 +51,7 @@ def index():
     elif search_term == 'doi':
         doi = search_val
 
-    status = request.args.get('status', None)
-    if status == '':
-        status = None
+    status = request.args.get('status', '')
 
     records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id,
                                           publisher_email=publisher_email, doi=doi,

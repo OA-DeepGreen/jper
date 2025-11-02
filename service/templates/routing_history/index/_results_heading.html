@@ -1,11 +1,48 @@
 <div class="row line-space">
-  <h2>Displaying Routing history logs from {{ since }} to {{ upto }}</h2>
-  {% if total > 9999 %}
-    {% set msg="( only the latest 10000 routing history logs are displayed )" %}
-  {%  else %}
-     {% set msg="" %}
-  {% endif %}
+  <h2>Displaying Routing history logs</h2>
+</div>
+<div class="row line-space">
+  <h3>Filters</h3>
+  <dl class="dl-details">
+    {% if since %}
+      <dt>Since:</dt>
+      <dd>{{ since }}</dd>
+    {% endif %}
+    {% if upto %}
+      <dt>Upto:</dt>
+      <dd>{{ upto }}</dd>
+    {% endif %}
+    {% if status %}
+      <dt>Status:</dt>
+      <dd>{{ status }}</dd>
+    {% endif %}
+    {% if publisher_id %}
+      <dt>Publisher ID:</dt>
+      <dd>{{ publisher_id }}</dd>
+    {% endif %}
+    {% if publisher_email %}
+      <dt>Publisher email:</dt>
+      <dd>{{ publisher_email }}</dd>
+    {% endif %}
+    {% if notification_id %}
+      <dt>Notificarion ID:</dt>
+      <dd>{{ notification_id }}</dd>
+    {% endif %}
+    {% if doi %}
+      <dt>DOI:</dt>
+      <dd>{{ doi }}</dd>
+    {% endif %}
+  </dl>
+</div>
+
+<div class="row line-space">
   <div class="col span-9">
-    <b>Total number of routing history logs: {{total}} {{ msg }}</b>
+    {% if total > 9999 %}
+      {% set msg="( only the latest 10000 routing history logs are displayed )" %}
+    {%  else %}
+      {% set msg="" %}
+    {% endif %}
+    <b>Total number of routing history logs: {{total}}</b><br/>
+    {{ msg }}
   </div>
 </div>
