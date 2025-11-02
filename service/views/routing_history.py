@@ -40,7 +40,7 @@ def index():
     publisher_email = None
     doi = None
     notification_id = None
-    search_val = request.args.get('search_value', None)
+    search_val = request.args.get('search_val', None)
     search_term = request.args.get('search_term', None)
     if search_term == 'publisher_id':
         publisher_id = search_val

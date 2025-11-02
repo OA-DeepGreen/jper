@@ -1,6 +1,6 @@
 <div class="row line-space">
-    <div class="col span-12">
-        <form class="form" action="" method="GET">
+    <form class="form" action="" method="GET">
+        <div class="col span-6">
             <div class="col span-6">
 
                 <ul class="form-fields">
@@ -26,23 +26,31 @@
                             {% if status == "failure" %}checked{% endif %}>
                         </label>
                     </li>
-                    <li class="form-fields__item--text">
-                        <span class="form-fields__label-text">
-                            <select name="search_term">
-                                <option value="publisher_id" {% if search_term == "publisher_id" %}selected{% endif %}>Publisher ID</option>
-                                <option value="publisher_email" {% if search_term == "publisher_email" %}selected{% endif %}>Publisher Email</option>
-                                <option value="notification_id" {% if search_term == "notification_id" %}selected{% endif %}>Notification ID</option>
-                                <option value="doi" {% if search_term == "doi" %}selected{% endif %}>DOI</option>
-                            </select>
-                            <input type="text" name="search_value" value="{{upto}}"/>
-                        </span>
-                    </li>
-
-                    <li class="form-fields__item--text">
-                        <button class="btn btn--3d btn--primary move-up" type="submit">Show</button>
-                    </li>
                 </ul>
             </div>
-        </form>
-    </div>
+        </div>
+        <div class="col span-6">
+            <ul class="form-fields">
+                <li>
+                    <label>Filter routing history</label>
+                </li>
+                <li class="form-fields__item--text">
+                    <select name="search_term">
+                        <option value="publisher_id" {% if search_term == "publisher_id" %}selected{% endif %}>Publisher ID</option>
+                        <option value="publisher_email" {% if search_term == "publisher_email" %}selected{% endif %}>Publisher Email</option>
+                        <option value="notification_id" {% if search_term == "notification_id" %}selected{% endif %}>Notification ID</option>
+                        <option value="doi" {% if search_term == "doi" %}selected{% endif %}>DOI</option>
+                    </select>
+                    <input type="text" name="search_val" value="{{search_val}}"/>
+                </li>
+            </ul>
+        </div>
+        <div class="col span-12">
+            <ul class="form-fields">
+                <li class="form-fields__item--text">
+                    <button class="btn btn--3d btn--primary move-up" type="submit">Show</button>
+                </li>
+            </ul>
+        </div>
+    </form>
 </div>
