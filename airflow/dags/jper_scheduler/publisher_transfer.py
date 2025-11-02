@@ -429,14 +429,14 @@ class PublisherFiles:
         if self.acc is None:
             msg = f"Could not find publisher account {self.username}. Not processing file {thisdir}"
             app.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": ""}
 
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirList = os.listdir(thisdir)
         if len(dirList) > 1:
             msg = f"Found {len(dirList)} directories, expected one. Not processing."
             os.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": ""}
 
         pub = dirList[0]
         thisfile = os.path.join(thisdir, pub)
@@ -444,7 +444,7 @@ class PublisherFiles:
         if not os.path.isfile(thisfile):
             msg = f"{thisfile} is not a file. Nothing to process further."
             app.logger.warning(msg)
-            return {"status": "Processed", "message": msg}
+            return {"status": "Processed", "message": msg, "publication": pub}
         #
         nf = uuid.uuid4().hex
         newloc = os.path.join(thisdir, nf, '')
@@ -454,7 +454,7 @@ class PublisherFiles:
         except Exception as e:
             msg = f"Could not move {thisfile} to {newloc}. Error: {str(e)}"
             app.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": pub}
         msg = f"Moved {thisfile} to {newloc}"
         app.logger.debug(msg)
 
@@ -479,7 +479,7 @@ class PublisherFiles:
             pdir = thisdir + '/' + nf + '/' + nf
         # Could have multiple directories. Process them individually in the next step
         dirList = os.listdir(pdir)
-        status = {'status': 'success', 'proc_dir': pdir}
+        status = {'status': 'success', 'proc_dir': pdir, "publication": pub}
 
         # Update routing history
         app.logger.info("Updating routing history")
@@ -487,7 +487,6 @@ class PublisherFiles:
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
         # self.__log_routing_history__()
-        status['publication'] = pub
         return status
 
     def processftp_dirs(self, pdir):
