@@ -490,7 +490,7 @@ class PublisherFiles:
     def processftp_dirs(self, pdir):
         resp_list = []
         final_status = 'failure'
-        dir_list = os.listdir(pdir)
+        dir_list = next(os.walk(pdir))[1]
         app.logger.debug(f"Processing {len(dir_list)} items in {pdir}")
         for idx, singlepub in enumerate(dir_list):
             fp = os.path.join(pdir, singlepub)
