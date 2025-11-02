@@ -22,8 +22,9 @@
               {% endif %}
               <dl class="dl-details">
                 <dt>File:</dt>
-                <dd>{{ rec.original_file_location }}</dd>
-                {% if notification_ids %}
+
+                <dd>{{ record.get('original_file_location', '').split('xfer/')[-1] }}</dd>
+                {% if notification_ids[record['id']]|length > 0 %}
                   <dt>Notification:</dt>
                   {% for nid in notification_ids[record['id']] %}
                     <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
