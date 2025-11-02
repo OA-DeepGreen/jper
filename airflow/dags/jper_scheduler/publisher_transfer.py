@@ -524,7 +524,7 @@ class PublisherFiles:
             notification_id = resp_data.get('id',None)
             message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
             if "error" in resp.text:
-                erlog = resp.text["error"]
+                erlog = json.load(resp.text)["error"]
             if resp.status_code < 200 or resp.status_code > 299:
                 app.logger.error(message)
                 app.logger.warn(f"No notification id for {fp}")
