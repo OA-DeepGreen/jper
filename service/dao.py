@@ -982,18 +982,18 @@ class RoutingHistoryDAO(dao.ESDAO):
             "size": page_size
         }
 
-        if publisher_id is not None:
+        if publisher_id:
             query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
-        if publisher_email is not None:
+        if publisher_email:
             query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
         if status == "failure":
             query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
         elif status == "success":
             query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": status}}]
-        if notification_id is not None:
+        if notification_id:
             del query['query']['bool']['filter']
             query['query']['bool']["must"].append({"match": {"workflow_states.notification_id.exact": notification_id}})
-        if doi is not None:
+        if doi:
             del query['query']['bool']['filter']
             query['query']['bool']["must"].append({"match": {"original_file_location": doi}})
         ans = cls.query(q=query)
