@@ -17,13 +17,6 @@
                         <input type="text" name="upto" value="{{upto}}"/>
                     </label>
                 </li>
-                <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">Show only failures</span>
-                        <input type="checkbox" name="status" value="failure"
-                        {% if status == "failure" %}checked{% endif %}>
-                    </label>
-                </li>
             </ul>
         </div>
         <div class="col span-6">
@@ -39,6 +32,23 @@
                         <option value="doi" {% if search_term == "doi" %}selected{% endif %}>DOI</option>
                     </select>
                     <input type="text" name="search_val" value="{{search_val}}"/>
+                </li>
+               <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Status:</span>
+                        <select name="status">
+                            <option value="all" {% if status != "failure" and status != "success" %}selected{% endif %}>All</option>
+                            <option value="success" {% if status == "success" %}selected{% endif %}>Success</option>
+                            <option value="failure" {% if status == "failure" %}selected{% endif %}>Failure</option>
+                        </select>
+                    </label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Show only failures</span>
+                        <input type="checkbox" name="status2" value="failure"
+                        {% if status == "failure" %}checked{% endif %}>
+                    </label>
                 </li>
             </ul>
         </div>

@@ -36,10 +36,10 @@ def index():
     page = validate_page()
     page_size = validate_page_size()
 
-    publisher_id = None
-    publisher_email = None
-    doi = None
-    notification_id = None
+    publisher_id = ''
+    publisher_email = ''
+    doi = ''
+    notification_id = ''
     search_val = request.args.get('search_val', None)
     search_term = request.args.get('search_term', None)
     if search_term == 'publisher_id':
@@ -113,7 +113,7 @@ def _gather_notification_ids(records):
         record = data.get('_source', {})
         nids = []
         for ws in record.get('workflow_states', []):
-            nid = ws.get('notification_id', 'None')
+            nid = ws.get('notification_id', None)
             if nid and nid not in nids:
                 nids.append(nid)
         notification_ids[record['id']] = nids
