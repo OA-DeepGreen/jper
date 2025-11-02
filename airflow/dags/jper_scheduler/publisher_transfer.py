@@ -485,6 +485,7 @@ class PublisherFiles:
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
         # self.__log_routing_history__()
+        status['publication'] = pub
         return status
 
     def processftp_dirs(self, pdir):
@@ -527,7 +528,7 @@ class PublisherFiles:
                 app.logger.error(message)
                 app.logger.warn(f"No notification id for {fp}")
                 notification_status = 'failure'
-                self.routing_history.add_notification_state(notification_status, "none")
+                self.routing_history.add_notification_state(notification_status, f"{singlepub}.zip")
             else:
                 app.logger.info(message)
                 app.logger.info(f"The notification id for {fp} is {notification_id}")
