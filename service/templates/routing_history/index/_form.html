@@ -1,33 +1,30 @@
 <form class="form" action="" method="GET">
     <div class="row line-space">
         <div class="col span-6">
-            <div class="col span-6">
-
-                <ul class="form-fields">
-                    <li>
-                        <label>Show routing history</label>
-                    </li>
-                    <li class="form-fields__item--text">
-                        <label>
-                            <span class="form-fields__label-text">From:</span>
-                            <input type="text" name="since" value="{{since}}"/>
-                        </label>
-                    </li>
-                    <li class="form-fields__item--text">
-                        <label>
-                            <span class="form-fields__label-text">To:</span>
-                            <input type="text" name="upto" value="{{upto}}"/>
-                        </label>
-                    </li>
-                    <li class="form-fields__item--text">
-                        <label>
-                            <span class="form-fields__label-text">Show only failures</span>
-                            <input type="checkbox" name="status" value="failure"
-                            {% if status == "failure" %}checked{% endif %}>
-                        </label>
-                    </li>
-                </ul>
-            </div>
+            <ul class="form-fields">
+                <li>
+                    <label>Show routing history</label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">From:</span>
+                        <input type="text" name="since" value="{{since}}"/>
+                    </label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">To:</span>
+                        <input type="text" name="upto" value="{{upto}}"/>
+                    </label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Show only failures</span>
+                        <input type="checkbox" name="status" value="failure"
+                        {% if status == "failure" %}checked{% endif %}>
+                    </label>
+                </li>
+            </ul>
         </div>
         <div class="col span-6">
             <ul class="form-fields">
