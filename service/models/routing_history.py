@@ -237,7 +237,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             'location_type': location_type,
             'file_location': file_location
         }
-        self._add_to_list("final_file_locations", val)
+        if not val in self.final_file_locations:
+            self._add_to_list("final_file_locations", val)
 
     @property
     def notification_states(self):
@@ -262,14 +263,21 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             raise dataobj.DataSchemaException(
                 "status can only be one of: {x}".format(x=", ".join(STATUS)))
         updated_states = []
+        updated = False
         for notification_state in self.notification_states:
             if notification_state.get("notification_id", "") == notification_id:
                 updated_states.append({
                     'status': status,
                     'notification_id': notification_id
                 })
+                updated = True
             else:
                 updated_states.append(notification_state)
+        if not updated:
+            updated_states.append({
+                'status': status,
+                'notification_id': notification_id
+            })
         self._set_list("notification_states", updated_states)
 
     @property

@@ -120,3 +120,17 @@ class RequestNotification(dataobj.DataObj, dao.RequestNotification):
         :param val: the deposit record request_type
         """
         self._set_single("request_type", val, coerce=dataobj.to_unicode(), allowed_values=["user", "machine"])
+
+    @classmethod
+    def request_notification_list(cls, repository_id, status='queued', size=100):
+        from_count = 0
+        rn = cls.pull_by_repository_status(repository_id, status=status, from_count=from_count, size=size)
+        total = rn.get('hits',{}).get('total',{}).get('value', 0)
+        if len(rn.get('hits', {}).get('hits', [])) == 0:
+            return -1
+        rnlist = []
+        for r in rn.get('hits', {}).get('hits', []):
+            raw_data = r.get('_source', {})
+            if raw_data:
+                rnlist.append(RequestNotification(raw_data))
+        return rnlist

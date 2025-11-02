@@ -487,13 +487,15 @@ class PublisherFiles:
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
         # self.__log_routing_history__()
+        status['publication'] = pub
         return status
 
     def processftp_dirs(self, pdir):
         resp_list = []
         final_status = 'failure'
-        dir_list = os.listdir(pdir)
+        dir_list = next(os.walk(pdir))[1]
         app.logger.debug(f"Processing {len(dir_list)} items in {pdir}")
+        erlog = ''
         for idx, singlepub in enumerate(dir_list):
             fp = os.path.join(pdir, singlepub)
             app.logger.debug(f"Processing item #{idx}: {fp}")
@@ -522,10 +524,13 @@ class PublisherFiles:
                 resp_data = {}
             notification_id = resp_data.get('id',None)
             message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
+            if "error" in resp.text:
+                erlog = json.loads(resp.text)["error"]
             if resp.status_code < 200 or resp.status_code > 299:
                 app.logger.error(message)
                 app.logger.warn(f"No notification id for {fp}")
                 notification_status = 'failure'
+                self.routing_history.add_notification_state(notification_status, f"{singlepub}.zip")
             else:
                 app.logger.info(message)
                 app.logger.info(f"The notification id for {fp} is {notification_id}")
@@ -533,11 +538,10 @@ class PublisherFiles:
                 notification_status = 'success'
                 final_status = 'success'
 
-            #####
-            store_files = store.StoreFactory.get().list_file_paths(notification_id)
-            for s_file in store_files:
-                self.routing_history.add_final_file_location("store", s_file)
-            #####
+                store_files = store.StoreFactory.get().list_file_paths(notification_id)
+                for s_file in store_files:
+                    self.routing_history.add_final_file_location("store", s_file)
+                self.routing_history.add_notification_state(notification_status, notification_id)
 
             # Update routing history
             app.logger.info("Updating routing history")
@@ -545,14 +549,14 @@ class PublisherFiles:
             self.routing_history.add_final_file_location("processftp dir zip", pkg)
             self.__update_routing_history__(action="processftp - directory", file_location=pkg,
                     notification_id=notification_id, status=notification_status, message=message)
-            self.routing_history.add_notification_state(notification_status, notification_id)
             self.routing_history.save()
             # self.__log_routing_history__()
         status = {
             'resp_ids': resp_list,
             "message": "Processing complete",
-            "status": final_status
-        }
+            "status": final_status,
+            "erlog": erlog
+     }
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---

@@ -1,13 +1,17 @@
 # Python stuff
-import uuid, time
+import uuid, time, datetime
 from octopus.core import app
+from datetime import timedelta
 
 # Airflow stuff
-from airflow import AirflowException
-from airflow.exceptions import AirflowFailException, AirflowTaskTerminated
+from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
+
+donot_rerun_processftp_dirs = [
+    "No handler for package format unknown"
+]
 
 def get_log_url(context):
     full_log_url = context['task_instance'].log_url
@@ -21,7 +25,9 @@ def get_log_url(context):
     return log_url
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
-     schedule=None, schedule_interval=None, catchup=False,
+     schedule=None, schedule_interval=app.config.get("AIRFLOW_ROUTING_SCHEDULE", 'None'),
+     start_date=datetime.datetime(2025, 10, 22),
+     catchup=False,
      tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
     @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
@@ -111,11 +117,12 @@ def move_from_server():
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = pend_dir.removeprefix(a.l_dir)
-        context["map_index_template"] = f"{ti.map_index} {ff}"
+        # context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.processftp(pend_dir)
+        context["map_index_template"] = f"{ti.map_index} {result['pub']}"
         if result["status"] == "success":
             app.logger.info(f"Successfully processed {pend_dir}")
-            return publisher_id, result['proc_dir'], routing_id
+            return publisher_id, result['proc_dir'], routing_id, result['pub']
         elif result["status"] == "Processed":
             app.logger.warn(result["message"])
             raise AirflowTaskTerminated(f"Processed {pend_dir}. {result['message']}")
@@ -133,20 +140,25 @@ def move_from_server():
         publisher_id = pub_tuple[0]
         pub_dir = pub_tuple[1]
         routing_id = pub_tuple[2]
+        pub_name = pub_tuple[3]
         app.logger.debug(
             f"Starting process dirs. Publisher: {publisher_id}. pub_dir: {pub_dir}. Routing id: {routing_id}")
 
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = pub_dir.removeprefix(a.l_dir)
-        context["map_index_template"] = f"{ti.map_index} {ff}"
+        context["map_index_template"] = f"{ti.map_index} {pub_name}"
         ##
         result = a.processftp_dirs(pub_dir)
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
             app.logger.info(f"Finished processing {pub_dir}")
-            return publisher_id, result['resp_ids'], routing_id
+            return publisher_id, result['resp_ids'], routing_id, pub_name
         else:
+            for message in donot_rerun_processftp_dirs:
+                if message in result["erlog"]:
+                    app.logger.error(f"Processftp_dirs failed with message : {result['erlog']}")
+                    raise AirflowFailException(f"Failed to process {pub_dir}. Will not rerun this task")
             raise AirflowException(f"Failed to process {pub_dir}. {result['message']}")
 
     @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}",
@@ -158,16 +170,17 @@ def move_from_server():
         publisher_id = pub_tuple[0]
         unrouted_id = pub_tuple[1]
         routing_id = pub_tuple[2]
+        pub_name = pub_tuple[3]
         app.logger.debug(
             f"Starting check unrouted. Publisher: {publisher_id}. Unrouted id: {unrouted_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        context["map_index_template"] = f"{ti.map_index} {unrouted_id}"
+        context["map_index_template"] = f"{ti.map_index} {pub_name} {unrouted_id}"
         result = a.checkunrouted(unrouted_id)
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
             app.logger.info(f"Finished processing {unrouted_id}")
-            return publisher_id, routing_id
+            return publisher_id, routing_id, pub_name
         else:
             raise AirflowException(f"Failed to process {unrouted_id}. {result['message']}")
 
@@ -179,11 +192,12 @@ def move_from_server():
         ti = context['ti']  # TaskInstance
         publisher_id = pub_tuple[0]
         routing_id = pub_tuple[1]
+        pub_name = pub_tuple[2]
         app.logger.debug(
             f"Starting clean_temp_files. Publisher: {publisher_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        context["map_index_template"] = f"{ti.map_index} {routing_id}"
+        context["map_index_template"] = f"{ti.map_index} {pub_name} {routing_id}"
         result = a.clean_temp_files()
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
