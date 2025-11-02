@@ -25,7 +25,7 @@ def get_log_url(context):
     return log_url
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
-     schedule=None, schedule_interval="@hourly",
+     schedule=None, schedule_interval=app.config.get("AIRFLOW_ROUTING_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
      catchup=False,
      tags=["teamCottageLabs", "jper_scheduler"])
