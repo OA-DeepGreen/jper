@@ -989,7 +989,7 @@ class RoutingHistoryDAO(dao.ESDAO):
         if status == "failure":
             query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
         elif status == "success":
-            query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": status}}]
+            query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
         if notification_id:
             del query['query']['bool']['filter']
             query['query']['bool']["must"].append({"match": {"workflow_states.notification_id.exact": notification_id}})
