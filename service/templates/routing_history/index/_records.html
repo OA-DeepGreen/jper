@@ -20,9 +20,16 @@
                 <a href="/account/{{ record['publisher_id'] }}">
                   {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
               {% endif %}
-              {% for nid in notification_ids[record['id']] %}
-                Notification: <a href="/api/v1/notification/{{ nid }}">{{ nid }}</a><br/>
-              {% endfor %}
+              <dl class="dl-details">
+                <dt>File:</dt>
+                <dd>{{ rec.original_file_location }}</dd>
+                {% if notification_ids %}
+                  <dt>Notification:</dt>
+                  {% for nid in notification_ids[record['id']] %}
+                    <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
+                  {% endfor %}
+                {% endif %}
+              </dl>
           </td>
           <td>{{ record['last_updated'] | safe }}</td>
           <td><dl>
