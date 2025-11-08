@@ -37,7 +37,7 @@ class PublisherFiles:
             # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.save()
-        self.__log_routing_history__()
+        # self.__log_routing_history__()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
