@@ -33,13 +33,11 @@ class PublisherFiles:
         else:
             self.routing_history.id = routing_id
             self.routing_history.publisher_id = self.id
-            if publisher and publisher.get('email', None):
-                self.routing_history.publisher_email = publisher['email']
+            self.routing_history.publisher_email = self.publisher_email
             # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
-        print("__init_routing_id publisher email :", publisher["email"])
         self.routing_history.save()
-        # self.__log_routing_history__()
+        self.__log_routing_history__()
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
@@ -114,6 +112,7 @@ class PublisherFiles:
         if not publisher:
             publisher = models.Account().pull(self.id, wrap=False)
         app.logger.info(f"Publisher email : {publisher['email']}")
+        self.publisher_email = publisher['email']
         server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():
             self.sftp_server = server
