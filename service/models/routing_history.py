@@ -20,6 +20,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "last_updated" : "<date this record was last updated>",
             "publisher_id" : "<publisher id>",
             "publisher_email" : "<publisher email>",
+            "doi" : "<doi>",
             "sftp_server_url" : "<sftp_server>",
             "sftp_server_port" : "<sftp_server_port>",
             "sftp_username" : "<sftp_username>",
@@ -61,6 +62,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "last_updated": {"coerce": "utcdatetime"},
                 "publisher_id": {"coerce": "unicode"},
                 "publisher_email": {"coerce": "unicode"},
+                "doi": {"coerce": "unicode"},
                 "sftp_server_url": {"coerce": "unicode"},
                 "sftp_server_port": {"coerce": "unicode"},
                 "sftp_username": {"coerce": "unicode"},
@@ -137,6 +139,25 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         :return: account email
         """
         self._set_single("publisher_email", val, coerce=dataobj.to_unicode())
+
+    @property
+    def doi(self):
+        """
+        The doi of the notification
+
+        :return: doi
+        """
+        return self._get_single("doi", coerce=dataobj.to_unicode())
+
+    @doi.setter
+    def doi(self, val):
+        """
+        Set the notification doi
+
+        :param val: doi
+        :return: doi
+        """
+        self._set_single("doi", val, coerce=dataobj.to_unicode())
 
     @property
     def sftp_server_url(self):
