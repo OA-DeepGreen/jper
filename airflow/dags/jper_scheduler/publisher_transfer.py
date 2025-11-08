@@ -588,7 +588,7 @@ class PublisherFiles:
                 if i["type"] == "doi":
                     self.routing_history.doi = i["id"]
 
-        if res:
+            if res:
                 if len(notification_obj.repositories) > 0:
                     app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
                     request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
