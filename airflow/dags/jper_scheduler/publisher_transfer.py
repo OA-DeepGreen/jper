@@ -37,6 +37,7 @@ class PublisherFiles:
                 self.routing_history.publisher_email = publisher['email']
             # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
+        print("__init_routing_id publisher email :", publisher["email"])
         self.routing_history.save()
         # self.__log_routing_history__()
 
@@ -112,6 +113,7 @@ class PublisherFiles:
         self.id = publisher_id
         if not publisher:
             publisher = models.Account().pull(self.id, wrap=False)
+        app.logger.info(f"Publisher email : {publisher['email']}")
         server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():
             self.sftp_server = server
@@ -555,7 +557,7 @@ class PublisherFiles:
             "message": "Processing complete",
             "status": final_status,
             "erlog": erlog
-     }
+        }
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
@@ -582,8 +584,11 @@ class PublisherFiles:
 
             # This is now a routed notification. I need the repositories matched.
             notification_obj = models.RoutedNotification.pull(uid)
+            for i in notification_obj.identifiers:
+                if i["type"] == "doi":
+                    self.routing_history.doi = i["id"]
 
-            if res:
+        if res:
                 if len(notification_obj.repositories) > 0:
                     app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
                     request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
