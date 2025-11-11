@@ -141,7 +141,7 @@ def pkgformat(src):
                         if "//NLM//DTD Journal " in line:
                             pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
                             break
-                        elif "//NLM//DTD JATS " in line:
+                        elif "//NLM//DTD JATS " in line or "jats.nlm.nih.gov" in line:
                             pkg_fmt = "https://datahub.deepgreen.org/FilesAndJATS"
                             break
                         elif "//RSC//DTD RSC " in line:

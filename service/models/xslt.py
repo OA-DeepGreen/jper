@@ -789,7 +789,12 @@ class XSLT(object):
                             <mods:namePart type="given"><xsl:value-of select=".//given-names"/></mods:namePart>
                           </xsl:if>
                           <mods:role>
-                              <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
+                            <mods:roleTerm type="text">
+                                <xsl:choose>
+                                    <xsl:when test="@corresp='yes' or .//xref[@ref-type='corresp']">corresponding author</xsl:when>
+                                    <xsl:otherwise><xsl:value-of select="@contrib-type"/></xsl:otherwise>
+                                </xsl:choose>
+                            </mods:roleTerm>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
                           <xsl:for-each select="./contrib-id">
@@ -838,11 +843,27 @@ class XSLT(object):
                           </xsl:if>
 
                           <!-- if the current contrib element contains the affiliation itself, without any rids: -->
-                          <xsl:if test=".//aff">
-                              <mods:affiliation>
-                                  <xsl:value-of select="normalize-space(.//aff)"/>
-                              </mods:affiliation>
-                          </xsl:if>
+                          <xsl:choose>
+                            <xsl:when test=".//aff">
+                                <mods:affiliation>
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select=".//aff"/>
+                                      <xsl:with-param name="combined_string" select="''"/>
+                                      <xsl:with-param name="current_position" select="1"/>
+                                    </xsl:call-template>
+                                </mods:affiliation>
+                            </xsl:when>
+                            <!-- if nothing has worked so far, take whatever aff element can be found in the whole document -->
+                            <xsl:when test="not(xref[@ref-type='aff']) and not(@rid) and //aff">
+                                <mods:affiliation>
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select="//aff"/>
+                                      <xsl:with-param name="combined_string" select="''"/>
+                                      <xsl:with-param name="current_position" select="1"/>
+                                    </xsl:call-template>
+                                </mods:affiliation>
+                            </xsl:when>
+                            </xsl:choose>
                       </mods:name>
                     </xsl:when>
 
