@@ -15,12 +15,13 @@
                     <th>ID</th>
                     <th>User Name</th>
                     <th>Account type</th>
-                    <th>Sword status</th>
+                    <th>Status</th>
                     <th>Manage</th>
                 </tr>
             </thead>
 
             <tbody>
+
             {% for user in users %}
                 <tr>
                     {# column: id #}
@@ -54,8 +55,8 @@
                        <td>Unknown</td>
                     {%  endif %}
                     {# column: sword status #}
-                    {% if user['id'] in sword_status %}
-                        <td>{{ sword_status[user['id']] }}</td>
+                    {% if user['status'] %}
+                        <td>{{ user['status'] }}</td>
                     {%  elif 'repository' in user['role'] %}
                         <td>-</td>
                     {%  elif 'publisher' in user['role'] %}

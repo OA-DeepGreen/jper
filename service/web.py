@@ -71,9 +71,6 @@ def index():
 from service.views.webapi import blueprint as webapi
 app.register_blueprint(webapi, url_prefix="/api/v1")
 
-from service.views.harvester import harvester
-app.register_blueprint(harvester, url_prefix="/harvester")
-
 from service.views.about import blueprint as about
 app.register_blueprint(about, url_prefix="/about")
 
