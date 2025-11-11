@@ -3,7 +3,7 @@
 # (i.e. target this file with the -r switch on pip).
 
 # install esprit
-git+https://github.com/OA-DeepGreen/esprit.git@d04bac9e0b22305b19831cd5d1d72c6ac23f5d22#egg=esprit
+git+https://github.com/OA-DeepGreen/esprit.git@ebead66bd64ff24172bd8aaccb9247576c45949c#egg=esprit
 
 # install octopus (initialise the submodule first)
 -e magnificent-octopus
