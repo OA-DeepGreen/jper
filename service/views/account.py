@@ -335,12 +335,13 @@ def index():
         user = {
             'id': u.get('_source', {}).get('id', ''),
             'email': u.get('_source', {}).get('email', ''),
-            'role': u.get('_source', {}).get('role', [])
+            'role': u.get('_source', {}).get('role', []),
+            'status' : ''
         }
-        if 'publisher' in user['role']:
-            user['status'] = u.get('_source', {}).get('publisher', {}).get('routing_status', '')
-        elif user['id'] in sword_status:
-            user['status'] = sword_status[user['id']]
+        if user["id"] in sword_status:
+            user["status"] = sword_status[user["id"]]
+        if "publisher" in user["role"]:
+            user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
         users.append(user)
     return render_template('account/users.html', users=users)
 
@@ -795,7 +796,7 @@ def apikey(username):
         abort(401)
     acc = models.Account.pull(username)
     try:
-        acc.api_key = str(uuid.uuid4())
+        acc.api_key = uuid.uuid4().hex
         acc.save()
         flash('Thank you. Your API key has been updated.', "success")
     except Exception as e:
@@ -1155,7 +1156,7 @@ def register():
         vals = request.values.to_dict()
         role = vals.get('radio', None)
         if not vals.get('id', None):
-            vals['id'] = str(uuid.uuid4())
+            vals['id'] = uuid.uuid4().hex
         account = models.Account()
         try:
             account.add_account(vals)
