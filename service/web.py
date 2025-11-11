@@ -102,6 +102,9 @@ app.register_blueprint(manage_license.blueprint, url_prefix="/manage_license")
 from service.views import test_xml
 app.register_blueprint(test_xml.blueprint, url_prefix="/test_xml")
 
+from service.views import routing_history
+app.register_blueprint(routing_history.blueprint, url_prefix="/routing_history")
+
 # this allows us to override the standard static file handling with our own dynamic version
 @app.route("/static/<path:filename>")
 def static(filename):

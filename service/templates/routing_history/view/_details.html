@@ -1,0 +1,32 @@
+<div class="row line-space">
+  <div class="col span-12">
+    <dl class="dl-details">
+      <dt>Date created:</dt>
+      <dd>{{ rec.created_date }}</dd>
+      <dt>Last updated:</dt>
+      <dd>{{ rec.last_updated }}</dd>
+      <dt>Publisher Id:</dt>
+      <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_id | safe }}</a></dd>
+      <dt>Notification ID:</dt>
+      {% for nid in rec.notification_ids %}
+        <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
+      {% endfor %}
+    </dl>
+  </div>
+</div>
+<div class="row">
+  <div class="span col-12" id="container">
+    <!-- Sftp details -->
+    {% with rec=rec, id='sftp_details', title='SFTP details' %}
+      {% include "routing_history/view/_sftp_details.html" %}
+    {% endwith %}
+    <!-- file locations -->
+    {% with rec=rec, id='file_locations', title='File locations' %}
+      {% include "routing_history/view/_file_locations.html" %}
+    {% endwith %}
+    <!-- Workflow details -->
+    {% with rec=rec, id='workflow', title='Workflow' %}
+      {% include "routing_history/view/_workflow.html" %}
+    {% endwith %}
+  </div>
+</div>

@@ -1,0 +1,15 @@
+<button class="accordion">{{ title }}</button>
+<div class="panel">
+  <div id="{{ id }}">
+    <dl class="dl-details">
+      <dt>Starting file location:</dt>
+      <dd>{{ rec.original_file_location }}</dd>
+      {% for fl in rec.final_file_locations %}
+        {% if fl.get('file_location', '') %}
+          <dt>{{ fl.get('location_type', 'Location') }}</dt>
+          <dd>{{ fl['file_location'] }}</dd>
+        {% endif %}
+      {% endfor %}
+    </dl>
+  </div>
+</div>

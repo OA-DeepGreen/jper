@@ -16,6 +16,7 @@ from service.lib.validation_helper import validate_date, validate_page, validate
 import math
 import csv
 import sys
+import os
 from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
@@ -339,7 +340,7 @@ def index():
         }
         if user["id"] in sword_status:
             user["status"] = sword_status[user["id"]]
-        elif "publisher" in user["role"]:
+        if "publisher" in user["role"]:
             user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
         users.append(user)
     return render_template('account/users.html', users=users)
@@ -640,9 +641,14 @@ def username(username):
         sword_status = None
 
     ssh_help_text = """Begins with 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'ssh-ed25519', 'sk-ecdsa-sha2-nistp256@openssh.com', or 'sk-ssh-ed25519@openssh.com'"""
+    ssh_key_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+    dg_public_key = ''
+    if os.path.isfile(ssh_key_file):
+        with open(ssh_key_file) as f:
+            dg_public_key = f.read()
     deepgreen_ssh_key = {
         "title": "Deepgreen service",
-        "public_key": app.config.get("DEEPGREEN_SSH_PUBLIC_KEY", ''),
+        "public_key": dg_public_key,
     }
     default_sftp_server = {
         'url':  app.config.get("DEFAULT_SFTP_SERVER_URL", ''),

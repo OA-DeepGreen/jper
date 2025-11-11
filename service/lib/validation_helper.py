@@ -1,7 +1,7 @@
+import json
 from flask import request, make_response
 from octopus.lib import dates
 from octopus.core import app
-
 
 def validate_date(dt, param='since'):
     if dt is None or dt == "":

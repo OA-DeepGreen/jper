@@ -15,7 +15,7 @@
                     <th>ID</th>
                     <th>User Name</th>
                     <th>Account type</th>
-                    <th>Status</th>
+                    <th>Routing status</th>
                     <th>Manage</th>
                 </tr>
             </thead>
@@ -54,8 +54,7 @@
                     {% else %}
                        <td>Unknown</td>
                     {%  endif %}
-                    {# column: sword status #}
-                    {% if user['status'] %}
+                    {% if user.get('status', '') %}
                         <td>{{ user['status'] }}</td>
                     {%  elif 'repository' in user['role'] %}
                         <td>-</td>

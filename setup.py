@@ -19,7 +19,7 @@ setup(
         "Flask-WTF~=1.2",
         "nose~=1.3",
         "Flask-Mail~=0.10",
-        "Flask-Babel~=4.0",
+        # "Flask-Babel~=4.0",
         "python-dateutil~=2.9",
         "unidecode~=1.3",
         "schedule~=1.2",
@@ -27,7 +27,11 @@ setup(
         "unicodecsv~=0.14",
         "Jinja2~=3.1",
         "esprit",
-        "octopus"
+        "octopus",
+        "apache-airflow~=2.10",
+        "psycopg2-binary>=2.9",
+        "paramiko>=3.5",
+        "graphviz"
     ],
     url='http://cottagelabs.com/',
     author='Cottage Labs',

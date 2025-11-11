@@ -1,0 +1,11 @@
+{% if num_pages > 1 %}
+<div class="row">
+    <div class="col span-9">
+        {% from "harvester/helpers/pagination.html" import render_pagination %}
+        {{ render_pagination(num_pages,page,link) }}
+    </div>
+    <div class="col span-3">
+        <div class="per-page">Per page: {{page_size}}</div>
+    </div>
+</div>
+{% endif %}

@@ -12,5 +12,7 @@ local.cfg
 .idea/
 service/tests/resources/report_test*.csv
 logfile.log
-
+airflow/airflow-webserver.pid
+airflow/airflow_logs/*
+!airflow/airflow_logs/.keep
 

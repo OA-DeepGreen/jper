@@ -1,0 +1,56 @@
+{%  if total > 0 %}
+<div class="row line-space">
+  <div class="col span-12">
+    <table id="routingHistoryTable" class="tablesorter-green">
+      <thead>
+        <tr>
+          <th>Ids</th>
+          <th class="sorter-iso8601date">Date Updated</th>
+          <th>Workflow</th>
+        </tr>
+      </thead>
+      {% for data in records['hits']['hits'] %}
+        {% set record = data['_source'] %}
+        {#  First row of results is header. So getting notifications from 2nd row #}
+        {#  First column is id #}
+        <tr class="tablesorter">
+          <td>
+              <a href="/routing_history/view/{{ record['id'] }}">record</a><br/>
+              {% if publisher_id == None %}
+                <a href="/account/{{ record['publisher_id'] }}">
+                  {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
+              {% endif %}
+              <dl class="dl-details">
+                <dt>File:</dt>
+
+                <dd>{{ record.get('original_file_location', '').split('xfer/')[-1] }}</dd>
+                {% if notification_ids[record['id']]|length > 0 %}
+                  <dt>Notification:</dt>
+                  {% for nid in notification_ids[record['id']] %}
+                    <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
+                  {% endfor %}
+                {% endif %}
+              </dl>
+          </td>
+          <td>{{ record['last_updated'] | safe }}</td>
+          <td><dl>
+            {% for workflow in record['workflow_states'] %}
+              <div>
+                {% if workflow['status'] == 'success' %}
+                  <span style="color:green">{{"&check;" | safe }}</span>
+                {% else %}
+                  <span style="color:red">x</span>
+                {% endif %}
+                {{ workflow['action'] }}
+                {%  if workflow.get('log_url', '') %}
+                  <a href="{{ workflow['log_url'] }}"> (log)</a>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </dl></td>
+          </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}

@@ -11,11 +11,22 @@ def request_deposit(notification_ids, repo_account_id):
             rec.account_id = repo_account_id
             rec.notification_id = n_id
             rec.status = 'queued'
+            rec.request_type = 'user'
             rec.save()
             count += 1
         else:
             duplicate += 1
     return count, duplicate
+
+def request_deposit_for_notification(notification_id, acc_ids):
+    for acc_id in acc_ids:
+        rec = models.RequestNotification()
+        rec.account_id = acc_id
+        rec.notification_id = notification_id
+        rec.status = 'queued'
+        rec.request_type = 'machine'
+        rec.save()
+    return
 
 def request_deposit_for_csv(repo_account_id, notification_csv_file):
     if not os.path.isfile(notification_csv_file):
