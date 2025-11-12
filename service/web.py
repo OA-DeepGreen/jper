@@ -41,8 +41,6 @@ from flask import render_template
 from octopus.lib.webapp import custom_static
 
 from service import models
-app.config.update(SESSION_COOKIE_NAME='jper_session_cookie', SESSION_COOKIE_PATH='/JPER/')
-
 
 @app.login_manager.user_loader
 def load_account_for_login_manager(userid):
