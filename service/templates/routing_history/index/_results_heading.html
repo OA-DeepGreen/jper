@@ -1,0 +1,15 @@
+<div class="row line-space">
+  <h2>Displaying Routing history logs</h2>
+</div>
+{#% include 'routing_history/index/_seslected_filter.html' %#}
+<div class="row line-space">
+  <div class="col span-9">
+    {% if total > 9999 %}
+      {% set msg="( only the latest 10000 routing history logs are displayed )" %}
+    {%  else %}
+      {% set msg="" %}
+    {% endif %}
+    <b>Total number of routing history logs: {{total}}</b><br/>
+    {{ msg }}
+  </div>
+</div>

@@ -673,11 +673,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         :return: The ftp_server information as a python dict object
         """
         sftp_server = self._get_single("sftp_server")
-        if not sftp_server['username']:
+        if not sftp_server:
+            sftp_server = {}
+        if not sftp_server.get('username', ''):
             sftp_server['username'] = self.id
-        if not sftp_server['url']:
+        if not sftp_server.get('url', ''):
             sftp_server['url'] = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        if not sftp_server['port']:
+        if not sftp_server.get('port', ''):
             sftp_server['port'] = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
         return sftp_server
 
@@ -776,7 +778,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
             raise dataobj.DataSchemaException("SSH public key is missing")
         current_date = dates.format(datetime.now())
         vals = {
-            'id': str(uuid.uuid4()),
+            'id': uuid.uuid4().hex,
             'title': title,
             'public_key': public_key,
             'status': 'new',
@@ -955,6 +957,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         return _extract_bibids(ans)
 
     @classmethod
+    def pull_all_publishers(cls, only_names=True):
+        ans = cls.pull_all_by_key("role.exact", "publisher", return_as_object=False)
+        if only_names:
+            return _extract_names(ans)
+        return ans
+
+    @classmethod
     def pull_all_subject_repositories(cls):
         size = 1000
         q = {
@@ -1070,6 +1079,31 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         ans = cls.pull_all(q, size=size, return_as_object=False)
         return _extract_bibids(ans)
 
+    @classmethod
+    def pull_all_active_publishers(cls):
+        size = 1000
+        q = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "role": "publisher"
+                            }
+                        },
+                        {
+                            "match": {
+                                "publisher.routing_status": "active"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": size,
+            "from": 0
+        }
+        ans = cls.pull_all(q, size=size, return_as_object=False)
+        return ans
 
     @classmethod
     def pull_all_by_email(cls,email):
@@ -1100,7 +1134,7 @@ def _coerce_account_hash(account_hash):
         account_hash = account_hash.to_dict()
     # set api_key if missing
     if not account_hash.get('api_key', None):
-        account_hash['api_key'] = str(uuid.uuid4())
+        account_hash['api_key'] = uuid.uuid4().hex
     # nested properties
     nested_properties = {
         'repository': ['repository_name', 'repository_software', 'repository_url', 'repository_bibid', 'repository_sigel'],
@@ -1143,3 +1177,12 @@ def _extract_bibids(ans):
         if bibid:
             bibids[bibid] = rec['id']
     return bibids
+
+
+def _extract_names(ans):
+    names = {}
+    for rec in ans:
+        email = rec.get('email', '')
+        if email:
+            names[rec['id']] = email
+    return names

@@ -42,7 +42,6 @@ from octopus.lib.webapp import custom_static
 
 from service import models
 
-
 @app.login_manager.user_loader
 def load_account_for_login_manager(userid):
     """
@@ -70,9 +69,6 @@ def index():
 
 from service.views.webapi import blueprint as webapi
 app.register_blueprint(webapi, url_prefix="/api/v1")
-
-from service.views.harvester import harvester
-app.register_blueprint(harvester, url_prefix="/harvester")
 
 from service.views.about import blueprint as about
 app.register_blueprint(about, url_prefix="/about")
@@ -104,6 +100,9 @@ app.register_blueprint(manage_license.blueprint, url_prefix="/manage_license")
 
 from service.views import test_xml
 app.register_blueprint(test_xml.blueprint, url_prefix="/test_xml")
+
+from service.views import routing_history
+app.register_blueprint(routing_history.blueprint, url_prefix="/routing_history")
 
 # this allows us to override the standard static file handling with our own dynamic version
 @app.route("/static/<path:filename>")

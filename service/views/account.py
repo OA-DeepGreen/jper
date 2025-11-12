@@ -16,6 +16,7 @@ from service.lib.validation_helper import validate_date, validate_page, validate
 import math
 import csv
 import sys
+import os
 from jsonpath_rw_ext import parse
 from itertools import zip_longest
 from service import models
@@ -324,20 +325,25 @@ def restrict():
 def index():
     if not current_user.is_super:
         abort(401)
-    users = []
-    for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
-        user = {
-            'id': u.get('_source', {}).get('id', ''),
-            'email': u.get('_source', {}).get('email', ''),
-            'role': u.get('_source', {}).get('role', [])
-        }
-        users.append(user)
     sword_status = {}
     for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
         acc_id = s.get('_source', {}).get('id')
         if acc_id:
             sword_status[acc_id] = s.get('_source', {}).get('status', '')
-    return render_template('account/users.html', users=users, sword_status=sword_status)
+    users = []
+    for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
+        user = {
+            'id': u.get('_source', {}).get('id', ''),
+            'email': u.get('_source', {}).get('email', ''),
+            'role': u.get('_source', {}).get('role', []),
+            'status' : ''
+        }
+        if user["id"] in sword_status:
+            user["status"] = sword_status[user["id"]]
+        if "publisher" in user["role"]:
+            user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
+        users.append(user)
+    return render_template('account/users.html', users=users)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)
@@ -393,7 +399,7 @@ def download(account_id):
     mem.seek(0)
     strm.close()
     fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=account_id, x=dates.now())
-    return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+    return send_file(mem, as_attachment=True, download_name=fname, mimetype='text/csv')
 
 @blueprint.route('/details/<repo_id>', methods=["GET", "POST"])
 def details(repo_id):
@@ -635,9 +641,14 @@ def username(username):
         sword_status = None
 
     ssh_help_text = """Begins with 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'ssh-ed25519', 'sk-ecdsa-sha2-nistp256@openssh.com', or 'sk-ssh-ed25519@openssh.com'"""
+    ssh_key_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
+    dg_public_key = ''
+    if os.path.isfile(ssh_key_file):
+        with open(ssh_key_file) as f:
+            dg_public_key = f.read()
     deepgreen_ssh_key = {
         "title": "Deepgreen service",
-        "public_key": app.config.get("DEEPGREEN_SSH_PUBLIC_KEY", ''),
+        "public_key": dg_public_key,
     }
     default_sftp_server = {
         'url':  app.config.get("DEFAULT_SFTP_SERVER_URL", ''),
@@ -785,7 +796,7 @@ def apikey(username):
         abort(401)
     acc = models.Account.pull(username)
     try:
-        acc.api_key = str(uuid.uuid4())
+        acc.api_key = uuid.uuid4().hex
         acc.save()
         flash('Thank you. Your API key has been updated.', "success")
     except Exception as e:
@@ -823,7 +834,7 @@ def config(username):
         mem.seek(0)
         strm.close()
         fname = "{z}_{y}_{x}.csv".format(z=fprefix, y=username, x=dates.now())
-        return send_file(mem, as_attachment=True, attachment_filename=fname, mimetype='text/csv')
+        return send_file(mem, as_attachment=True, download_name=fname, mimetype='text/csv')
 
     elif request.method == "POST":
         try:
@@ -1139,12 +1150,13 @@ def register():
         abort(401)
 
     form = AdduserForm(request.form)
-    vals = request.json if request.json else request.values.to_dict()
+    vals = None
 
     if request.method == 'POST' and form.validate():
+        vals = request.values.to_dict()
         role = vals.get('radio', None)
         if not vals.get('id', None):
-            vals['id'] = str(uuid.uuid4())
+            vals['id'] = uuid.uuid4().hex
         account = models.Account()
         try:
             account.add_account(vals)

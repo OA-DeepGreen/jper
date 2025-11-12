@@ -952,3 +952,72 @@ class LicenseManagementDAO(dao.ESDAO):
             "sort": [{"last_updated": {"order": "desc"}}]
         }
         return cls.pull_all(q, size=1000, return_as_object=False)
+
+
+class RoutingHistoryDAO(dao.ESDAO):
+    """
+    DAO for RoutingHistoryDAO
+    """
+    __type__ = "routing_history"
+
+    @classmethod
+    def pull_records(cls, since, upto, page, page_size, publisher_id=None,
+                     publisher_email=None, doi=None, notification_id=None, status=None):
+        query = {
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "last_updated": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
+                    },
+                    "must": []
+                }
+            },
+            "sort": [{"last_updated": {"order": "desc"}}],
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
+
+        if publisher_id:
+            query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
+        if publisher_email:
+            query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
+        if status == "failure":
+            query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
+        elif status == "success":
+            query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+        if notification_id:
+            del query['query']['bool']['filter']
+            query['query']['bool']["must"].append({"match": {"workflow_states.notification_id.exact": notification_id}})
+        if doi:
+            del query['query']['bool']['filter']
+            query['query']['bool']["must"].append({"match": {"original_file_location": doi}})
+        ans = cls.query(q=query)
+        return ans
+
+    @classmethod
+    def pull_record_for_notification(cls, nid):
+        query = {
+            "query": {
+                "nested": {
+                    "path": "workflow_states",
+                    "query": {
+                        "bool": {
+                            "must": [{
+                                "match": {
+                                    "workflow_states.notification_id.exact": nid
+                                }
+                            }]
+                        }
+                    }
+                }
+            }
+        }
+        ans = cls.object_query(q=query)
+        if len(ans) == 1:
+            return ans[0]
+        return None

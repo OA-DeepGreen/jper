@@ -898,8 +898,10 @@ def _is_article_license_gold(metadata, provider_id):
         app.logger.debug(" -- license typ: {x}".format(x=license_typ))
         app.logger.debug(" -- license url: {x}".format(x=license_url))
         provider = models.Account.pull(provider_id)
+        if not provider:
+            return False
         gold_license = []
-        if provider.license and provider.license.get('gold_license', []):
+        if provider and provider.license and provider.license.get('gold_license', []):
             gold_license = provider.license.get('gold_license')
         if license_typ in gold_license or license_url in gold_license:
             app.logger.debug(" -- license is gold")
@@ -909,8 +911,9 @@ def _is_article_license_gold(metadata, provider_id):
 
 
 def _select_active_participant_bibids(issn_data, publ_year, doi, gold_article_license, bibids, subject_repo_bibids):
-    app.logger.debug("Staring get all matching license")
+    app.logger.debug("Starting get all matching license")
     part_bibids = {}
+    al_repos = []
     for issn in issn_data:
         lics = models.License.pull_all_by_status_and_issn('active', issn)
         if lics is None:
@@ -951,12 +954,9 @@ def _select_active_participant_bibids(issn_data, publ_year, doi, gold_article_li
         # 2019-06-03 TD : yet a level more to differentiate between active and passive
         #                 accounts. A new requirement, at a /very/ early stage... gosh.
         app.logger.debug("Starting get active repositories for all matched license")
-        al_repos = []
-
         for bibid, lic_data in part_bibids.items():
-            if bibid is None:
-                continue
-            al_repos.append((bibids[bibid], lic_data, bibid))
+            if bibid and bibid in bibids:
+                al_repos.append((bibids[bibid], lic_data, bibid))
         # 2016-09-08 TD : end of checking alliance (and probably other!) license legitimation(s)
     return al_repos
 
