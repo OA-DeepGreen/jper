@@ -583,16 +583,20 @@ class PublisherFiles:
 
             # This is now a routed notification. I need the repositories matched.
             notification_obj = models.RoutedNotification.pull(uid)
-            for i in notification_obj.identifiers:
-                if i["type"] == "doi":
-                    self.routing_history.doi = i["id"]
+            if notification_obj:
+                for i in notification_obj.identifiers:
+                    if i["type"] == "doi":
+                        self.routing_history.doi = i["id"]
 
             if res:
-                if len(notification_obj.repositories) > 0:
-                    app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
-                    request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
+                if notification_obj:
+                    if len(notification_obj.repositories) > 0:
+                        app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
+                        request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
+                    else:
+                        app.logger.debug(f"There were no repositories to deposit to for notification {notification_obj.id}")
                 else:
-                    app.logger.debug(f"There were no repositories to deposit to for notification {notification_obj.id}")
+                    app.logger.debug(f"There were no repositories to deposit to for notification {uid}")
                 app.logger.info(message)
                 self.routing_history.add_notification_state("success", uid)
                 if self.delete_routed:
