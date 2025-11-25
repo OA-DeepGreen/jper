@@ -137,7 +137,7 @@ def _route(unrouted):
         if routing_reason == "n/a":
             routing_reason = "No match in qualified repositories."
         # log the failure
-        app.logger.error("Routing - Notification:{y} was not routed".format(y=unrouted.id))
+        app.logger.info("Routing - Notification:{y} was not routed".format(y=unrouted.id))
         _notify_failure(unrouted, routing_reason, issn_data, metadata, '')
         return False
 
