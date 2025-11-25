@@ -174,7 +174,12 @@ def move_from_server():
             f"Starting check unrouted. Publisher: {publisher_id}. Unrouted id: {unrouted_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        context["map_index_template"] = f"{ti.map_index} {pub_name} {unrouted_id}"
+        if len(unrouted_id) > 2:
+            unrouted_len = len(unrouted_id)
+            context["map_index_template"] = f"{ti.map_index} {pub_name} - {unrouted_len} notifications"
+        else:
+            context["map_index_template"] = f"{ti.map_index} {pub_name} {unrouted_id}"
+
         result = a.checkunrouted(unrouted_id)
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
