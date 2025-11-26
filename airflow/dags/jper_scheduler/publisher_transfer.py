@@ -2,6 +2,7 @@ import os, stat, uuid, shutil, json, requests
 from pathlib import Path
 from datetime import datetime
 import paramiko
+import logging
 from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
@@ -15,6 +16,7 @@ from octopus.modules.store import store
 
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
+        logging.getLogger("paramiko").setLevel(logging.WARNING)
         self.__init_constants__()  # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
