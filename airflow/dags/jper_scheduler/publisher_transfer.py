@@ -14,6 +14,8 @@ from service.models.routing_history import RoutingHistory
 
 from octopus.modules.store import store
 
+maxFiles_per_publisher_run = 150
+
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
         logging.getLogger("paramiko").setLevel(logging.WARNING)
@@ -246,6 +248,8 @@ class PublisherFiles:
                 folders.append(r_obj)
             else:
                 self.file_list_publisher.append(r_obj)
+                if len(self.file_list_publisher) > maxFiles_per_publisher_run:
+                    break
         # Recursive call for the folders
         for folder in folders:
             self.list_remote_dir(folder)
