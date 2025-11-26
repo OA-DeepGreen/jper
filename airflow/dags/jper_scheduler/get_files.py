@@ -2,6 +2,7 @@
 import uuid, time, datetime
 from octopus.core import app
 from datetime import timedelta
+from urllib.parse import urlparse
 
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
@@ -21,8 +22,10 @@ def get_log_url(context):
         if not 'base_date' in q:
             query_params_filtered.append(q)
     log_url = "&".join(query_params_filtered)
-    app.logger.info(f"Log for this job : {log_url}")
-    return log_url
+    parsed_url = urlparse(log_url)
+    new_path = f"{parsed_url.path}?{parsed_url.query}" 
+    app.logger.info(f"Log for this job : {new_path}")
+    return new_path
 
 def set_task_name(map_index, task_str):
     task_name = f"{map_index} {task_str}"
