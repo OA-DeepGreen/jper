@@ -60,7 +60,7 @@ def move_from_server():
                 number_of_files += 1
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
-            app.logger.info(f"Found {number_of_files} files for publisher {publisher}")
+            app.logger.info(f"Found {number_of_files} file(s)")
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
         return files_list  # This is visible in the xcom tab
 
