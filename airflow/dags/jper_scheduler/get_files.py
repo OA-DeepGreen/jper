@@ -11,6 +11,7 @@ from airflow.exceptions import AirflowException, AirflowFailException, AirflowTa
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from jper_scheduler.publisher_transfer import PublisherFiles
+from airflow.utils.session import provide_session
 
 donot_rerun_processftp_dirs = [
     "No handler for package format unknown"
@@ -43,8 +44,8 @@ def set_task_name(map_index, task_str):
      tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
     @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
-    def get_file_list():
-        context = get_current_context()
+    @provide_session
+    def get_file_list(session=None, **context):
         log_url = get_log_url(context)
         app.logger.debug("Starting get list of files")
         # Get File list
@@ -64,6 +65,10 @@ def move_from_server():
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
+        if len(files_list) == 0:
+            dag_run = session.merge(context['dag_run'])
+            dag_run.note = "Empty run"
+            session.commit()
         return files_list  # This is visible in the xcom tab
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",
