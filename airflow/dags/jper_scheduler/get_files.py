@@ -66,6 +66,7 @@ def move_from_server():
                 files_list.append((publisher['id'], f, routing_history_id))
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
         if len(files_list) == 0:
+            app.logger.warn("Empty run")
             dag_run = session.merge(context['dag_run'])
             dag_run.note = "Empty run"
             session.commit()
