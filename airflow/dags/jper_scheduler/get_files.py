@@ -1,17 +1,15 @@
 # Python stuff
-import os
 import uuid, time, datetime
-import json, random, string # for the list of files to transfer
 from octopus.core import app
-from datetime import timedelta
 from urllib.parse import urlparse
-
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
-from jper_scheduler.publisher_transfer import PublisherFiles
 from airflow.utils.session import provide_session
+from airflow.configuration import conf
+# My code
+from jper_scheduler.publisher_transfer import PublisherFiles
 
 donot_rerun_processftp_dirs = [
     "No handler for package format unknown"
@@ -48,6 +46,7 @@ def move_from_server():
     def get_file_list(session=None, **context):
         log_url = get_log_url(context)
         app.logger.debug("Starting get list of files")
+        max_map_length = conf.getint("core", "max_map_length")
         # Get File list
         files_list = []
         a = PublisherFiles()
@@ -60,8 +59,9 @@ def move_from_server():
             b.list_remote_dir(b.remote_dir)
             app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
             for f in b.file_list_publisher:
-                if len(files_list) > 999:
-                    break # Temporary fix to avoid xcom limits
+                # The maximum number of tasks we can create is limited by max_map_length
+                if len(files_list) >= max_map_length:
+                    break
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
