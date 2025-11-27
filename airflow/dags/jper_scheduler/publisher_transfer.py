@@ -14,8 +14,6 @@ from service.models.routing_history import RoutingHistory
 
 from octopus.modules.store import store
 
-maxFiles_per_publisher_run = 150
-
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
         logging.getLogger("paramiko").setLevel(logging.WARNING)
@@ -90,6 +88,7 @@ class PublisherFiles:
         self.delete_unrouted = app.config.get("DELETE_UNROUTED", False)
         self.publishers = None
         self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        self.publisher_file_transfer_limit = app.config.get("PUBLISHER_FILE_TRANSFER_LIMIT", 150)
 
         self.apiurl = app.config['API_URL']
 
@@ -248,7 +247,7 @@ class PublisherFiles:
                 folders.append(r_obj)
             else:
                 self.file_list_publisher.append(r_obj)
-                if len(self.file_list_publisher) > maxFiles_per_publisher_run:
+                if len(self.file_list_publisher) > self.publisher_file_transfer_limit:
                     break
         # Recursive call for the folders
         for folder in folders:
