@@ -1,4 +1,5 @@
 # Python stuff
+import os
 import uuid, time, datetime
 import json, random, string # for the list of files to transfer
 from octopus.core import app
@@ -56,27 +57,22 @@ def move_from_server():
             b = PublisherFiles(publisher['id'], publisher=publisher)
             b.airflow_log_location = log_url
             b.list_remote_dir(b.remote_dir)
-            number_of_files = 0
+            app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
             for f in b.file_list_publisher:
-                number_of_files += 1
                 routing_history_id = uuid.uuid4().hex
-                files_list.append((publisher['id'], f, routing_history_id))
-            app.logger.info(f"Found {number_of_files} file(s)")
+                files_list.append({
+                    "publisher": publisher['id'],
+                    "file_name": f,
+                    "routingid": routing_history_id
+                })
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        file_name = f"{timestamp}_{random_string}.json"
-        save_list = []
-        for file in files_list:
-            pub_tuple = {}
-            pub_tuple["publisher"] = file[0]
-            pub_tuple["file_name"] = file[1]
-            pub_tuple["routingid"] = file[2]
-            save_list.append(pub_tuple)
+        file_name = f"{a.tmpdir}{timestamp}_{random_string}.json"
         with open(file_name, 'w') as f:
-            json.dump(save_list, f, indent=4)
-        return filename  # This is visible in the xcom tab
+            json.dump(files_list, f, indent=4)
+        return file_name # This is visible in the xcom tab
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
@@ -236,8 +232,7 @@ def move_from_server():
     @task_group(group_id='ProcessFileFromPublisher')
     def process_one_file(pub_tuple, **context):
         # Each of the following processes a single file, with the output of one feeding into to the next
-        local_tuple = (pub_tuple["publisher"], pub_tuple["file_name"], pub_tuple["routingid"])
-        local_tuple = get_single_file(local_tuple)
+        local_tuple = get_single_file(pub_tuple)
         local_tuple = copy_ftp(local_tuple)
         local_tuple = process_ftp(local_tuple)
         local_tuple = process_ftp_dirs(local_tuple)
@@ -247,7 +242,11 @@ def move_from_server():
     # The first call + chaining of the tasks
     json_file = get_file_list()
     with open(json_file) as file:
-        file_tuple = json.load(file)
-    process_one_file.expand(pub_tuple=file_tuple)
+        files_list = json.load(file)
+    files_tuple = []
+    for file_info in files_list:
+        files_tuple.append((file_info["publisher"], file_info["file_name"], file_info["routingid"]))
+    os.remove(json_file)
+    process_one_file.expand(pub_tuple=files_tuple)
 
 move_from_server()
