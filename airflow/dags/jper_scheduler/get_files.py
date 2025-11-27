@@ -1,15 +1,14 @@
 # Python stuff
-import os
 import uuid, time, datetime
-import json, random, string # for the list of files to transfer
 from octopus.core import app
-from datetime import timedelta
 from urllib.parse import urlparse
-
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
+from airflow.utils.session import provide_session
+from airflow.configuration import conf
+# My code
 from jper_scheduler.publisher_transfer import PublisherFiles
 
 donot_rerun_processftp_dirs = [
@@ -43,10 +42,11 @@ def set_task_name(map_index, task_str):
      tags=["teamCottageLabs", "jper_scheduler"])
 def move_from_server():
     @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
-    def get_file_list():
-        context = get_current_context()
+    @provide_session
+    def get_file_list(session=None, **context):
         log_url = get_log_url(context)
         app.logger.debug("Starting get list of files")
+        max_map_length = conf.getint("core", "max_map_length")
         # Get File list
         files_list = []
         a = PublisherFiles()
@@ -59,11 +59,17 @@ def move_from_server():
             b.list_remote_dir(b.remote_dir)
             app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
             for f in b.file_list_publisher:
-                if len(files_list) > 999:
-                    break # Temporary fix to avoid xcom limits
+                # The maximum number of tasks we can create is limited by max_map_length
+                if len(files_list) >= max_map_length:
+                    break
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
+        if len(files_list) == 0:
+            app.logger.warn("Empty run")
+            dag_run = session.merge(context['dag_run'])
+            dag_run.note = "Empty run"
+            session.commit()
         return files_list  # This is visible in the xcom tab
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",

@@ -247,7 +247,7 @@ class PublisherFiles:
                 folders.append(r_obj)
             else:
                 self.file_list_publisher.append(r_obj)
-                if len(self.file_list_publisher) > self.publisher_file_transfer_limit:
+                if len(self.file_list_publisher) >= self.publisher_file_transfer_limit:
                     break
         # Recursive call for the folders
         for folder in folders:
