@@ -59,20 +59,12 @@ def move_from_server():
             b.list_remote_dir(b.remote_dir)
             app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
             for f in b.file_list_publisher:
+                if len(files_list) > 999:
+                    break # Temporary fix to avoid xcom limits
                 routing_history_id = uuid.uuid4().hex
-                files_list.append({
-                    "publisher": publisher['id'],
-                    "file_name": f,
-                    "routingid": routing_history_id
-                })
+                files_list.append((publisher['id'], f, routing_history_id))
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
-
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        file_name = f"{a.tmpdir}{timestamp}_{random_string}.json"
-        with open(file_name, 'w') as f:
-            json.dump(files_list, f, indent=4)
-        return file_name # This is visible in the xcom tab
+        return files_list  # This is visible in the xcom tab
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
@@ -240,13 +232,7 @@ def move_from_server():
         clean_temp_files(local_tuple)
 
     # The first call + chaining of the tasks
-    json_file = get_file_list()
-    with open(json_file) as file:
-        files_list = json.load(file)
-    files_tuple = []
-    for file_info in files_list:
-        files_tuple.append((file_info["publisher"], file_info["file_name"], file_info["routingid"]))
-    os.remove(json_file)
-    process_one_file.expand(pub_tuple=files_tuple)
+    file_tuple = get_file_list()
+    process_one_file.expand(pub_tuple=file_tuple)
 
 move_from_server()
