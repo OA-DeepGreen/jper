@@ -1,7 +1,10 @@
 # Python stuff
+import os
 import uuid, time, datetime
+import json, random, string # for the list of files to transfer
 from octopus.core import app
 from datetime import timedelta
+from urllib.parse import urlparse
 
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
@@ -21,8 +24,17 @@ def get_log_url(context):
         if not 'base_date' in q:
             query_params_filtered.append(q)
     log_url = "&".join(query_params_filtered)
-    app.logger.info(f"Log for this job : {log_url}")
-    return log_url
+    parsed_url = urlparse(log_url)
+    new_path = f"{parsed_url.path}?{parsed_url.query}"
+    app.logger.info(f"Log for this job : {new_path}")
+    return new_path
+
+def set_task_name(map_index, task_str):
+    task_name = f"{map_index} {task_str}"
+    sanitised_name = task_name
+    if len(task_name) > 250:
+        sanitised_name = f"{task_name[:245]} ..."
+    return sanitised_name
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_ROUTING_SCHEDULE", 'None'),
@@ -45,12 +57,12 @@ def move_from_server():
             b = PublisherFiles(publisher['id'], publisher=publisher)
             b.airflow_log_location = log_url
             b.list_remote_dir(b.remote_dir)
-            number_of_files = 0
+            app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
             for f in b.file_list_publisher:
-                number_of_files += 1
+                if len(files_list) > 999:
+                    break # Temporary fix to avoid xcom limits
                 routing_history_id = uuid.uuid4().hex
                 files_list.append((publisher['id'], f, routing_history_id))
-            app.logger.info(f"Found {number_of_files} files for publisher {publisher}")
         app.logger.info(f"Total number of files to transfer : {len(files_list)}")
         return files_list  # This is visible in the xcom tab
 
@@ -69,7 +81,7 @@ def move_from_server():
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = file_name.removeprefix(a.remote_dir).lstrip("/")
-        context["map_index_template"] = f"{ti.map_index} {ff}"
+        context["map_index_template"] = set_task_name(ti.map_index, ff)
         result = a.get_file(file_name)
         if result["status"] == "success":
             app.logger.info(f"Sftp file transfer complete for file name: {file_name}")
@@ -92,7 +104,7 @@ def move_from_server():
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = sym_link_path.removeprefix(a.l_dir)
-        context["map_index_template"] = f"{ti.map_index} {ff}"
+        context["map_index_template"] = set_task_name(ti.map_index, ff)
 
         result = a.copyftp(sym_link_path)
 
@@ -118,7 +130,7 @@ def move_from_server():
         a.airflow_log_location = log_url
         ff = pend_dir.removeprefix(a.l_dir)
         result = a.processftp(pend_dir)
-        context["map_index_template"] = f"{ti.map_index} {result['publication']}"
+        context["map_index_template"] = set_task_name(ti.map_index, result['publication'])
         if result["status"] == "success":
             app.logger.info(f"Successfully processed {pend_dir}")
             return publisher_id, result['proc_dir'], routing_id, result['publication']
@@ -146,8 +158,8 @@ def move_from_server():
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = pub_dir.removeprefix(a.l_dir)
-        context["map_index_template"] = f"{ti.map_index} {pub_name}"
-        ##
+        context["map_index_template"] = set_task_name(ti.map_index, pub_name)
+
         result = a.processftp_dirs(pub_dir)
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
@@ -174,7 +186,10 @@ def move_from_server():
             f"Starting check unrouted. Publisher: {publisher_id}. Unrouted id: {unrouted_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        context["map_index_template"] = f"{ti.map_index} {pub_name} {unrouted_id}"
+
+        task_name = f"{pub_name} {unrouted_id}"
+        context["map_index_template"] = set_task_name(ti.map_index, task_name)
+
         result = a.checkunrouted(unrouted_id)
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
@@ -196,7 +211,8 @@ def move_from_server():
             f"Starting clean_temp_files. Publisher: {publisher_id}. Routing id: {routing_id}")
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        context["map_index_template"] = f"{ti.map_index} {pub_name} {routing_id}"
+        task_name = f"{pub_name} {routing_id}"
+        context["map_index_template"] = set_task_name(ti.map_index, task_name)
         result = a.clean_temp_files()
         time.sleep(2)  # Wait for OS to catch up
         if result["status"] == "success":
@@ -204,7 +220,6 @@ def move_from_server():
             return
         else:
             raise AirflowException(f"Failed to clean temp files. {result['message']}")
-
 
     @task_group(group_id='ProcessFileFromPublisher')
     def process_one_file(pub_tuple, **context):
@@ -219,6 +234,5 @@ def move_from_server():
     # The first call + chaining of the tasks
     file_tuple = get_file_list()
     process_one_file.expand(pub_tuple=file_tuple)
-
 
 move_from_server()

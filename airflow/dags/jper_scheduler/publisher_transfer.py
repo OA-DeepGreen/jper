@@ -2,6 +2,7 @@ import os, stat, uuid, shutil, json, requests
 from pathlib import Path
 from datetime import datetime
 import paramiko
+import logging
 from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
@@ -15,6 +16,7 @@ from octopus.modules.store import store
 
 class PublisherFiles:
     def __init__(self, publisher_id=None, publisher=None, routing_id=None):
+        logging.getLogger("paramiko").setLevel(logging.WARNING)
         self.__init_constants__()  # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
@@ -86,6 +88,7 @@ class PublisherFiles:
         self.delete_unrouted = app.config.get("DELETE_UNROUTED", False)
         self.publishers = None
         self.tmpdir = app.config.get('TMP_DIR', '/tmp')
+        self.publisher_file_transfer_limit = app.config.get("PUBLISHER_FILE_TRANSFER_LIMIT", 150)
 
         self.apiurl = app.config['API_URL']
 
@@ -244,6 +247,8 @@ class PublisherFiles:
                 folders.append(r_obj)
             else:
                 self.file_list_publisher.append(r_obj)
+                if len(self.file_list_publisher) > self.publisher_file_transfer_limit:
+                    break
         # Recursive call for the folders
         for folder in folders:
             self.list_remote_dir(folder)
@@ -578,7 +583,7 @@ class PublisherFiles:
                 self.routing_history.save()
                 continue
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
-            res = routing.route(obj)
+            res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
 
             # This is now a routed notification. I need the repositories matched.
@@ -607,8 +612,12 @@ class PublisherFiles:
                     msg = f"Not deleting unrouted notification {obj.id}"
                     app.logger.debug(msg)
             else:
-                app.logger.warn(message)
-                self.routing_history.add_notification_state("failure", uid)
+                if routing_msg == "Exception":
+                    app.logger.warn(message)
+                    self.routing_history.add_notification_state("failure", uid)
+                else:
+                    app.logger.info(message)
+                    self.routing_history.add_notification_state("success", uid)
                 if self.delete_unrouted:
                     msg = f"Deleting unrouted notification {obj.id}"
                     app.logger.info(msg)
