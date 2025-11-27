@@ -23,14 +23,14 @@ class RoutingException(Exception):
 #                 be able to catch 'stalled' notifications
 def route(unrouted):
     try:
-        rc = _route(unrouted)
+        rc, msg = _route(unrouted)
     except Exception as e:
         urid = unrouted.id
         routing_reason = "Stalled: " + str(e)
         _notify_failure(unrouted, routing_reason, None, None, '(stalling)')
         app.logger.error("Routing - Notification:{y} failed with (stalling) error '{x}'".format(y=urid, x=str(e)))
-        return False
-    return rc
+        return False, "Exception"
+    return rc, msg
 
 
 def _route(unrouted):
@@ -132,14 +132,14 @@ def _route(unrouted):
     # notification for the routed index and its content for download
     if len(match_ids) > 0:
         _make_routed(match_ids, unrouted, issn_data, metadata)
-        return True
+        return True, "Done"
     else:
         if routing_reason == "n/a":
             routing_reason = "No match in qualified repositories."
         # log the failure
         app.logger.info("Routing - Notification:{y} was not routed".format(y=unrouted.id))
         _notify_failure(unrouted, routing_reason, issn_data, metadata, '')
-        return False
+        return False, "Done"
 
     # Note that we don't delete the unrouted notification here - that's for the caller to decide
 

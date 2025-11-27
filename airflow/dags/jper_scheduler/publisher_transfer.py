@@ -584,7 +584,7 @@ class PublisherFiles:
                 self.routing_history.save()
                 continue
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
-            res = routing.route(obj)
+            res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
 
             # This is now a routed notification. I need the repositories matched.
@@ -613,8 +613,12 @@ class PublisherFiles:
                     msg = f"Not deleting unrouted notification {obj.id}"
                     app.logger.debug(msg)
             else:
-                app.logger.warn(message)
-                self.routing_history.add_notification_state("failure", uid)
+                if routing_msg == "Exception":
+                    app.logger.warn(message)
+                    self.routing_history.add_notification_state("failure", uid)
+                else:
+                    app.logger.info(message)
+                    self.routing_history.add_notification_state("success", uid)
                 if self.delete_unrouted:
                     msg = f"Deleting unrouted notification {obj.id}"
                     app.logger.info(msg)
