@@ -225,7 +225,5 @@ for log_cleanup_id in range(1, NUMBER_OF_WORKERS + 1):
             params={
                 "directory": str(directory),
                 "sleep_time": int(log_cleanup_id)*3},
-            env={'AIRFLOW__LOGGING__LOGGING_LEVEL': 'DEBUG'},
             dag=dag)
 
-        log_cleanup_op.log.setLevel(logging.ERROR)
