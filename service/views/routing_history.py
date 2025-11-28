@@ -63,6 +63,8 @@ def index():
         link = link + f"&publisher_id={publisher_id}"
     publishers = Account.pull_all_publishers()
     notification_ids = _gather_notification_ids(records)
+    if not search_val:
+        search_val = ""
     return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
                            publishers=publishers, notification_ids=notification_ids, page_size=page_size,
                            link=link, page=page, num_pages=num_pages, total=total, since=since,
