@@ -995,7 +995,7 @@ class RoutingHistoryDAO(dao.ESDAO):
             query['query']['bool']["must"].append({"match": {"workflow_states.notification_id.exact": notification_id}})
         if doi:
             del query['query']['bool']['filter']
-            query['query']['bool']["must"].append({"match": {"original_file_location": doi}})
+            query['query']['bool']["must"].append({"match": {"doi.exact": doi}})
         ans = cls.query(q=query)
         return ans
 
