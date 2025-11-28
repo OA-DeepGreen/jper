@@ -47,7 +47,7 @@ ENABLE_DELETE = True
 NUMBER_OF_WORKERS = 1
 DIRECTORIES_TO_DELETE = [BASE_LOG_FOLDER]
 ENABLE_DELETE_CHILD_LOG = Variable.get(
-    "airflow_log_cleanup__enable_delete_child_log", "True"
+    "airflow_log_cleanup__enable_delete_child_log", "False"
 )
 LOG_CLEANUP_PROCESS_LOCK_FILE = "/tmp/airflow_log_cleanup_worker.lock"
 logging.info("ENABLE_DELETE_CHILD_LOG  " + ENABLE_DELETE_CHILD_LOG)
@@ -95,10 +95,6 @@ if hasattr(dag, 'doc_md'):
     dag.doc_md = __doc__
 if hasattr(dag, 'catchup'):
     dag.catchup = False
-
-start = DummyOperator(
-    task_id='start',
-    dag=dag)
 
 log_cleanup = """
 
@@ -229,6 +225,7 @@ for log_cleanup_id in range(1, NUMBER_OF_WORKERS + 1):
             params={
                 "directory": str(directory),
                 "sleep_time": int(log_cleanup_id)*3},
+            env={'AIRFLOW__LOGGING__LOGGING_LEVEL': 'DEBUG'},
             dag=dag)
 
-        log_cleanup_op.set_upstream(start)
+        log_cleanup_op.log.setLevel(logging.ERROR)
