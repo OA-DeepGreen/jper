@@ -24,12 +24,12 @@ def find_and_delete_dag_runs_by_note(
     only considering runs from the last 7 days.
     """
     logs_dir = Path(BASE_LOG_FOLDER)
-    dag_logs = logs_dir / f'dag_id={dag_id}'
+    dag_log = logs_dir / f'dag_id={dag_id}'
 
     now = utcnow()  # timezone-aware UTC datetime
     week_ago = now - timedelta(days=7)
 
-    if not dag_logs.exists():
+    if not dag_log.exists():
         print(f"No logs found for DAG: {dag_id}")
 
     with create_session() as session:
@@ -50,11 +50,8 @@ def find_and_delete_dag_runs_by_note(
             print("\n--- DRY RUN: No deletions will be made ---")
             for run in matching_runs:
                 print(f"[DRY RUN] Would delete: {run.dag_id} / {run.run_id} / note='{run.note}' / execution_date={run.execution_date}")
-                run_logs = dag_logs / f'run_id={run.run_id}'
-                print(f"Run logs directory : {run_logs}")
-                for root, dirs, files in os.walk(run_logs, topdown=False):
-                    for name in files:
-                        print(f"Would delete: {os.path.join(root, name)}")
+                run_log = dag_log / f'run_id={run.run_id}'
+                print(f"[DRY RUN] Would recursively delete {run_log}")
             return len(matching_runs)
 
         # Perform actual deletions
@@ -87,9 +84,10 @@ def find_and_delete_dag_runs_by_note(
             delete_count += 1
 
             # Now work on the actual log files
-            run_logs = dag_logs / f'run_id={run_id}'
-            print(f"Recursively deleting log file directory : {run_logs}")
-            shutil.rmtree(run_logs)
+            run_log = dag_log / f'run_id={run_id}'
+            print(f"Recursively deleting log file directory : {run_log}")
+            if run_log.is_dir():
+                shutil.rmtree(run_log)
 
         session.commit()
         print(f"Deleted {delete_count} DAG runs.")
