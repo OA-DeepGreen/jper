@@ -1,11 +1,18 @@
-import os, datetime
+import os, datetime, shutil
 import json, random, string
+from pathlib import Path
+from datetime import timedelta
 
 from airflow.decorators import dag, task
+from airflow.configuration import conf
 from airflow.models import DagRun, TaskInstance, XCom, Log
 from airflow.utils.session import create_session
 from airflow.utils.timezone import utcnow
-from datetime import timedelta
+
+try:
+    BASE_LOG_FOLDER = conf.get("core", "BASE_LOG_FOLDER").rstrip("/")
+except Exception as e:
+    BASE_LOG_FOLDER = conf.get("logging", "BASE_LOG_FOLDER").rstrip("/")
 
 def find_and_delete_dag_runs_by_note(
     note_text: str,
@@ -16,9 +23,14 @@ def find_and_delete_dag_runs_by_note(
     Find and optionally delete DAG runs for a specific DAG whose note contains `note_text`,
     only considering runs from the last 7 days.
     """
+    logs_dir = Path(BASE_LOG_FOLDER)
+    dag_log = logs_dir / f'dag_id={dag_id}'
 
     now = utcnow()  # timezone-aware UTC datetime
     week_ago = now - timedelta(days=7)
+
+    if not dag_log.exists():
+        print(f"No logs found for DAG: {dag_id}")
 
     with create_session() as session:
         # Query all runs for this DAG in the last week
@@ -38,6 +50,8 @@ def find_and_delete_dag_runs_by_note(
             print("\n--- DRY RUN: No deletions will be made ---")
             for run in matching_runs:
                 print(f"[DRY RUN] Would delete: {run.dag_id} / {run.run_id} / note='{run.note}' / execution_date={run.execution_date}")
+                run_log = dag_log / f'run_id={run.run_id}'
+                print(f"[DRY RUN] Would recursively delete {run_log}")
             return len(matching_runs)
 
         # Perform actual deletions
@@ -68,6 +82,12 @@ def find_and_delete_dag_runs_by_note(
             # Delete the DAG run itself
             session.delete(run)
             delete_count += 1
+
+            # Now work on the actual log files
+            run_log = dag_log / f'run_id={run_id}'
+            print(f"Recursively deleting log file directory : {run_log}")
+            if run_log.is_dir():
+                shutil.rmtree(run_log)
 
         session.commit()
         print(f"Deleted {delete_count} DAG runs.")
