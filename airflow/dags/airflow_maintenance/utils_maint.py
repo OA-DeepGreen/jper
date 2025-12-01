@@ -6,6 +6,10 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
     if dry_run:
         print("\n--- DRY RUN: No deletions will be made ---")
 
+    # Likely just a configuration error. No harm done to the logs...
+    if not dag_log.exists():
+        print(f"No logs found for DAG: {dag_id}")
+
     delete_count = 0
     for run in matching_runs:
 
@@ -13,10 +17,6 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
         run_id = run.run_id
         run_log = dag_log / f'run_id={run_id}'
         delete_count += 1
-
-	    # Likely just a configuration error. No harm done to the logs...
-	    if not dag_log.exists():
-	        print(f"No logs found for DAG: {dag_id}")
 
         if dry_run:
             print(f"[DRY RUN] Would clean: {dag_id} / {run_id} / note='{run.note}' / execution_date={run.execution_date}")
