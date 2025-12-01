@@ -26,7 +26,7 @@ class PublisherFiles:
 
     def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
-        app.logger.debug(f"Routing history id: {routing_id}")
+        app.logger.info(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
         if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
@@ -576,9 +576,6 @@ class PublisherFiles:
             mun = models.UnroutedNotification()
             obj = mun.pull(uid)
             doi = ''
-            for i in obj.identifiers:
-                if i["type"] == "doi":
-                    doi = i["id"]
             if not obj:
                 app.logger.warn(f"#{idx} :Notification {uid} not found")
                 self.__update_routing_history__(action="checkunrouted", file_location="",
@@ -586,6 +583,9 @@ class PublisherFiles:
                 self.routing_history.add_notification_state("failure", uid, doi=doi)
                 self.routing_history.save()
                 continue
+            for i in obj.identifiers:
+                if i["type"] == "doi":
+                    doi = i["id"]
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
@@ -594,17 +594,16 @@ class PublisherFiles:
                 # This is now a routed notification. I need the repositories matched and the doi.
                 notification_obj = models.RoutedNotification.pull(uid)
                 if notification_obj:
-                    if len(notification_obj.repositories) > 0:
-                        app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
-                        request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
-                    else:
-                        app.logger.debug(f"There were no repositories to deposit to for notification {notification_obj.id}")
+                    msg = f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories"
+                    app.logger.info(msg)
                     if not doi:
                         for i in notification_obj.identifiers:
                             if i["type"] == "doi":
                                 doi = i["id"]
                 else:
-                    app.logger.debug(f"There were no repositories to deposit to for notification {uid}")
+                    msg = "Routed notification object {uid} not found"
+                    app.logger.debug(msg)
+                message = message + ". " + msg
                 app.logger.info(message)
                 self.routing_history.add_notification_state("success", uid, doi=doi)
                 if self.delete_routed:
@@ -616,10 +615,14 @@ class PublisherFiles:
                     app.logger.debug(msg)
             else:
                 if routing_msg == "Exception":
-                    app.logger.warn(message)
+                    msg = "Received exception from routing"
+                    message = message + ". " + msg
+                    app.logger.warn(msg)
                     self.routing_history.add_notification_state("failure", uid, doi=doi)
                 else:
-                    app.logger.info(message)
+                    msg = f"Notification {uid} matched to 0 repositories"
+                    app.logger.info(msg)
+                    message = message + ". " + msg
                     self.routing_history.add_notification_state("success", uid, doi=doi)
                 if self.delete_unrouted:
                     msg = f"Deleting unrouted notification {obj.id}"
