@@ -16,18 +16,24 @@
         <tr class="tablesorter">
           <td>
               <a href="/routing_history/view/{{ record['id'] }}">record</a><br/>
-              {% if publisher_id == None %}
-                <a href="/account/{{ record['publisher_id'] }}">
-                  {{ publishers.get(record['publisher_id'], record['publisher_id']) | safe }}</a><br/>
+              {% if record.get('publisher_email', '') and  record.get('publisher_id', '') %}
+                <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_email'] | safe }}</a><br/>
+              {% elif record.get('publisher_id', '') %}
+                <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_id'] | safe }}</a><br/>
               {% endif %}
               <dl class="dl-details">
                 <dt>File:</dt>
-
                 <dd>{{ record.get('original_file_location', '').split('xfer/')[-1] }}</dd>
-                {% if notification_ids[record['id']]|length > 0 %}
-                  <dt>Notification:</dt>
-                  {% for nid in notification_ids[record['id']] %}
-                    <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
+                {% if record.get('notification_states', [])|length > 0 %}
+                  {% for n_state in record['notification_states'] %}
+                    {% if n_state.get('notification_id', '') %}
+                      <dt>Notification:</dt>
+                      <dd><a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a></dd>
+                    {% endif %}
+                    {% if n_state.get('doi', '') %}
+                      <dt>DOI:</dt>
+                      <dd>{{ n_state['doi'] }}</dd>
+                    {% endif %}
                   {% endfor %}
                 {% endif %}
               </dl>

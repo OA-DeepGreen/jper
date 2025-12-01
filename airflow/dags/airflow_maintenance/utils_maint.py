@@ -23,7 +23,7 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
             print(f"[DRY RUN] Would recursively delete {run_log}")
             continue
 
-	    # Perform actual deletions
+        # Perform actual deletions
         print(f"Deleting DAG run: {dag_id} / {run_id} / execution_date={run.execution_date}")
 
         # Delete related XComs
@@ -49,7 +49,7 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
 
         # Now work on the actual log files
         if run_log.is_dir():
-	        print(f"Recursively deleting log file directory : {run_log}")
+            print(f"Recursively deleting log file directory : {run_log}")
             shutil.rmtree(run_log)
 
     return delete_count

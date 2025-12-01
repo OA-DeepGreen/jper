@@ -26,7 +26,7 @@ class PublisherFiles:
 
     def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
-        app.logger.debug(f"Routing history id: {routing_id}")
+        app.logger.info(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
         if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
@@ -528,7 +528,7 @@ class PublisherFiles:
             except:
                 resp_data = {}
             notification_id = resp_data.get('id',None)
-            message = f"Posted metadata and {pkg} to {self.apiurl}. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
+            message = f"Posted metadata and {pkg} to jperstore. Status: {resp.status_code}. Message: {resp.text}. Data: {resp_data}"
             if "error" in resp.text:
                 erlog = json.loads(resp.text)["error"]
             if resp.status_code < 200 or resp.status_code > 299:
@@ -579,53 +579,54 @@ class PublisherFiles:
                 app.logger.warn(f"#{idx} :Notification {uid} not found")
                 self.__update_routing_history__(action="checkunrouted", file_location="",
                         notification_id=uid, status="failure", message="Notification not found")
-                self.routing_history.add_notification_state("failure", uid)
+                self.routing_history.add_notification_state("failure", uid, doi=doi)
                 self.routing_history.save()
                 continue
+
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
 
-            # This is now a routed notification. I need the repositories matched.
-            notification_obj = models.RoutedNotification.pull(uid)
-            if notification_obj:
-                for i in notification_obj.identifiers:
-                    if i["type"] == "doi":
-                        self.routing_history.doi = i["id"]
+            if routing_msg == "Done":
+                doi = ''
+                # This is now a routed notification. I need the repositories matched and the doi.
+                if res:
+                    notification_obj = models.RoutedNotification.pull(uid)
+                    if notification_obj:
+                        msg = f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories"
+                        app.logger.info(msg)
+                        dois = notification_obj.get_identifiers('doi')
+                        if len(dois) > 0:
+                            doi = dois[0]
+                else:
+                    msg = f"Routed notification object {uid} not found"
+                    failed_obj = models.FailedNotification.pull(uid)
+                    app.logger.debug(msg)
+                    if failed_obj:
+                        msg = f"Notification {failed_obj.id} matched to {len(failed_obj.repositories)} repositories"
+                        app.logger.info(msg)
+                        dois = failed_obj.get_identifiers('doi')
+                        if len(dois) > 0:
+                            doi = dois[0]
 
-            if res:
-                if notification_obj:
-                    if len(notification_obj.repositories) > 0:
-                        app.logger.info(f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories - adding to request notification queue")
-                        request_deposit_helper.request_deposit_for_notification(notification_obj.id, notification_obj.repositories)
-                    else:
-                        app.logger.debug(f"There were no repositories to deposit to for notification {notification_obj.id}")
-                else:
-                    app.logger.debug(f"There were no repositories to deposit to for notification {uid}")
+                message = message + ". " + msg
                 app.logger.info(message)
-                self.routing_history.add_notification_state("success", uid)
-                if self.delete_routed:
-                    msg = f"Deleting unrouted notification {obj.id}"
-                    app.logger.info(msg)
-                    obj.delete()
-                else:
-                    msg = f"Not deleting unrouted notification {obj.id}"
-                    app.logger.debug(msg)
+                self.routing_history.add_notification_state("success", uid, doi=doi)
+            else: # Exception during routing
+                msg = "Received exception from routing"
+                message = message + ". " + msg
+                app.logger.warn(msg)
+                self.routing_history.add_notification_state("failure", uid, doi=doi)
+
+            if self.delete_routed:
+                msg = f"Deleting unrouted notification {obj.id}"
+                app.logger.info(msg)
+                obj.delete()
             else:
-                if routing_msg == "Exception":
-                    app.logger.warn(message)
-                    self.routing_history.add_notification_state("failure", uid)
-                else:
-                    app.logger.info(message)
-                    self.routing_history.add_notification_state("success", uid)
-                if self.delete_unrouted:
-                    msg = f"Deleting unrouted notification {obj.id}"
-                    app.logger.info(msg)
-                    obj.delete()
-                else:
-                    msg = f"Not deleting unrouted notification {obj.id}"
-                    app.logger.debug(msg)
+                msg = f"Not deleting unrouted notification {obj.id}"
+                app.logger.debug(msg)
             message = message + ". " + msg
+
             # Update routing history
             app.logger.info("Updating routing history")
             self.__update_routing_history__(action="checkunrouted", file_location="None",
@@ -657,7 +658,7 @@ class PublisherFiles:
                     app.logger.debug(f'Deleting directory {file_name} from {file_location}')
                     shutil.rmtree(file_name, ignore_errors=True)
 
-            # Essentially what should come here will be the pending directory
+            # Essentially what should come here will be the (old) pending directory or something new
             if os.path.isfile(file_name) or os.path.islink(file_name):
                 app.logger.debug(f'Deleting file {file_name} from {file_location}')
                 os.remove(file_name)
