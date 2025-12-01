@@ -1,234 +1,62 @@
-"""
-A maintenance workflow that you can deploy into Airflow to periodically clean
-out the task logs to avoid those getting too big.
-airflow trigger_dag --conf '[curly-braces]"maxLogAgeInDays":30[curly-braces]' airflow-log-cleanup
---conf options:
-    maxLogAgeInDays:<INT> - Optional
-"""
-import logging
-import os
+import datetime, shutil
+from pathlib import Path
 from datetime import timedelta
+from octopus.core import app
 
-import airflow
-import jinja2
-import pendulum
+from airflow.decorators import dag, task
 from airflow.configuration import conf
-from airflow.models import DAG, Variable
-from airflow.operators.bash_operator import BashOperator
-from airflow.operators.dummy_operator import DummyOperator
+from airflow.models import DagRun
+from airflow.utils.session import create_session
+from airflow.utils.timezone import utcnow
 
-days_to_clean_before = 60
+from airflow_maintenance.utils_maint import clean_runs
 
-# airflow-log-cleanup
-DAG_ID = os.path.basename(__file__).replace(".pyc", "").replace(".py", "")
-# START_DATE = airflow.utils.dates.days_ago(1)
-START_DATE = pendulum.today('UTC').add(days=-days_to_clean_before)
-try:
-    BASE_LOG_FOLDER = conf.get("core", "BASE_LOG_FOLDER").rstrip("/")
-except Exception as e:
-    BASE_LOG_FOLDER = conf.get("logging", "BASE_LOG_FOLDER").rstrip("/")
-# How often to Run. @daily - Once a day at Midnight
-SCHEDULE_INTERVAL = "@daily"
-# Who is listed as the owner of this DAG in the Airflow Web Server
-DAG_OWNER_NAME = "admin"
-# List of email address to send email alerts to if this job fails
-ALERT_EMAIL_ADDRESSES = []
-# Length to retain the log files if not already provided in the conf. If this
-# is set to 30, the job will remove those files that are 30 days old or older
-DEFAULT_MAX_LOG_AGE_IN_DAYS = Variable.get(
-    "airflow_log_cleanup__max_log_age_in_days", days_to_clean_before
-)
-# Whether the job should delete the logs or not. Included if you want to
-# temporarily avoid deleting the logs
-ENABLE_DELETE = True
-# The number of worker nodes you have in Airflow. Will attempt to run this
-# process for however many workers there are so that each worker gets its
-# logs cleared.
-NUMBER_OF_WORKERS = 1
-DIRECTORIES_TO_DELETE = [BASE_LOG_FOLDER]
-ENABLE_DELETE_CHILD_LOG = Variable.get(
-    "airflow_log_cleanup__enable_delete_child_log", "True"
-)
-LOG_CLEANUP_PROCESS_LOCK_FILE = "/tmp/airflow_log_cleanup_worker.lock"
-logging.info("ENABLE_DELETE_CHILD_LOG  " + ENABLE_DELETE_CHILD_LOG)
+BASE_LOG_FOLDER = conf.get("logging", "BASE_LOG_FOLDER").rstrip("/")
+AIRMAINT_OLDLOGS_DAYS = app.config.get("AIRMAINT_OLDLOGS_DAYS", 60)
 
-if not BASE_LOG_FOLDER or BASE_LOG_FOLDER.strip() == "":
-    raise ValueError(
-        "BASE_LOG_FOLDER variable is empty in airflow.cfg. It can be found "
-        "under the [core] (<2.0.0) section or [logging] (>=2.0.0) in the cfg file. "
-        "Kindly provide an appropriate directory path."
-    )
+def find_and_delete_dag_runs_by_date(
+    dag_id: str = "Process_Publisher_Deposits",
+    dry_run: bool = True,
+):
+    """
+    Only considering runs older than the above number of days.
+    """
+    logs_dir = Path(BASE_LOG_FOLDER)
+    dag_log = logs_dir / f'dag_id={dag_id}'
 
-if ENABLE_DELETE_CHILD_LOG.lower() == "true":
-    try:
-        CHILD_PROCESS_LOG_DIRECTORY = conf.get(
-            "scheduler", "CHILD_PROCESS_LOG_DIRECTORY"
-        )
-        if CHILD_PROCESS_LOG_DIRECTORY != ' ':
-            DIRECTORIES_TO_DELETE.append(CHILD_PROCESS_LOG_DIRECTORY)
-    except Exception as e:
-        logging.exception(
-            "Could not obtain CHILD_PROCESS_LOG_DIRECTORY from " +
-            "Airflow Configurations: " + str(e)
+    now = utcnow()  # timezone-aware UTC datetime
+    oldlogs_days = now - timedelta(days=AIRMAINT_OLDLOGS_DAYS)
+
+    with create_session() as session:
+        # Query all runs for this DAG in the last week
+        runs = (
+            session.query(DagRun)
+            .filter(DagRun.dag_id == dag_id)
+            .filter(DagRun.execution_date < oldlogs_days)
+            .all()
         )
 
-default_args = {
-    'owner': DAG_OWNER_NAME,
-    'depends_on_past': False,
-    'email': ALERT_EMAIL_ADDRESSES,
-    'email_on_failure': True,
-    'email_on_retry': False,
-    'start_date': START_DATE,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=1)
-}
+        print(f"Found {len(runs)} DAG runs for '{dag_id}' older than {oldlogs_days} days")
 
-dag = DAG(
-    DAG_ID,
-    default_args=default_args,
-    schedule_interval=SCHEDULE_INTERVAL,
-    start_date=START_DATE,
-    tags=['teamCottageLabs', 'airflow-maintenance'],
-    template_undefined=jinja2.Undefined
-)
-if hasattr(dag, 'doc_md'):
-    dag.doc_md = __doc__
-if hasattr(dag, 'catchup'):
-    dag.catchup = False
+        delete_count = clean_runs(session, runs, dag_log, dry_run)
 
-start = DummyOperator(
-    task_id='start',
-    dag=dag)
+        session.commit()
+        if dry_run:
+            print(f"[DRY RUN] Would have deleted {delete_count} DAG runs.")
+        else:
+            print(f"Deleted {delete_count} DAG runs.")
+        return delete_count
 
-log_cleanup = """
+@dag(dag_id="Airflow_Log_Cleanup", max_active_runs=1, schedule=None, schedule_interval=None, start_date=datetime.datetime(2025, 10, 22),
+     description="This cleans up all DAG runs older than a set number of days defined in local.cfg",
+     catchup=False, tags=["teamCottageLabs", "airflow_maintenance"])
+def dag_run_cleanup():
 
-echo "Getting Configurations..."
-BASE_LOG_FOLDER="{{params.directory}}"
-WORKER_SLEEP_TIME="{{params.sleep_time}}"
+    @task(task_id="clean_up_old_runs", retries=0)
+    def clean_up_empty_runs():
+        find_and_delete_dag_runs_by_date(dag_id="Process_Publisher_Deposits", dry_run=False)
+        return
 
-sleep ${WORKER_SLEEP_TIME}s
+    clean_up_empty_runs()
 
-MAX_LOG_AGE_IN_DAYS="{{dag_run.conf.maxLogAgeInDays}}"
-if [ "${MAX_LOG_AGE_IN_DAYS}" == "" ]; then
-    echo "maxLogAgeInDays conf variable isn't included. Using Default '""" + str(DEFAULT_MAX_LOG_AGE_IN_DAYS) + """'."
-    MAX_LOG_AGE_IN_DAYS='""" + str(DEFAULT_MAX_LOG_AGE_IN_DAYS) + """'
-fi
-ENABLE_DELETE=""" + str("true" if ENABLE_DELETE else "false") + """
-echo "Finished Getting Configurations"
-echo ""
-
-echo "Configurations:"
-echo "BASE_LOG_FOLDER:      '${BASE_LOG_FOLDER}'"
-echo "MAX_LOG_AGE_IN_DAYS:  '${MAX_LOG_AGE_IN_DAYS}'"
-echo "ENABLE_DELETE:        '${ENABLE_DELETE}'"
-
-cleanup() {
-    echo "Executing Find Statement: $1"
-    FILES_MARKED_FOR_DELETE=`eval $1`
-    echo "Process will be Deleting the following File(s)/Directory(s):"
-    echo "${FILES_MARKED_FOR_DELETE}"
-    echo "Process will be Deleting `echo "${FILES_MARKED_FOR_DELETE}" | \
-    grep -v '^$' | wc -l` File(s)/Directory(s)"     \
-    # "grep -v '^$'" - removes empty lines.
-    # "wc -l" - Counts the number of lines
-    echo ""
-    if [ "${ENABLE_DELETE}" == "true" ];
-    then
-        if [ "${FILES_MARKED_FOR_DELETE}" != "" ];
-        then
-            echo "Executing Delete Statement: $2"
-            eval $2
-            DELETE_STMT_EXIT_CODE=$?
-            if [ "${DELETE_STMT_EXIT_CODE}" != "0" ]; then
-                echo "Delete process failed with exit code \
-                    '${DELETE_STMT_EXIT_CODE}'"
-
-                echo "Removing lock file..."
-                rm -f """ + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """
-                if [ "${REMOVE_LOCK_FILE_EXIT_CODE}" != "0" ]; then
-                    echo "Error removing the lock file. \
-                    Check file permissions.\
-                    To re-run the DAG, ensure that the lock file has been \
-                    deleted (""" + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """)."
-                    exit ${REMOVE_LOCK_FILE_EXIT_CODE}
-                fi
-                exit ${DELETE_STMT_EXIT_CODE}
-            fi
-        else
-            echo "WARN: No File(s)/Directory(s) to Delete"
-        fi
-    else
-        echo "WARN: You're opted to skip deleting the File(s)/Directory(s)!!!"
-    fi
-}
-
-
-if [ ! -f """ + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """ ]; then
-
-    echo "Lock file not found on this node! \
-    Creating it to prevent collisions..."
-    touch """ + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """
-    CREATE_LOCK_FILE_EXIT_CODE=$?
-    if [ "${CREATE_LOCK_FILE_EXIT_CODE}" != "0" ]; then
-        echo "Error creating the lock file. \
-        Check if the airflow user can create files under tmp directory. \
-        Exiting..."
-        exit ${CREATE_LOCK_FILE_EXIT_CODE}
-    fi
-
-    echo ""
-    echo "Running Cleanup Process..."
-
-    FIND_STATEMENT="find ${BASE_LOG_FOLDER}/*/* -type f -mtime \
-     +${MAX_LOG_AGE_IN_DAYS}"
-    DELETE_STMT="${FIND_STATEMENT} -exec rm -f {} \;"
-
-    cleanup "${FIND_STATEMENT}" "${DELETE_STMT}"
-    CLEANUP_EXIT_CODE=$?
-
-    FIND_STATEMENT="find ${BASE_LOG_FOLDER}/*/* -type d -empty"
-    DELETE_STMT="${FIND_STATEMENT} -prune -exec rm -rf {} \;"
-
-    cleanup "${FIND_STATEMENT}" "${DELETE_STMT}"
-    CLEANUP_EXIT_CODE=$?
-
-    FIND_STATEMENT="find ${BASE_LOG_FOLDER}/* -type d -empty"
-    DELETE_STMT="${FIND_STATEMENT} -prune -exec rm -rf {} \;"
-
-    cleanup "${FIND_STATEMENT}" "${DELETE_STMT}"
-    CLEANUP_EXIT_CODE=$?
-
-    echo "Finished Running Cleanup Process"
-
-    echo "Deleting lock file..."
-    rm -f """ + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """
-    REMOVE_LOCK_FILE_EXIT_CODE=$?
-    if [ "${REMOVE_LOCK_FILE_EXIT_CODE}" != "0" ]; then
-        echo "Error removing the lock file. Check file permissions. To re-run the DAG, ensure that the lock file has been deleted (""" + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """)."
-        exit ${REMOVE_LOCK_FILE_EXIT_CODE}
-    fi
-
-else
-    echo "Another task is already deleting logs on this worker node. \
-    Skipping it!"
-    echo "If you believe you're receiving this message in error, kindly check \
-    if """ + str(LOG_CLEANUP_PROCESS_LOCK_FILE) + """ exists and delete it."
-    exit 0
-fi
-
-"""
-
-for log_cleanup_id in range(1, NUMBER_OF_WORKERS + 1):
-
-    for dir_id, directory in enumerate(DIRECTORIES_TO_DELETE):
-
-        log_cleanup_op = BashOperator(
-            task_id='log_cleanup_worker_num_' +
-            str(log_cleanup_id) + '_dir_' + str(dir_id),
-            bash_command=log_cleanup,
-            params={
-                "directory": str(directory),
-                "sleep_time": int(log_cleanup_id)*3},
-            dag=dag)
-
-        log_cleanup_op.set_upstream(start)
+dag_run_cleanup()
