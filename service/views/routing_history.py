@@ -61,14 +61,12 @@ def index():
     link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
     if publisher_id:
         link = link + f"&publisher_id={publisher_id}"
-    publishers = Account.pull_all_publishers()
-    notification_ids = _gather_notification_ids(records)
     if not search_val:
         search_val = ""
     return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
-                           publishers=publishers, notification_ids=notification_ids, page_size=page_size,
-                           link=link, page=page, num_pages=num_pages, total=total, since=since,
-                           upto=upto, status=status, search_term=search_term, search_val=search_val)
+                           page_size=page_size, link=link, page=page, num_pages=num_pages, total=total,
+                           since=since, upto=upto, status=status, search_term=search_term,
+                           search_val=search_val)
 
 
 @blueprint.route('/view/<record_id>')
@@ -105,19 +103,6 @@ def view_routing_history_by_nid(notification_id):
         workflow_states = _shorten_workflow_message(rec)
         rec.workflow_states = workflow_states
         return render_template('routing_history/view.html', rec=rec)
-
-
-def _gather_notification_ids(records):
-    notification_ids = {}
-    for data in records.get('hits', {}).get('hits', []):
-        record = data.get('_source', {})
-        nids = []
-        for ws in record.get('workflow_states', []):
-            nid = ws.get('notification_id', None)
-            if nid and nid not in nids:
-                nids.append(nid)
-        notification_ids[record['id']] = nids
-    return notification_ids
 
 
 def _shorten_workflow_message(rec):

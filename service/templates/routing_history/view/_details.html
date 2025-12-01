@@ -7,10 +7,18 @@
       <dd>{{ rec.last_updated }}</dd>
       <dt>Publisher Id:</dt>
       <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_id | safe }}</a></dd>
-      <dt>Notification ID:</dt>
-      {% for nid in rec.notification_ids %}
-        <dd><a href="/api/v1/notification/{{ nid }}">{{ nid }}</a></dd>
-      {% endfor %}
+      {% if record.get('notification_states', [])|length > 0 %}
+        {% for n_state in record['notification_states'] %}
+          {% if n_state.get('notification_id', '') %}
+            <dt>Notification ID:</dt>
+            <dd><a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a></dd>
+          {% endif %}
+          {% if n_state.get('doi', '') %}
+            <dt>DOI:</dt>
+            <dd>{{ n_state['doi'] }}</dd>
+          {% endif %}
+        {% endfor %}
+     {% endif %}
     </dl>
   </div>
 </div>

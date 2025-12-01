@@ -20,7 +20,6 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "last_updated" : "<date this record was last updated>",
             "publisher_id" : "<publisher id>",
             "publisher_email" : "<publisher email>",
-            "doi" : "<doi>",
             "sftp_server_url" : "<sftp_server>",
             "sftp_server_port" : "<sftp_server_port>",
             "sftp_username" : "<sftp_username>",
@@ -32,6 +31,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "notification_states" : [{
                 "status": "<one of STATUS>",,
                 "notification_id": "<notification_id>",
+                "doi": "<doi>"
             }],
             workflow_states: [{
                 "date": "<date action was performed>",
@@ -62,7 +62,6 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "last_updated": {"coerce": "utcdatetime"},
                 "publisher_id": {"coerce": "unicode"},
                 "publisher_email": {"coerce": "unicode"},
-                "doi": {"coerce": "unicode"},
                 "sftp_server_url": {"coerce": "unicode"},
                 "sftp_server_port": {"coerce": "unicode"},
                 "sftp_username": {"coerce": "unicode"},
@@ -83,6 +82,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "notification_states": {
                     "fields": {
                         "notification_id": {"coerce": "unicode"},
+                        "doi": {"coerce": "unicode"},
                         "status": {"coerce": "unicode", "allowed_values": STATUS}
                     }
                 },
@@ -269,11 +269,12 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
     def notification_states(self, vals):
         self._set_list("notification_states", vals)
 
-    def add_notification_state(self, status, notification_id):
+    def add_notification_state(self, status, notification_id, doi=''):
         """
         {
             "status": {"coerce": "unicode", "allowed_values": STATUS},
-            "notification_id": {"coerce": "unicode"}
+            "notification_id": {"coerce": "unicode"},
+            "doi": {"coerce": "unicode"}
         }
         """
         if not status:
@@ -289,7 +290,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             if notification_state.get("notification_id", "") == notification_id:
                 updated_states.append({
                     'status': status,
-                    'notification_id': notification_id
+                    'notification_id': notification_id,
+                    'doi': doi
                 })
                 updated = True
             else:
@@ -297,7 +299,8 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         if not updated:
             updated_states.append({
                 'status': status,
-                'notification_id': notification_id
+                'notification_id': notification_id,
+                'doi': doi
             })
         self._set_list("notification_states", updated_states)
 
@@ -345,12 +348,4 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             vals['log_url'] = log_url
         self._add_to_list("workflow_states", vals)
 
-    @property
-    def notification_ids(self):
-        notification_ids = []
-        for ws in self._get_list("workflow_states"):
-            nid = ws.get('notification_id', '')
-            if nid and not nid in notification_ids:
-                notification_ids.append(nid)
-        return notification_ids
 
