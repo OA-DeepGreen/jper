@@ -27,10 +27,6 @@ def find_and_delete_dag_runs_by_date(
     now = utcnow()  # timezone-aware UTC datetime
     oldlogs_days = now - timedelta(days=AIRMAINT_OLDLOGS_DAYS)
 
-    # Likely just a configuration error. No harm done ...
-    if not dag_log.exists():
-        print(f"No logs found for DAG: {dag_id}")
-
     with create_session() as session:
         # Query all runs for this DAG in the last week
         runs = (

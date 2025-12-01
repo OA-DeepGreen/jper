@@ -14,6 +14,10 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
         run_log = dag_log / f'run_id={run_id}'
         delete_count += 1
 
+	    # Likely just a configuration error. No harm done to the logs...
+	    if not dag_log.exists():
+	        print(f"No logs found for DAG: {dag_id}")
+
         if dry_run:
             print(f"[DRY RUN] Would clean: {dag_id} / {run_id} / note='{run.note}' / execution_date={run.execution_date}")
             print(f"[DRY RUN] Would recursively delete {run_log}")
@@ -44,8 +48,8 @@ def clean_runs(session, matching_runs, dag_log, dry_run=True):
         session.delete(run)
 
         # Now work on the actual log files
-        print(f"Recursively deleting log file directory : {run_log}")
         if run_log.is_dir():
+	        print(f"Recursively deleting log file directory : {run_log}")
             shutil.rmtree(run_log)
 
     return delete_count
