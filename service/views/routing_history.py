@@ -114,11 +114,7 @@ def _shorten_workflow_message(rec):
     for workflow in rec.workflow_states:
         msg = workflow.get('message', '')
         for fk, fl in file_locations.items():
-            if f" {fl} " in msg or \
-                    f"{fl}\n" in msg or \
-                    f"\n{fl}" in msg or \
-                    f"{fl}." in msg or \
-                    msg.startswith(fl) or msg.endswith(fl):
+            if fl in msg:
                 msg = msg.replace(fl, f"<{fk}>")
         workflow['short_message'] = msg
         workflow_states.append(workflow)
