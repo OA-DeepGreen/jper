@@ -61,14 +61,12 @@ def index():
     link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
     if publisher_id:
         link = link + f"&publisher_id={publisher_id}"
-    publishers = Account.pull_all_publishers()
-    notification_ids = _gather_notification_ids(records)
     if not search_val:
         search_val = ""
     return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
-                           publishers=publishers, notification_ids=notification_ids, page_size=page_size,
-                           link=link, page=page, num_pages=num_pages, total=total, since=since,
-                           upto=upto, status=status, search_term=search_term, search_val=search_val)
+                           page_size=page_size, link=link, page=page, num_pages=num_pages, total=total,
+                           since=since, upto=upto, status=status, search_term=search_term,
+                           search_val=search_val)
 
 
 @blueprint.route('/view/<record_id>')
@@ -107,19 +105,6 @@ def view_routing_history_by_nid(notification_id):
         return render_template('routing_history/view.html', rec=rec)
 
 
-def _gather_notification_ids(records):
-    notification_ids = {}
-    for data in records.get('hits', {}).get('hits', []):
-        record = data.get('_source', {})
-        nids = []
-        for ws in record.get('workflow_states', []):
-            nid = ws.get('notification_id', None)
-            if nid and nid not in nids:
-                nids.append(nid)
-        notification_ids[record['id']] = nids
-    return notification_ids
-
-
 def _shorten_workflow_message(rec):
     file_locations = {'original_file_location': rec.original_file_location}
     for fl in rec.final_file_locations:
@@ -129,11 +114,7 @@ def _shorten_workflow_message(rec):
     for workflow in rec.workflow_states:
         msg = workflow.get('message', '')
         for fk, fl in file_locations.items():
-            if f" {fl} " in msg or \
-                    f"{fl}\n" in msg or \
-                    f"\n{fl}" in msg or \
-                    f"{fl}." in msg or \
-                    msg.startswith(fl) or msg.endswith(fl):
+            if fl in msg:
                 msg = msg.replace(fl, f"<{fk}>")
         workflow['short_message'] = msg
         workflow_states.append(workflow)
