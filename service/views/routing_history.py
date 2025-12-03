@@ -117,8 +117,19 @@ def view_routing_history_by_nid(notification_id):
 
 def _shorten_workflow_message(rec):
     file_locations = {'original_file_location': rec.original_file_location}
-    for fl in rec.final_file_locations:
-        file_locations[fl['location_type']] = fl['file_location']
+    file_labels = {'original_file_location': 1}
+    for f in rec.final_file_locations:
+        fk = f['location_type']
+        fl = f['file_location']
+        count = 1
+        if fk in file_labels.keys():
+            count = file_labels[fk] + 1
+            file_labels[fk] = count
+            file_locations[f"{fk}_{count}"] = fl
+            f['location_type'] = f"{fk}_{count}"
+        else:
+            file_labels[fk] = 1
+            file_locations[fk] = fl
 
     workflow_states = []
     for workflow in rec.workflow_states:
