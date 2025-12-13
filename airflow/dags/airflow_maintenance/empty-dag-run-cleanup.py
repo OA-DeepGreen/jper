@@ -21,7 +21,7 @@ def find_and_delete_dag_runs_by_note(
 ):
     """
     Find and optionally delete DAG runs for a specific DAG whose note contains `note_text`,
-    only considering runs from the last 7 days.
+    only considering runs older than 7 days.
     """
     logs_dir = Path(BASE_LOG_FOLDER)
     dag_log = logs_dir / f'dag_id={dag_id}'
@@ -34,7 +34,7 @@ def find_and_delete_dag_runs_by_note(
         runs = (
             session.query(DagRun)
             .filter(DagRun.dag_id == dag_id)
-            .filter(DagRun.execution_date >= week_ago)
+            .filter(DagRun.execution_date < week_ago)
             .all()
         )
 
