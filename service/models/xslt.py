@@ -792,8 +792,8 @@ class XSLT(object):
                             <mods:roleTerm type="text">
                                 <xsl:value-of select="@contrib-type"/>
                             </mods:roleTerm>
-                            <xsl:if test=test="@corresp='yes' or .//xref[@ref-type='corresp']">
-                              <mods:roleTerm type="text">corresponding author </mods:roleTerm>
+                            <xsl:if test="@corresp='yes' or .//xref[@ref-type='corresp']">
+                              <mods:roleTerm type="text">corresponding author</mods:roleTerm>
                             </xsl:if>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
