@@ -1,7 +1,7 @@
 # Python stuff
 import uuid, time, datetime
 from octopus.core import app
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.decorators import dag, task, task_group
@@ -17,14 +17,17 @@ donot_rerun_processftp_dirs = [
 
 def get_log_url(context):
     full_log_url = context['task_instance'].log_url
-    query_params = full_log_url.split("&")
-    query_params_filtered = []
-    for q in query_params:
-        if not 'base_date' in q:
-            query_params_filtered.append(q)
-    log_url = "&".join(query_params_filtered)
-    parsed_url = urlparse(log_url)
-    new_path = f"{parsed_url.path}?{parsed_url.query}"
+    print(f"Full log url : {full_log_url}")
+    dag_id = f"dag_id={context['dag'].dag_id}"
+    ti = context['task_instance']
+    task_id = f"task_id={ti.task_id}"
+    execution_date = urlencode({"execution_date": ti.run_id.split('__')[1]})
+    map_index = None
+    if ti.map_index > -1:
+        map_index = f"map_index={ti.map_index}"
+    new_path = f"/airflow/log?{dag_id}&{task_id}&{execution_date}"
+    if map_index:
+        new_path = f"{new_path}&{map_index}"
     app.logger.info(f"Log for this job : {new_path}")
     return new_path
 
