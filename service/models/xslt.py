@@ -790,11 +790,11 @@ class XSLT(object):
                           </xsl:if>
                           <mods:role>
                             <mods:roleTerm type="text">
-                                <xsl:choose>
-                                    <xsl:when test="@corresp='yes' or .//xref[@ref-type='corresp']">corresponding author</xsl:when>
-                                    <xsl:otherwise><xsl:value-of select="@contrib-type"/></xsl:otherwise>
-                                </xsl:choose>
+                                <xsl:value-of select="@contrib-type"/>
                             </mods:roleTerm>
+                            <xsl:if test=test="@corresp='yes' or .//xref[@ref-type='corresp']">
+                              <mods:roleTerm type="text">corresponding author </mods:roleTerm>
+                            </xsl:if>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
                           <xsl:for-each select="./contrib-id">
