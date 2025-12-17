@@ -186,11 +186,11 @@ class XSLT(object):
               <xsl:value-of select="normalize-space()"/>
             </title>
           </xsl:for-each>
-          <xsl:if test="//article-meta/title-group/subtitle">
+          <xsl:if test="//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')]">
             <title>
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
               <xsl:attribute name="type"><xsl:text>sub</xsl:text></xsl:attribute>
-              <xsl:value-of select="normalize-space(//article-meta/title-group/subtitle)"/>
+              <xsl:value-of select="normalize-space(//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')])"/>
             </title>
           </xsl:if>
           <xsl:for-each select="//article-meta/title-group/trans-title-group/trans-subtitle">
@@ -665,7 +665,7 @@ class XSLT(object):
                         <xsl:value-of select="normalize-space()"/>
                     </mods:title>
                 </xsl:for-each>
-                <xsl:for-each select="//article-meta/title-group/subtitle">
+                <xsl:for-each select="//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')]">
                     <mods:subTitle>
                         <xsl:call-template name="insert-lang-attribute"/>
                         <xsl:value-of select="normalize-space()"/>
@@ -790,11 +790,11 @@ class XSLT(object):
                           </xsl:if>
                           <mods:role>
                             <mods:roleTerm type="text">
-                                <xsl:choose>
-                                    <xsl:when test="@corresp='yes' or .//xref[@ref-type='corresp']">corresponding author</xsl:when>
-                                    <xsl:otherwise><xsl:value-of select="@contrib-type"/></xsl:otherwise>
-                                </xsl:choose>
+                                <xsl:value-of select="@contrib-type"/>
                             </mods:roleTerm>
+                            <xsl:if test="@corresp='yes' or .//xref[@ref-type='corresp']">
+                              <mods:roleTerm type="text">corresponding author</mods:roleTerm>
+                            </xsl:if>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
                           <xsl:for-each select="./contrib-id">
