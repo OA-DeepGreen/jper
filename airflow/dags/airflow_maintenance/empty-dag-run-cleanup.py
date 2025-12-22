@@ -27,7 +27,7 @@ def find_and_delete_dag_runs_by_note(
     dag_log = logs_dir / f'dag_id={dag_id}'
 
     now = utcnow()  # timezone-aware UTC datetime
-    week_ago = now - timedelta(days=AIRMAINT_EMPTY_DAYSBACK)
+    days_ago = now - timedelta(days=AIRMAINT_EMPTY_DAYSBACK)
     print(f"Searching for DAG runs for '{dag_id}' older than {AIRMAINT_EMPTY_DAYSBACK} days with note containing '{note_text}'")
 
     with create_session() as session:
@@ -35,7 +35,7 @@ def find_and_delete_dag_runs_by_note(
         runs = (
             session.query(DagRun)
             .filter(DagRun.dag_id == dag_id)
-            .filter(DagRun.execution_date < week_ago)
+            .filter(DagRun.execution_date < days_ago)
             .all()
         )
 
@@ -53,7 +53,9 @@ def find_and_delete_dag_runs_by_note(
             print(f"Deleted {delete_count} DAG runs.")
         return delete_count
 
-@dag(dag_id="Cleanup_Empty_DAG_run", max_active_runs=1, schedule=None, schedule_interval=None, start_date=datetime.datetime(2025, 10, 22),
+@dag(dag_id="Cleanup_Empty_DAG_run", max_active_runs=1, schedule=None,
+     schedule_interval=app.config.get("AIRMAINT_EMPTY_SCHEDULE", 'None'),
+     start_date=datetime.datetime(2025, 10, 22),
      description="This cleans up all empty Process_Publisher_Deposits DAG runs from the past week with the note 'Empty run'",
      catchup=False, tags=["teamCottageLabs", "airflow_maintenance"])
 def dag_run_cleanup():
