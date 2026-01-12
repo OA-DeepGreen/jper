@@ -203,21 +203,30 @@ class XSLT(object):
       </titles>
 
       <!-- Abstract(s) -->
-      <xsl:if test="//article-meta/abstract or //article-meta/trans-abstract">
+      <xsl:if test="//article-meta/abstract[not(@abstract-type='graphical')
+                                            and not(@abstract-type='toc')
+                                            and not(@abstract-type='precis')]
+                    or //article-meta/trans-abstract">
       <abstracts>
-          <xsl:for-each select="//article-meta/abstract[1]">
-          <!-- selecting only the first abstract since opus only accepts one abstract per language! -->
+        <xsl:if test="//article-meta/abstract[not(@abstract-type='graphical')
+                                              and not(@abstract-type='toc')
+                                              and not(@abstract-type='precis')]">
+          <xsl:for-each select="//article-meta/abstract[not(@abstract-type='graphical')
+                                                        and not(@abstract-type='toc')
+                                                        and not(@abstract-type='precis')][1]">
+          <!-- selecting the first non-toc non-grapical non-precis abstract -->
             <abstract>
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
               <xsl:call-template name="abstract-nested-whitespacing"/>
             </abstract>
           </xsl:for-each>
-          <xsl:for-each select="//article-meta/trans-abstract">
-            <abstract>
-              <xsl:call-template name="insert-lang-attribute"/>
-              <xsl:call-template name="abstract-nested-whitespacing"/>
-            </abstract>
-          </xsl:for-each>
+        </xsl:if>
+        <xsl:for-each select="//article-meta/trans-abstract">
+          <abstract>
+            <xsl:call-template name="insert-lang-attribute"/>
+            <xsl:call-template name="abstract-nested-whitespacing"/>
+          </abstract>
+        </xsl:for-each>
       </abstracts>
       </xsl:if>
 
@@ -524,8 +533,9 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()">
           <xsl:if test="string-length(normalize-space())&gt;0">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
+              <xsl:when test="local-name(parent::*)='tex-math'
+                              or (local-name(parent::*)='title' and .='Abstract')">
+              <!--ignore tex-math elements and skip "Abstract" headers-->
               </xsl:when>
               <xsl:otherwise>
                 <xsl:value-of select="."/>
@@ -538,15 +548,17 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()">
           <xsl:if test="string-length(normalize-space())&gt;0">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*)='title' "> <!-- when text of title element is selected, add line breaks before and after-->
+              <xsl:when test="local-name(parent::*)='title' and not(.='Abstract')">
+              <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
                 </xsl:text>
                 <xsl:value-of select="normalize-space()"/>
                 <xsl:text>
                 </xsl:text>
               </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
+              <xsl:when test="local-name(parent::*)='tex-math'
+                              or (local-name(parent::*)='title' and .='Abstract')">
+              <!--ignore tex-math elements and skip "Abstract" headers-->
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
@@ -754,6 +766,11 @@ class XSLT(object):
                             </xsl:if>
                         </mods:extent>
                     </xsl:if>
+                    <xsl:if test="//article-meta/elocation-id">
+                      <mods:detail type="article-number">
+                        <mods:number><xsl:value-of select="//article-meta/elocation-id"/></mods:number>
+                      </mods:detail>
+                    </xsl:if>
                 </mods:part>
             </mods:relatedItem>
 
@@ -874,14 +891,20 @@ class XSLT(object):
             <!-- Description: Abstract / TOC -->
             <xsl:for-each select="//article-meta/abstract">
                 <xsl:choose>
-                    <xsl:when test="@type = 'toc'">
+                    <xsl:when test="@abstract-type='toc'">
                         <mods:tableOfContents>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:value-of select="."/>
                         </mods:tableOfContents>
                     </xsl:when>
+                    <xsl:when test="@abstract-type='graphical'">
+                      <!-- exclude graphical abstracts -->
+                    </xsl:when>
                     <xsl:otherwise>
                         <mods:abstract>
+                            <xsl:if test="@abstract-type">
+                              <xsl:attribute name="type"><xsl:value-of select="@abstract-type"/></xsl:attribute>
+                            </xsl:if>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:call-template name="abstract-nested-whitespacing"/>
                         </mods:abstract>
@@ -1044,8 +1067,9 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()">
           <xsl:if test="string-length(normalize-space())&gt;0">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
+              <xsl:when test="local-name(parent::*) = 'tex-math'
+                              or (local-name(parent::*)='title' and .='Abstract')">
+              <!--ignore tex-math elements and skip "Abstract" headers-->
               </xsl:when>
               <xsl:otherwise>
                 <xsl:value-of select="."/>
@@ -1058,7 +1082,7 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()">
           <xsl:if test="string-length(normalize-space())&gt;0">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*)='title' ">
+              <xsl:when test="local-name(parent::*)='title' and not(.='Abstract')">
                 <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
                 </xsl:text>
@@ -1066,7 +1090,9 @@ class XSLT(object):
                 <xsl:text>
                 </xsl:text>
               </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
+              <xsl:when test="local-name(parent::*) = 'tex-math'
+                              or (local-name(parent::*)='title' and .='Abstract')">
+              <!--ignore tex-math elements and skip "Abstract" headers-->
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
