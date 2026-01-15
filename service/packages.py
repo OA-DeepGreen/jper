@@ -1076,7 +1076,6 @@ class FilesAndJATS(PackageHandler):
         #
         # 2017-07-12 TD : all of the above missing list done!! (-:
         #
-        etree.XSLT.set_global_max_depth(50)
         xslt_root = etree.XML(models.XSLT.jats2metsmods)
         transform = etree.XSLT(xslt_root)
 
