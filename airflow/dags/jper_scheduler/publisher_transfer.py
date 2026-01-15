@@ -586,7 +586,7 @@ class PublisherFiles:
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
-
+            status = "success"
             if routing_msg == "Done":
                 doi = ''
                 # This is now a routed notification. I need the repositories matched and the doi.
@@ -617,6 +617,7 @@ class PublisherFiles:
                 message = message + ". " + msg
                 app.logger.warn(msg)
                 self.routing_history.add_notification_state("failure", uid, doi=doi)
+                status = "failure"
 
             if self.delete_routed:
                 msg = f"Deleting unrouted notification {obj.id}"
@@ -630,10 +631,10 @@ class PublisherFiles:
             # Update routing history
             app.logger.info("Updating routing history")
             self.__update_routing_history__(action="checkunrouted", file_location="None",
-                    notification_id=uid, status="success", message=message)
+                    notification_id=uid, status=status, message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
-        return {'status': "success"}
+        return {'status': status}
 
     ##### --- End checkunrouted. Clean up temporary files. ---
 
