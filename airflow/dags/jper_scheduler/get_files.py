@@ -205,7 +205,11 @@ def move_from_server():
             app.logger.info(f"Finished processing {unrouted_id}")
             return publisher_id, routing_id, pub_name
         else:
-            raise AirflowException(f"Failed to process {unrouted_id}. {result['message']}")
+            if "Received exception from routing" in result['message']:
+                app.logger.error(f"Checkunrouted failed with message : {result['message']}")
+                raise AirflowFailException(f"Failed to process {unrouted_id}. Will not rerun this task")
+            else:
+                raise AirflowException(f"Failed to process {unrouted_id}. {result['message']}")
 
     @task(task_id="clean_temp_files", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
