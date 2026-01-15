@@ -587,8 +587,9 @@ class PublisherFiles:
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
             status = "success"
+            doi = ''
+            message = None
             if routing_msg == "Done":
-                doi = ''
                 # This is now a routed notification. I need the repositories matched and the doi.
                 if res:
                     notification_obj = models.RoutedNotification.pull(uid)
@@ -609,15 +610,14 @@ class PublisherFiles:
                         if len(dois) > 0:
                             doi = dois[0]
 
-                message = message + ". " + msg
                 app.logger.info(message)
                 self.routing_history.add_notification_state("success", uid, doi=doi)
             else: # Exception during routing
                 msg = "Received exception from routing"
-                message = message + ". " + msg
                 app.logger.warn(msg)
                 self.routing_history.add_notification_state("failure", uid, doi=doi)
                 status = "failure"
+                message = msg
 
             if self.delete_routed:
                 msg = f"Deleting unrouted notification {obj.id}"
@@ -626,7 +626,6 @@ class PublisherFiles:
             else:
                 msg = f"Not deleting unrouted notification {obj.id}"
                 app.logger.debug(msg)
-            message = message + ". " + msg
 
             # Update routing history
             app.logger.info("Updating routing history")
@@ -634,7 +633,9 @@ class PublisherFiles:
                     notification_id=uid, status=status, message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
-        return {'status': status}
+            if not message:
+                message = f"Processed {total_number_of_notification} notifications."
+        return {'status': status, 'message': message}
 
     ##### --- End checkunrouted. Clean up temporary files. ---
 
