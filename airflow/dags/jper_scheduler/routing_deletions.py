@@ -131,8 +131,13 @@ class RoutingDeletion(PublisherFiles):
                     notification_obj.delete()
 
             if not dryRun:
+                # Set the notification to deleted
                 now_utc = datetime.now(timezone.utc).isoformat()
                 self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
+                # Add a tombstone state to workflow states
+                self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status="success",
+                                                        message="Notification deleted as part of routing history cleanup",
+                                                        log_url=self.airflow_log_location)
                 self.routing_history.save()
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
 
