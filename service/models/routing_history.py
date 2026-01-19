@@ -29,7 +29,6 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 "location": "<the file location on disk>",
             }]
             "notification_states" : [{
-            self.routing_history
                 "status": "<one of STATUS>",,
                 "notification_id": "<notification_id>",
                 "doi": "<doi>",
