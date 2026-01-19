@@ -112,6 +112,7 @@ class RoutingDeletion(PublisherFiles):
 
     # Clean all notifications
     def delete_notifications(self, note_list):
+        del_status = "success"
         for notification_id, status in note_list:
             notification_obj = models.RoutedNotification.pull(notification_id)
             if notification_obj:
@@ -120,7 +121,11 @@ class RoutingDeletion(PublisherFiles):
                 if dryRun:
                     app.logger.info(f"DRY RUN: Would delete routed notification {notification_id}")
                 else:
-                    notification_obj.delete()
+                    try:
+                        notification_obj.delete()
+                    except Exception as e:
+                        app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
+                        del_status = "failure"
             else:
                 app.logger.debug(f"Deleting failed notification {notification_id}")
                 notification_obj = models.FailedNotification.pull(notification_id)
@@ -128,14 +133,18 @@ class RoutingDeletion(PublisherFiles):
                 if dryRun:
                     app.logger.info(f"DRY RUN: Would delete failed notification {notification_id}")
                 else:
-                    notification_obj.delete()
+                    try:
+                        notification_obj.delete()
+                    except Exception as e:
+                        app.logger.error(f"Failed to delete failed notification {notification_id}. Error: {str(e)}")
+                        del_status = "failure"
 
             if not dryRun:
                 # Set the notification to deleted
                 now_utc = datetime.now(timezone.utc).isoformat()
                 self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
                 # Add a tombstone state to workflow states
-                self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status="success",
+                self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status=del_status,
                                                         message="Notification deleted as part of routing history cleanup",
                                                         log_url=self.airflow_log_location)
                 self.routing_history.save()
