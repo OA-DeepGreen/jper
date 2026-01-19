@@ -14,6 +14,8 @@ from jper_scheduler.routing_deletions import RoutingDeletion
 from jper_scheduler.notification_helpers import notifications_before, iter_notifications_before
 from jper_scheduler.utils import set_task_name, get_log_url
 
+days_to_keep = app.config.getint("AIRMAINT_DATA_KEEP", 180)
+
 @dag(dag_id="Clean_Old_Data", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRMAINT_OLD_CLEAN", 'None'),
      start_date=datetime(2025, 10, 22),
@@ -31,7 +33,7 @@ def clean_old_data():
         a = RoutingHistory()
         since = "1970-01-01T00:00:00Z"
         # upto = "2025-12-01T11:53:20Z"
-        upto = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        upto = (datetime.now() - relativedelta(days=days_to_keep)).strftime("%Y-%m-%dT%H:%M:%SZ")
         #
         h = a.pull_records(since=since, upto=upto, page=1, page_size=1000)
         routing_ids = []
