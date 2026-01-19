@@ -112,7 +112,7 @@ class RoutingDeletion(PublisherFiles):
 
     # Clean all notifications
     def delete_notifications(self, note_list):
-        for notification_id in note_list:
+        for notification_id, status in note_list:
             notification_obj = models.RoutedNotification.pull(notification_id)
             if notification_obj:
                 app.logger.debug(f"Deleting routed notification {notification_id}")
@@ -132,7 +132,7 @@ class RoutingDeletion(PublisherFiles):
 
             if not dryRun:
                 now_utc = datetime.now(timezone.utc).isoformat()
-                self.routing_history.add_notification_state('deleted', notification_id, deleted=True, deleted_date=now_utc)
+                self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
                 self.routing_history.save()
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
 
@@ -146,7 +146,7 @@ class RoutingDeletion(PublisherFiles):
         # Clean up the notifications
         note_list = []
         for note in self.routing_history.notification_states:
-            note_list.append(note['notification_id'])
+            note_list.append((note['notification_id'], note['status']))
         if len(note_list) > 0:
             app.logger.debug(f"Notifications to delete: {note_list}")
             statusN = self.delete_notifications(note_list=note_list)
