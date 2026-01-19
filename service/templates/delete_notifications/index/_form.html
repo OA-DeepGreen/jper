@@ -1,0 +1,45 @@
+<form class="form" action="" method="GET">
+    <div class="row line-space">
+        <div class="col span-9">
+            <ul class="form-fields">
+                <li>
+                    <label>Delete old notifications</label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">To:</span>
+                        <input type="text" name="upto" value="{{upto}}"/>
+                    </label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Publisher ID</span>
+                        <input type="text" name="publisher_id" value="{{publisher_id}}"/>
+                    </label>
+                </li>
+               <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Status:</span>
+                    </label>
+                   <span class="form-fields__label-text">
+                        <input type="checkbox" name="success-routed" value="success-routed">
+                        <label for="success-routed"> Success - routed</label><br>
+                        <input type="checkbox" name="success-failed" value="success-failed">
+                        <label for="success-failed"> Success - failed</label><br>
+                        <input type="checkbox" name="failure" value="failure">
+                        <label for="success-failed"> Failure</label><br>
+                   </span>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="row line-space">
+        <div class="col span-12">
+            <ul class="form-fields">
+                <li class="form-fields__item--text">
+                    <button class="btn btn--3d btn--primary move-up" type="submit">Delete notifications</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+</form>
