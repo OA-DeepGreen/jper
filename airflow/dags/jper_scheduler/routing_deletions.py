@@ -1,4 +1,5 @@
-import os, shutil
+import os
+from datetime import datetime, timezone
 from service import models
 from octopus.core import app
 from octopus.modules.store import store
@@ -15,6 +16,17 @@ class RoutingDeletion(PublisherFiles):
             app.logger.debug(f"Invalid routing {routing_id} or publisher {publisher_id}")
             return -1
         super().__init__(publisher_id, routing_id=routing_id)
+
+    def routing_history_status(self):
+        status = "active"
+        statusList = []
+        for state in self.routing_history.notification_states:
+            statusList.append(state.get("status", ""))
+        if len(statusList) > 0 and all(s == "deleted" for s in statusList):
+            status = "deleted"
+        else:
+            status = "partial"
+        return status
 
     def _delete_file_in_server(self, remote_file):
         # Delete one file in the sftp server
@@ -117,6 +129,11 @@ class RoutingDeletion(PublisherFiles):
                     app.logger.info(f"DRY RUN: Would delete failed notification {notification_id}")
                 else:
                     notification_obj.delete()
+
+            if not dryRun:
+                now_utc = datetime.now(timezone.utc).isoformat()
+                self.routing_history.add_notification_state('deleted', notification_id, deleted=True, deleted_date=now_utc)
+                self.routing_history.save()
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
 
     # Clean everything for this routing history
