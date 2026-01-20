@@ -1,4 +1,4 @@
-<form class="form" action="" method="GET">
+<form class="form" action="" method="POST">
     <div class="row line-space">
         <div class="col span-9">
             <ul class="form-fields">
@@ -19,16 +19,14 @@
                 </li>
                <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text">Status:</span>
-                    </label>
-                   <span class="form-fields__label-text">
-                        <input type="checkbox" name="success-routed" value="success-routed">
+                        <span class="form-fields__label-text">Status: <br/><br/></span>
+                        <input type="checkbox" id="success-routed" name="status" value="success-routed">
                         <label for="success-routed"> Success - routed</label><br>
-                        <input type="checkbox" name="success-failed" value="success-failed">
+                        <input type="checkbox" id="success-failed" name="status" value="success-failed">
                         <label for="success-failed"> Success - failed</label><br>
-                        <input type="checkbox" name="failure" value="failure">
-                        <label for="success-failed"> Failure</label><br>
-                   </span>
+                        <input type="checkbox" id="failure" name="status" value="failure">
+                        <label for="failure"> Failure</label>
+                    </label>
                 </li>
             </ul>
         </div>
