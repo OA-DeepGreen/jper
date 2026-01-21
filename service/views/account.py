@@ -775,6 +775,15 @@ def repoinfo(username):
     if request.values.get('packaging', False):
         packaging = [s.strip() for s in request.values['packaging'].split(',')]
 
+    add_publisher = False
+    publisher = {}
+    if request.values.get('publisher_form', False):
+        add_publisher = True
+        if 'publisher_url' in request.values:
+            publisher['url'] = request.values['publisher_url'].strip()
+        if 'publisher_name' in request.values:
+            publisher['name'] = request.values['publisher_name']
+
     try:
         if add_repository:
             acc.data['repository'] = repository
@@ -782,11 +791,16 @@ def repoinfo(username):
             acc.data['sword'] = sword
         if add_packaging:
             acc.data['packaging'] = packaging
+        if add_publisher:
+            if publisher.get('name', None):
+                acc.publisher_name = publisher['name']
+            if publisher.get('url', None):
+                acc.publisher_url = publisher['url']
         acc.save()
-        flash('Thank you. Your repository details have been updated.', "success")
+        flash('Thank you. Your account details have been updated.', "success")
     except Exception as e:
         ex_type, ex_value, ex_traceback = sys.exc_info()
-        flash('Error updating repository details: ' + str(ex_value), 'error')
+        flash('Error updating account details: ' + str(ex_value), 'error')
     return redirect(url_for('.username', username=username))
 
 

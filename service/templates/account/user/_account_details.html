@@ -5,15 +5,19 @@
 				<h2>
 					{% if account.has_role('admin') %} Admin {% endif %}
 					{% if account.has_role('repository') %} Institution Repository {% endif %}
-					{% if account.has_role('publisher') %}
-					{% if account.has_role('repository')
-					%} / {% endif %} Publisher {% endif %} account details
+					{% if account.has_role('publisher') %} Publisher {% endif %}
+					account details
 				</h2>
 			</div>
 	    	<div class="col span-4 cms">
 				<dl>
 	            	<dt class="visuallyhidden">Email address</dt>
 	            	<dd>{{account.data['email']}}</dd>
+                    {% if account.has_role('publisher') and user.get('publisher', {}).get('name', '') %}
+                      {{ user['publisher']['name'] }}
+                    {% elif account.has_role('repository') and user.get('repository', {}).get('name', '') %}
+                      {{ user['repository']['name'] }}
+                    {% endif %}
 	            </dl>
 			</div>
 			<div class="col span-8 cms">
