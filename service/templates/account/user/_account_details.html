@@ -9,28 +9,29 @@
 					account details
 				</h2>
 			</div>
-	    	<div class="col span-6 cms">
+	    	<div class="col span-4 cms">
 				<dl>
                     <dt>Email</dt>
                     <dd>{{ account.email }}</dd>
+                    {% if account.has_role('repository') %}
+                      <dt>Bibid</dt>
+                      <dd>{{ account.repository_bibid }}</dd>
+                    {% endif %}
+                	{% if current_user.is_super %}
+	                  <dt>Created</dt>
+					  <dd>{{account.data['created_date']}}</dd>
+					{% endif %}
+	            </dl>
+			</div>
+			<div class="col span-8 cms">
+            	<dl class="dl-horizontal dl-horizontal--account-details">
                     {% if account.has_role('publisher') %}
                       <dt>Name</dt>
                       <dd>{{ account.publisher_name }}</dd>
                     {% elif account.has_role('repository') %}
                       <dt>Name</dt>
                       <dd>{{ account.repository_name }}</dd>
-                      <dt>Bibid</dt>
-                      <dd>{{ account.repository_bibid }}</dd>
-                      <dt>Bibid</dt>
                     {% endif %}
-	            </dl>
-			</div>
-			<div class="col span-6 cms">
-            	<dl class="dl-horizontal dl-horizontal--account-details">
-	            	{% if current_user.is_super %}
-	                  <dt>Created</dt>
-					  <dd>{{account.data['created_date']}}</dd>
-					{% endif %}
 					<dt>Account <abbr title="Identifier">ID</abbr></dt>
 					<dd>{{account.id}}</dd>
 					<dt><abbr title="Application Programming Interface">API</abbr> key</dt>
