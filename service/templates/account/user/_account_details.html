@@ -13,10 +13,10 @@
 				<dl>
 	            	<dt class="visuallyhidden">Name / Email address</dt>
 	            	<dd>
-                    {% if account.has_role('publisher') and account.get('publisher', {}).get('name', '') %}
-                      {{ account['publisher']['name'] }}
-                    {% elif account.has_role('repository') and account.get('repository', {}).get('name', '') %}
-                      {{ account['repository']['name'] }}
+                    {% if account.has_role('publisher') and account.publisher_name %}
+                      {{ account.publisher_name }}
+                    {% elif account.has_role('repository') and account.repository_name %}
+                      {{ account.repository_name }}
                     {% else %}
                       {{account.data['email']}}
                     {% endif %}
