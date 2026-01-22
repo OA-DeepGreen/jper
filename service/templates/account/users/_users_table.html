@@ -30,7 +30,7 @@
                         {{ user['repository']['name'] }}
                       {% else %}
                         {{ user['email'] }}
-                      {% end %}
+                      {% endif %}
                     </td>
                     {# column: role #}
                     {% if 'admin' in user['role'] %}
