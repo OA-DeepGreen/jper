@@ -4,8 +4,10 @@
 <div class="row cms">
 	<div class="col span-9">
 		<h2><b>Manage Users</b></h2>
-        {% include 'account/users/_add_user_form.html' %}
         {% include 'account/users/_filter_form.html' %}
+    </div>
+    <div class="col span-3">
+        {% include 'account/users/_add_user_form.html' %}
     </div>
 </div>
 {% include 'account/users/_number_of_results.html' %}
