@@ -11,20 +11,23 @@
 			</div>
 	    	<div class="col span-4 cms">
 				<dl>
-	            	<dt class="visuallyhidden">Email address</dt>
-	            	<dd>{{account.data['email']}}</dd>
-                    {% if account.has_role('publisher') and user.get('publisher', {}).get('name', '') %}
-                      {{ user['publisher']['name'] }}
-                    {% elif account.has_role('repository') and user.get('repository', {}).get('name', '') %}
-                      {{ user['repository']['name'] }}
+	            	<dt class="visuallyhidden">Name / Email address</dt>
+	            	<dd>
+                    {% if account.has_role('publisher') and account.get('publisher', {}).get('name', '') %}
+                      {{ account['publisher']['name'] }}
+                    {% elif account.has_role('repository') and account.get('repository', {}).get('name', '') %}
+                      {{ account['repository']['name'] }}
+                    {% else %}
+                      {{account.data['email']}}
                     {% endif %}
+                    </dd>
 	            </dl>
 			</div>
 			<div class="col span-8 cms">
             	<dl class="dl-horizontal dl-horizontal--account-details">
 	            	{% if current_user.is_super %}
-	                <dt>Created</dt>
-					<dd>{{account.data['created_date']}}</dd>
+	                  <dt>Created</dt>
+					  <dd>{{account.data['created_date']}}</dd>
 					{% endif %}
 					<dt>Account <abbr title="Identifier">ID</abbr></dt>
 					<dd>{{account.id}}</dd>
