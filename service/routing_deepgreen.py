@@ -279,6 +279,8 @@ def _match(notification_data, repository_config, provenance, acc_id):
         return False, provenance
 
     # Removing further match refinements - keywords, excluded keywords and content_types
+    # See issue https://github.com/CottageLabs/deepgreen/issues/188
+    # - Issue #188 -------------------------------------------------
     # do further match refinements
     # if the configuration specifies a keyword,
     #     it must match the notification data, otherwise the match fails
@@ -294,7 +296,7 @@ def _match(notification_data, repository_config, provenance, acc_id):
     #     # app.logger.debug(" ---- matched: {x}".format(x=keyword_matched))
     #     if not keyword_matched:
     #         return False, provenance
-
+    #
     # if the configuration specifies an excluded keyword,
     #     it must not match the notification data
     # if len(rc.excluded_keywords) > 0:
@@ -308,7 +310,7 @@ def _match(notification_data, repository_config, provenance, acc_id):
     #                 provenance.add_provenance("keywords", rk, "keywords", mk, m)
     #     if excluded_keyword_matched:
     #         return False, provenance
-
+    #
     # as above, if the config requires a content type it must match the notification data or the match fails
     # if len(rc.content_types) > 0:
     #     # app.logger.debug(" -- Refine with content types")
@@ -322,6 +324,7 @@ def _match(notification_data, repository_config, provenance, acc_id):
     #     # app.logger.debug(" ---- matched: {x}".format(x=content_type_matched))
     #     if not content_type_matched:
     #         return False, provenance
+    # - Issue #188 -------------------------------------------------
 
     return len(provenance.provenance) > 0, provenance
 
