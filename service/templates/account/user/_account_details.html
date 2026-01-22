@@ -11,20 +11,20 @@
 			</div>
 	    	<div class="col span-4 cms">
 				<dl>
-                    <dt>Email</dt>
-                    <dd>{{ account.email }}</dd>
+                	<dt class="visuallyhidden">Email address</dt>
+	            	<dd>{{ account.email }}</dd>
                     {% if account.has_role('repository') %}
-                      <dt>Bibid</dt>
+                      <dt class="visuallyhidden">Bibid</dt>
                       <dd>{{ account.repository_bibid }}</dd>
                     {% endif %}
-                	{% if current_user.is_super %}
-	                  <dt>Created</dt>
-					  <dd>{{account.data['created_date']}}</dd>
-					{% endif %}
 	            </dl>
 			</div>
 			<div class="col span-8 cms">
             	<dl class="dl-horizontal dl-horizontal--account-details">
+                    {% if current_user.is_super %}
+	                  <dt>Created</dt>
+					  <dd>{{account.data['created_date']}}</dd>
+					{% endif %}
                     {% if account.has_role('publisher') %}
                       <dt>Name</dt>
                       <dd>{{ account.publisher_name }}</dd>
