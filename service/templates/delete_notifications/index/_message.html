@@ -1,0 +1,21 @@
+<div class="row line-space">
+  <div class="col span-12">
+    <dl class="dl-details">
+     {% if upto %}
+        <dt>Delete notifications older than:</dt>
+        <dd>{{ upto }}</dd>
+      {% endif %}
+      {% if publisher_id %}
+        <dt>Publisher ID:</dt>
+        <dd>{{ publisher_id }}</dd>
+      {% endif %}
+      {% if status_values|length > 0 %}
+        <dt>Status:</dt>
+        {% for status_value in status_values %}
+          <dd>{{ status_value }}</dd>
+        {% endfor %}
+      {% endif %}
+    </dl>
+    <div><a href="/delete_notifications">Back to deletion form</a></div>
+  </div>
+</div>
