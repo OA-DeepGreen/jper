@@ -952,7 +952,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
                     q['query'] = {'bool': {'must': []}}
                 q['query']['bool']['must'].append({'match': {v['term']: v['selected']}})
 
-        ans = cls.pull_all(q, size=size, return_as_object=False)
+        ans = cls.query(q, size=size)
         return ans
 
     @classmethod

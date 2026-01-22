@@ -1,10 +1,5 @@
 <div class="row cms">
     <div class="col span-12">
- 		{% if current_user.is_super %}
-		<a href="{{url_for('account.register')}}">
-			<button type="button" class="btn btn--3d btn--primary">Add&nbsp;a&nbsp;user</button>
-		</a>
-		{% endif %}
         <table class="tablesorter-green" id="users">
             <thead>
                 <tr>
