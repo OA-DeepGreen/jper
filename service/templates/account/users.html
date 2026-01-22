@@ -28,21 +28,13 @@
                     <td>{{user['id']}}</td>
                     {# column: name / email #}
                     <td>
-                    {% if 'publisher' in user['role'] %}
-                        {% if user.get('publisher', {}).get('name', '') %}
-                          {{ user['publisher']['name'] }}
-                        {% else %}
-                          {{ user['email'] }}
-                        {% endif %}
-                    {% elif 'repository' in user['role'] %}
-                        {% if user.get('repository', {}).get('name', '') %}
-                          {{ user['repository']['name'] }}
-                        {% else %}
-                          {{ user['email'] }}
-                        {% endif %}
-                    {% else %}
-                      {{ user['email'] }}
-                    {% end %}
+                      {% if 'publisher' in user['role'] and user.get('publisher', {}).get('name', '') %}
+                        {{ user['publisher']['name'] }}
+                      {% elif 'repository' in user['role'] and user.get('repository', {}).get('name', '') %}
+                        {{ user['repository']['name'] }}
+                      {% else %}
+                        {{ user['email'] }}
+                      {% end %}
                     </td>
                     {# column: role #}
                     {% if 'admin' in user['role'] %}
