@@ -516,6 +516,10 @@ dl.dl-details dd {
   padding-left: 10px;
   font-weight: normal;
 }
+#file_locations dl.dl-details dd {
+    word-wrap: break-word;
+    max-width: 50%;
+}
 
 .per-page {
     padding-top: 25px;
