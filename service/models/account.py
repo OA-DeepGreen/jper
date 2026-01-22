@@ -18,7 +18,6 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         "id" : "<unique persistent account id>",
         "created_date" : "<date account created>",
         "last_updated" : "<date account last modified>",
-        "name" : "<name of the account>",
         "email" : "<account contact email>",
         "contact_name" : "<name of key contact>",
         "password" : "<hashed password for ui login>",
