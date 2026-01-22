@@ -906,27 +906,27 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         elif not self.password:
             raise dataobj.DataSchemaException("Account has to contain password")
         if account_hash.get('email', None):
-            self.email = account_hash.get('email')
+            self.email = account_hash['email']
         if account_hash.get('contact_name', None):
-            self.contact_name = account_hash.get('contact_name')
+            self.contact_name = account_hash['contact_name']
         if account_hash.get('api_key', None):
-            self.api_key = account_hash.get('api_key')
+            self.api_key = account_hash['api_key']
         if account_hash.get('role', []):
-            self.role = account_hash.get('role')
+            self.role = account_hash['role']
         if account_hash.get('packaging', []):
-            self.packaging = account_hash.get('packaging')
+            self.packaging = account_hash['packaging']
         if account_hash.get('repository', {}):
-            self.repository = account_hash.get('repository')
+            self.repository = account_hash['repository']
         if account_hash.get('publisher', {}):
-            self.publisher = account_hash.get('publisher')
+            self.publisher = account_hash['publisher']
         if account_hash.get('sword', {}):
-            self.sword = account_hash.get('sword')
+            self.sword = account_hash['sword']
         if account_hash.get('embargo', {}):
-            self.embargo = account_hash.get('embargo')
+            self.embargo = account_hash['embargo']
         if account_hash.get('license', {}):
-            self.license = account_hash.get('license')
+            self.license = account_hash['license']
         if account_hash.get('ssh_keys', []):
-            for key in ssh_keys:
+            for key in account_hash['ssh_keys']:
                 if key.get('public_key', None) and key.get('title', None):
                     self.add_ssh_key(key['public_key'], key['title'])
         return
@@ -936,7 +936,6 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
 
     @classmethod
     def pull_all_accounts_filter(cls, account_filters, page, page_size):
-        size = 10000
         q = {
             "query": {
                 "match_all": {}
@@ -944,7 +943,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
             "from": (page - 1) * page_size,
             "size": page_size
         }
-        for k,v in account_filters.items():
+        for k, v in account_filters.items():
             if v['selected']:
                 if 'match_all' in q:
                   del q['query']['match_all']
@@ -952,7 +951,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
                     q['query'] = {'bool': {'must': []}}
                 q['query']['bool']['must'].append({'match': {v['term']: v['selected']}})
 
-        ans = cls.query(q, size=size)
+        ans = cls.query(q, size=page_size)
         return ans
 
     @classmethod

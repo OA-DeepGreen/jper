@@ -382,13 +382,12 @@ def index():
             'term': 'publisher.routing_status.exact'
         }
     }
-    for k,v in account_filters.items():
-        if v['selected']:
-            filled_params[k] = v
+    for k, v in account_filters.items():
+        filled_params[k] = v
 
     # get page and page size
     page = validate_page()
-    page_size = validate_page_size(default=1000)
+    page_size = validate_page_size(default=100)
     filled_params['pageSize'] = page_size
 
     link = f"/account"
