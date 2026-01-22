@@ -314,17 +314,7 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         notifications.append(row)
     return notifications
 
-@blueprint.before_request
-def restrict():
-    if current_user.is_anonymous:
-        if not request.path.endswith('login'):
-            return redirect(request.path.rsplit('/', 1)[0] + '/login')
-
-
-@blueprint.route('/')
-def index():
-    if not current_user.is_super:
-        abort(401)
+def _get_users():
     sword_status = {}
     for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
         acc_id = s.get('_source', {}).get('id')
@@ -336,14 +326,55 @@ def index():
             'id': u.get('_source', {}).get('id', ''),
             'email': u.get('_source', {}).get('email', ''),
             'role': u.get('_source', {}).get('role', []),
-            'status' : ''
+            'status': ''
         }
         if user["id"] in sword_status:
             user["status"] = sword_status[user["id"]]
         if "publisher" in user["role"]:
             user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
         users.append(user)
-    return render_template('account/users.html', users=users)
+    return users
+
+@blueprint.before_request
+def restrict():
+    if current_user.is_anonymous:
+        if not request.path.endswith('login'):
+            return redirect(request.path.rsplit('/', 1)[0] + '/login')
+
+
+@blueprint.route('/')
+def index():
+    if not current_user.is_super:
+        abort(401)
+    filters = {
+        'roles': {
+            'label': 'Roles',
+            'values': models.Account.get_all_roles(),
+            'selected': None
+        },
+        'packaging_formats': {
+            'label': 'Packaging formats',
+            'values': models.Account.get_all_packaging_formats(),
+            'selected': None
+        },
+        'software': {
+            'label': 'Software',
+            'values':  models.Account.get_all_software(),
+            'selected': None
+        },
+        'repository_software': {
+            'label': 'Repository software',
+            'values': models.Account.get_all_repository_software(),
+            'selected': None
+        },
+        'publisher_routing_status': {
+            'label': 'Publisher routing status',
+            'values': models.Account.get_all_publisher_routing_status(),
+            'selected': None
+        }
+    }
+    users = _get_users()
+    return render_template('account/users.html', users=users, filters=filters)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)

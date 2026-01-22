@@ -1,0 +1,7 @@
+{% if current_user.is_super %}
+    <div>
+        <a href="{{url_for('account.register')}}">
+            <button type="button" class="btn btn--3d btn--primary">Add&nbsp;a&nbsp;user</button>
+        </a>
+    </div>
+{% endif %}

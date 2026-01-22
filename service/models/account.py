@@ -1124,6 +1124,40 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
     def pull_by_sftp_username(cls, username):
         return cls.pull_by_key('sftp_server.username',username)
 
+    @classmethod
+    def get_all_roles(cls):
+        return cls.get_all_facet_values("role.exact")
+
+    @classmethod
+    def get_all_packaging_formats(cls):
+        return cls.get_all_facet_values("packaging.exact")
+
+    @classmethod
+    def get_all_software(cls):
+        return cls.get_all_facet_values("repository.software.exact")
+
+    @classmethod
+    def get_all_repository_software(cls):
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"role.exact": "repository"}}
+                ]
+            }
+        }
+        return cls.get_all_facet_values("repository.software.exact", query_filter=query)
+
+    @classmethod
+    def get_all_publisher_routing_status(cls):
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"role.exact": "publisher"}}
+                ]
+            }
+        }
+        return cls.get_all_facet_values("publisher.routing_status", query_filter=query)
+
     def remove(self):
         self.delete()
 
