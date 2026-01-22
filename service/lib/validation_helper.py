@@ -46,3 +46,9 @@ def bad_request(message):
     resp.mimetype = "application/json"
     resp.status_code = 400
     return resp
+
+
+def is_newer(date_string, time_threshold_string):
+    time_threshold = dates.parse(time_threshold_string)
+    dt = dates.parse(date_string)
+    return dt > time_threshold
