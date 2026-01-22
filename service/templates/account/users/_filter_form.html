@@ -1,0 +1,33 @@
+<div class="line-space">
+    <h3>Filter users</h3>
+    <form class="form" action="" method="GET">
+    <div class="row line-space">
+        <div class="col span-9">
+            <ul class="form-fields">
+                {% for filter_key, filter_value in account_filters.items() %}
+                    <li class="form-fields__item--text">
+                        <label>
+                            <span class="form-fields__label-text" style="width: 35%">{{ filter_value['label'] }}</span>
+                            <select name="{{filter_key}}">
+                                <option value="" {% if filter_value['selected'] == "" %}selected{% endif %}>Filter by {{ filter_value['label'] | lower }}</option>
+                                {% for val in filter_value['values'] %}
+                                    <option value="{{ val }}" {% if filter_value['selected'] == val %}selected{% endif %}>{{ val }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </li>
+               {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="row line-space">
+        <div class="col span-12">
+            <ul class="form-fields">
+                <li class="form-fields__item--text">
+                    <button class="btn btn--3d btn--primary move-up" type="submit">Show</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+</form>
+</div>
