@@ -17,7 +17,7 @@
                       {{ account.publisher_name }} <br/>
                       {{ account.email }}
                     {% elif account.has_role('repository') and account.repository_name %}
-                      {{ account.bibid }} <br/>
+                      {{ account.repository_bibid }} <br/>
                       {{ account.repository_name }} <br/>
                       {{ account.email }}
                     {% else %}
