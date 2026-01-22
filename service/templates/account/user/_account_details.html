@@ -9,24 +9,23 @@
 					account details
 				</h2>
 			</div>
-	    	<div class="col span-4 cms">
+	    	<div class="col span-6 cms">
 				<dl>
-	            	<dt class="visuallyhidden">Name / Email address</dt>
-	            	<dd>
-                    {% if account.has_role('publisher') and account.publisher_name %}
-                      {{ account.publisher_name }} <br/>
-                      {{ account.email }}
-                    {% elif account.has_role('repository') and account.repository_name %}
-                      {{ account.repository_bibid }} <br/>
-                      {{ account.repository_name }} <br/>
-                      {{ account.email }}
-                    {% else %}
-                      {{account.data['email']}}
+                    <dt>Email</dt>
+                    <dd>{{ account.email }}</dd>
+                    {% if account.has_role('publisher') %}
+                      <dt>Name</dt>
+                      <dd>{{ account.publisher_name }}</dd>
+                    {% elif account.has_role('repository') %}
+                      <dt>Name</dt>
+                      <dd>{{ account.repository_name }}</dd>
+                      <dt>Bibid</dt>
+                      <dd>{{ account.repository_bibid }}</dd>
+                      <dt>Bibid</dt>
                     {% endif %}
-                    </dd>
 	            </dl>
 			</div>
-			<div class="col span-8 cms">
+			<div class="col span-6 cms">
             	<dl class="dl-horizontal dl-horizontal--account-details">
 	            	{% if current_user.is_super %}
 	                  <dt>Created</dt>
