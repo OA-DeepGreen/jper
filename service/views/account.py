@@ -17,7 +17,8 @@ import math
 import csv
 import sys
 import os
-from jsonpath_rw_ext import parse
+import urllib.parse
+from jsonpath_rw_ext import parse as json_parse
 from itertools import zip_longest
 from service import models
 from io import StringIO, TextIOWrapper, BytesIO
@@ -314,14 +315,17 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         notifications.append(row)
     return notifications
 
-def _get_users():
+def _get_users(account_filters, page, page_size):
+    records = models.Account().pull_all_accounts_filter(account_filters, page, page_size)
     sword_status = {}
     for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
         acc_id = s.get('_source', {}).get('id')
         if acc_id:
             sword_status[acc_id] = s.get('_source', {}).get('status', '')
     users = []
-    for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
+    total = records.get('hits', {}).get('total', {}).get('value', 0)
+    num_pages = int(math.ceil(total / page_size))
+    for u in records.get('hits', {}).get('hits', []):
         user = {
             'id': u.get('_source', {}).get('id', ''),
             'email': u.get('_source', {}).get('email', ''),
@@ -337,7 +341,7 @@ def _get_users():
         if "repository" in user["role"]:
             user['name'] = u.get('_source', {}).get('repository', {}).get('bibid', '')
         users.append(user)
-    return users
+    return users, total, num_pages
 
 @blueprint.before_request
 def restrict():
@@ -350,35 +354,49 @@ def restrict():
 def index():
     if not current_user.is_super:
         abort(401)
-    filters = {
+    filled_params = {}
+    account_filters = {
         'roles': {
             'label': 'Roles',
             'values': models.Account.get_all_roles(),
-            'selected': None
+            'selected': request.args.get('roles', ''),
+            'term': 'role.exact'
         },
         'packaging_formats': {
             'label': 'Packaging formats',
             'values': models.Account.get_all_packaging_formats(),
-            'selected': None
-        },
-        'software': {
-            'label': 'Software',
-            'values':  models.Account.get_all_software(),
-            'selected': None
+            'selected': request.args.get('packaging_formats', ''),
+            'term': 'packaging.exact',
+
         },
         'repository_software': {
             'label': 'Repository software',
             'values': models.Account.get_all_repository_software(),
-            'selected': None
+            'selected': request.args.get('repository_software', ''),
+            'term': 'repository.software.exact'
         },
         'publisher_routing_status': {
             'label': 'Publisher routing status',
             'values': models.Account.get_all_publisher_routing_status(),
-            'selected': None
+            'selected': request.args.get('publisher_routing_status', ''),
+            'term': 'publisher.routing_status.exact'
         }
     }
-    users = _get_users()
-    return render_template('account/users.html', users=users, filters=filters)
+    for k,v in account_filters.items():
+        if v['selected']:
+            filled_params[k] = v
+
+    # get page and page size
+    page = validate_page()
+    page_size = validate_page_size(default=1000)
+    filled_params['pageSize'] = page_size
+
+    link = f"/account"
+    encoded_params = urllib.parse.urlencode(filled_params)
+    link = f'{link}?{encoded_params}'
+    users, total, num_pages = _get_users(account_filters, page, page_size)
+    return render_template('account/users.html', users=users, account_filters=account_filters,
+                           page_size=page_size, link=link, page=page, num_pages=num_pages, total=total)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)
@@ -869,7 +887,7 @@ def config(username):
 
         rows = []
         for hdr in xtable["header"]:
-            rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
+            rows.append((m.value for m in json_parse(xtable[hdr]).find(res)), )
 
         rows = list(zip_longest(*rows, fillvalue=''))
 

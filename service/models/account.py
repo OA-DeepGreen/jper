@@ -935,8 +935,29 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         return True
 
     @classmethod
+    def pull_all_accounts_filter(cls, account_filters, page, page_size):
+        size = 10000
+        q = {
+            "query": {
+                "match_all": {}
+            },
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
+        for k,v in account_filters.items():
+            if v['selected']:
+                if 'match_all' in q:
+                  del q['query']['match_all']
+                if not 'bool' in q['query']:
+                    q['query'] = {'bool': {'must': []}}
+                q['query']['bool']['must'].append({'match': {v['term']: v['selected']}})
+
+        ans = cls.pull_all(q, size=size, return_as_object=False)
+        return ans
+
+    @classmethod
     def pull_all_accounts(cls):
-        size = 1000
+        size = 10000
         q = {
             "query": {
                 "match_all": {}
@@ -944,7 +965,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
             "size": size,
             "from": 0
         }
-        ans = cls.pull_all(q, size=1000, return_as_object=False)
+        ans = cls.pull_all(q, size=size, return_as_object=False)
         accounts = {}
         for rec in ans:
             accounts[rec.get("id")] = rec.get("email", '')
