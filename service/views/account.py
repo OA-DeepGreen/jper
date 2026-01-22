@@ -383,16 +383,15 @@ def index():
         }
     }
     for k, v in account_filters.items():
-        filled_params[k] = v
+        filled_params[k] = v['selected']
 
     # get page and page size
     page = validate_page()
-    page_size = validate_page_size(default=100)
+    page_size = validate_page_size(default=1000)
     filled_params['pageSize'] = page_size
 
-    link = f"/account"
     encoded_params = urllib.parse.urlencode(filled_params)
-    link = f'{link}?{encoded_params}'
+    link = f'/account?{encoded_params}'
     users, total, num_pages = _get_users(account_filters, page, page_size)
     return render_template('account/users.html', users=users, account_filters=account_filters,
                            page_size=page_size, link=link, page=page, num_pages=num_pages, total=total)
