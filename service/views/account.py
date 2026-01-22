@@ -326,12 +326,16 @@ def _get_users():
             'id': u.get('_source', {}).get('id', ''),
             'email': u.get('_source', {}).get('email', ''),
             'role': u.get('_source', {}).get('role', []),
-            'status': ''
+            'status': '',
+            'name': ''
         }
         if user["id"] in sword_status:
             user["status"] = sword_status[user["id"]]
         if "publisher" in user["role"]:
             user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
+            user['name'] = u.get('_source', {}).get('publisher', {}).get('name', '')
+        if "repository" in user["role"]:
+            user['name'] = u.get('_source', {}).get('repository', {}).get('bibid', '')
         users.append(user)
     return users
 

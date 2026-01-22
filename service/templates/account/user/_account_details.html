@@ -14,9 +14,12 @@
 	            	<dt class="visuallyhidden">Name / Email address</dt>
 	            	<dd>
                     {% if account.has_role('publisher') and account.publisher_name %}
-                      {{ account.publisher_name }}
+                      {{ account.publisher_name }} <br/>
+                      {{ account.email }}
                     {% elif account.has_role('repository') and account.repository_name %}
-                      {{ account.repository_name }}
+                      {{ account.bibid }} <br/>
+                      {{ account.repository_name }} <br/>
+                      {{ account.email }}
                     {% else %}
                       {{account.data['email']}}
                     {% endif %}

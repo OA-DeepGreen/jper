@@ -24,10 +24,8 @@
                     <td>{{user['id']}}</td>
                     {# column: name / email #}
                     <td>
-                      {% if 'publisher' in user['role'] and user.get('publisher', {}).get('name', '') %}
-                        {{ user['publisher']['name'] }}
-                      {% elif 'repository' in user['role'] and user.get('repository', {}).get('name', '') %}
-                        {{ user['repository']['name'] }}
+                      {% if user.get('name', '') %}
+                        {{ user['name'] }}
                       {% else %}
                         {{ user['email'] }}
                       {% endif %}
