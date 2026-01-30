@@ -728,27 +728,6 @@ class XSLT(object):
             <!-- Creator / Contributor (Author, Editor...)-->
             <xsl:for-each select="//article-meta/contrib-group/contrib[not(@contrib-type='author non-byline')]">
               <xsl:choose>
-                    <!-- if contributor is a non-person entity -->
-                    <xsl:when test="collab">
-                        <mods:name type="corporate">
-                        <mods:namePart>
-                        <xsl:choose>
-                            <xsl:when test="collab/institution">
-                                <xsl:value-of select="collab/institution/text()"/>
-                            </xsl:when>
-                            <xsl:otherwise>
-                                <xsl:value-of select="collab/text()"/>
-                            </xsl:otherwise>
-                        </xsl:choose>
-                        </mods:namePart>
-                        <mods:role>
-                            <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
-                        </mods:role>
-                        </mods:name>
-
-                    </xsl:when>
-
-
                   <!-- if contributor is a person -->
                   <xsl:when test="//string-name or //name">
                       <mods:name type="personal">
@@ -781,22 +760,8 @@ class XSLT(object):
                             <xsl:when test="xref[@ref-type='aff' and string-length(@rid) > 0]">
                               <xsl:for-each select="xref[@ref-type='aff' and string-length(@rid) > 0]">
                                 <mods:affiliation>
-                                  <!--xsl:variable name="aff_node" select="key('kAffById',@rid)"/>
-                                  <xsl:for-each select="$aff_node//*/text()">
-                                      <xsl:if test="not(local-name(parent::*)='label') and
-                                                  not(local-name(parent::*)='sub') and
-                                                  not(local-name(parent::*)='sup') and
-                                                  not(local-name(parent::*)='institution-id') and
-                                                  not(local-name(parent::*)='addr-line') and
-                                                  not(normalize-space(.)='')">
-                                          <xsl:value-of select="normalize-space(.)" />
-                                          <xsl:text> </xsl:text>
-                                      </xsl:if>
-                                  </xsl:for-each-->
                                     <xsl:call-template name="build_aff_string">
                                       <xsl:with-param name="aff_node" select="key('kAffById',@rid)"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
                                     </xsl:call-template>
                                 </mods:affiliation>
                               </xsl:for-each>
@@ -813,8 +778,6 @@ class XSLT(object):
                                   <mods:affiliation>
                                     <xsl:call-template name="build_aff_string">
                                       <xsl:with-param name="aff_node" select="."/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
                                     </xsl:call-template>
                                   </mods:affiliation>
                                 </xsl:for-each>
@@ -824,17 +787,31 @@ class XSLT(object):
                                   <mods:affiliation>
                                       <xsl:call-template name="build_aff_string">
                                         <xsl:with-param name="aff_node" select="//aff[1]"/>
-                                        <xsl:with-param name="combined_string" select="''"/>
-                                        <xsl:with-param name="current_position" select="1"/>
                                       </xsl:call-template>
                                   </mods:affiliation>
                               </xsl:when>
                             </xsl:choose>
+                    </mods:name>
+                  </xsl:when>
+                  <!-- if contributor is a non-person entity -->
+                    <xsl:when test="collab">
+                        <mods:name type="corporate">
+                        <mods:namePart>
+                        <xsl:choose>
+                            <xsl:when test="collab/institution">
+                                <xsl:value-of select="collab/institution/text()"/>
+                            </xsl:when>
+                            <xsl:otherwise>
+                                <xsl:value-of select="collab/text()"/>
+                            </xsl:otherwise>
+                        </xsl:choose>
+                        </mods:namePart>
+                        <mods:role>
+                            <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
+                        </mods:role>
                         </mods:name>
                     </xsl:when>
-
                 </xsl:choose>
-
             </xsl:for-each>
 
             <!-- Description: Abstract / TOC -->
