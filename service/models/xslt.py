@@ -777,60 +777,60 @@ class XSLT(object):
                           </xsl:if>
 
                           <!-- Affiliations -->
-                          <xsl:for-each select="xref[@ref-type='aff']">
-                            <xsl:choose>
-                              <xsl:when test="contains(./@ref-type,'aff') and string-length(@rid) > 0">
+                          <xsl:choose>
+                            <xsl:when test="xref[@ref-type='aff' and string-length(@rid) > 0]">
+                              <xsl:for-each select="xref[@ref-type='aff' and string-length(@rid) > 0]">
                                 <mods:affiliation>
-
-                                  <xsl:call-template name="build_aff_string">
-                                    <xsl:with-param name="aff_node" select="key('kAffById',@rid)"/>
-                                    <xsl:with-param name="combined_string" select="''"/>
-                                    <xsl:with-param name="current_position" select="1"/>
-                                  </xsl:call-template>
+                                  <!--xsl:variable name="aff_node" select="key('kAffById',@rid)"/>
+                                  <xsl:for-each select="$aff_node//*/text()">
+                                      <xsl:if test="not(local-name(parent::*)='label') and
+                                                  not(local-name(parent::*)='sub') and
+                                                  not(local-name(parent::*)='sup') and
+                                                  not(local-name(parent::*)='institution-id') and
+                                                  not(local-name(parent::*)='addr-line') and
+                                                  not(normalize-space(.)='')">
+                                          <xsl:value-of select="normalize-space(.)" />
+                                          <xsl:text> </xsl:text>
+                                      </xsl:if>
+                                  </xsl:for-each-->
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select="key('kAffById',@rid)"/>
+                                      <xsl:with-param name="combined_string" select="''"/>
+                                      <xsl:with-param name="current_position" select="1"/>
+                                    </xsl:call-template>
                                 </mods:affiliation>
+                              </xsl:for-each>
                               </xsl:when>
-                              <xsl:when test="string-length(//aff[position()=last()]/text()) > 0">
+                              <xsl:when test="not(xref[@ref-type='aff']) and @rid">
+                              <!-- accommodate aff linking via @rid in contrib element, multiple ids separated by spaces -->
+                                <xsl:call-template name="parse-multiple-rids-for-affs">
+                                    <xsl:with-param name="rid_string" select="@rid"/>
+                                </xsl:call-template>
+                              </xsl:when>
+                              <!-- if the current contrib element contains the affiliation itself, without any rids: -->
+                              <xsl:when test=".//aff">
+                                <xsl:for-each select=".//aff">
                                   <mods:affiliation>
                                     <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select="//aff[position()=last()]"/>
+                                      <xsl:with-param name="aff_node" select="."/>
                                       <xsl:with-param name="combined_string" select="''"/>
                                       <xsl:with-param name="current_position" select="1"/>
                                     </xsl:call-template>
                                   </mods:affiliation>
+                                </xsl:for-each>
+                              </xsl:when>
+                            <!-- if nothing has worked so far, take the first aff element that can be found in the whole document -->
+                              <xsl:when test="//aff">
+                                  <mods:affiliation>
+                                      <xsl:call-template name="build_aff_string">
+                                        <xsl:with-param name="aff_node" select="//aff[1]"/>
+                                        <xsl:with-param name="combined_string" select="''"/>
+                                        <xsl:with-param name="current_position" select="1"/>
+                                      </xsl:call-template>
+                                  </mods:affiliation>
                               </xsl:when>
                             </xsl:choose>
-                          </xsl:for-each>
-
-                          <!-- accommodate aff linking via @rid in contrib element, multiple ids separated by spaces -->
-                          <xsl:if test="not(xref[@ref-type='aff']) and @rid">
-                              <xsl:call-template name="parse-multiple-rids-for-affs">
-                                  <xsl:with-param name="rid_string" select="@rid"/>
-                              </xsl:call-template>
-                          </xsl:if>
-
-                          <!-- if the current contrib element contains the affiliation itself, without any rids: -->
-                          <xsl:choose>
-                            <xsl:when test=".//aff">
-                                <mods:affiliation>
-                                    <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select=".//aff"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
-                                    </xsl:call-template>
-                                </mods:affiliation>
-                            </xsl:when>
-                            <!-- if nothing has worked so far, take whatever aff element can be found in the whole document -->
-                            <xsl:when test="not(xref[@ref-type='aff']) and not(@rid) and //aff">
-                                <mods:affiliation>
-                                    <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select="//aff"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
-                                    </xsl:call-template>
-                                </mods:affiliation>
-                            </xsl:when>
-                            </xsl:choose>
-                      </mods:name>
+                        </mods:name>
                     </xsl:when>
 
                 </xsl:choose>
@@ -1041,87 +1041,71 @@ class XSLT(object):
 
   <xsl:template name="build_aff_string">
   <!-- builds string recursively, by going through each node and adding its text to the string. end condition: counter > total no of nodes. -->
-        <xsl:param name="combined_string"/>
-        <xsl:param name="aff_node"/>
-        <xsl:param name="current_position"/>
-        <xsl:variable name="total_nodes" select="count($aff_node/descendant-or-self::text())"/>
+    <xsl:param name="combined_string" select="''"/>
+    <xsl:param name="aff_node"/>
+    <xsl:param name="current_position" select="1"/>
+    <xsl:variable name="total_nodes" select="count($aff_node/descendant-or-self::text())"/>
+    <xsl:variable name="current_node" select="$aff_node/descendant-or-self::text()[$current_position]"/>
+    <xsl:variable name="stripped_string" select="normalize-space($aff_node/descendant-or-self::text()[$current_position])"/>
+    <xsl:variable name="nn" select="local-name($aff_node/descendant-or-self::text()[$current_position]/parent::*)"/>
+    <xsl:choose>
+      <xsl:when test="number($current_position) &gt; $total_nodes">
+          <!-- exit condition, prints out value of combined_string -->
+          <xsl:value-of select="$combined_string"/>
+      </xsl:when>
+      <xsl:when test="string-length($stripped_string) = 0 or
+                      $stripped_string = ',' or
+                      $stripped_string = '.' or
+                      $stripped_string = ';' or
+                      $nn = 'label' or $nn ='institution-id' or
+                      $nn='sub' or $nn = 'sup' or
+                      $nn='email' or $nn='postal-code'" >
+          <!-- if stripped_string is empty or merely a punctuation character, or parent should be ignored -->
+        <xsl:call-template name="build_aff_string">
+          <xsl:with-param name="combined_string" select="$combined_string"/>
+          <xsl:with-param name="aff_node" select="$aff_node"/>
+          <xsl:with-param name="current_position" select="number($current_position)+1"/>
+        </xsl:call-template>
+      </xsl:when>
+      <xsl:when test="$combined_string=''">
+      <!-- if combined_string is empty still-->
+        <xsl:call-template name="build_aff_string">
+          <xsl:with-param name="combined_string" select="$stripped_string"/>
+          <xsl:with-param name="aff_node" select="$aff_node"/>
+          <xsl:with-param name="current_position" select="number($current_position)+1"/>
+        </xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise>
+      <!-- if there is already text in the combined string, add stripped_string with separators depending on preceding / succeeding punctuation -->
+        <xsl:variable name="last_char" select="substring($combined_string, string-length($combined_string))"/>
+        <xsl:variable name="first_char" select="substring($stripped_string, 1,1)"/>
         <xsl:choose>
-            <xsl:when test="number($current_position) &gt; $total_nodes">
-                <!-- exit condition, prints out value of combined_string -->
-                <xsl:value-of select="$combined_string"/>
-            </xsl:when>
-            <xsl:otherwise>
-            <xsl:for-each select="$aff_node/descendant-or-self::text()[$current_position]">
-            <!--selects current node-->
-                <xsl:variable name="stripped_string" select="normalize-space()"/>
-                <xsl:choose>
-                    <xsl:when test="local-name(parent::*)='sub' or local-name(parent::*)='label' or local-name(parent::*) = 'sup' or local-name(parent::*)='email' or local-name(parent::*)='institution-id' or local-name(parent::*)='postal-code'">
-                    <!-- if text belongs to irrelevant element, simply call template again with counter +1 -->
-                            <xsl:call-template name="build_aff_string">
-                                <xsl:with-param name="combined_string" select="$combined_string"/>
-                                <xsl:with-param name="aff_node" select="$aff_node"/>
-                                <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                            </xsl:call-template>
-                    </xsl:when>
-                    <xsl:when test="string-length($stripped_string) &gt; 0 and
-                    $stripped_string != ',' and
-                    $stripped_string != '.' and
-                    $stripped_string != ';'">
-                    <!-- if stripped_string is not empty and not only a punctuation character -->
-                        <xsl:choose>
-                            <xsl:when test="string-length($combined_string) &gt; 0"> <!-- if there is already text in the combined string, add stripped_string with separators depending on preceding / succeeding punctuation -->
-                                <xsl:variable name="last_char" select="substring($combined_string, string-length($combined_string))"/>
-                                <xsl:variable name="first_char" select="substring($stripped_string, 1,1)"/>
-                                <xsl:choose>
-                                    <xsl:when test="$last_char = ',' or $last_char = '.' or $last_char = ';'"> <!-- if there's a separator at the end of the combined string -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string,' ', $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:when test="$first_char = ',' or $first_char = '.' or $first_char = ';'"> <!-- if there's a separator at the start of the new string -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string, $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:otherwise> <!-- normal case: add to combined_string with ', ' as separator -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string,', ', $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:otherwise>
-                                </xsl:choose>
-                            </xsl:when>
-                            <xsl:otherwise>
-                            <!-- if combined_string is empty, then set stripped_string as combined_string and call template again. -->
-                                <xsl:call-template name="build_aff_string">
-                                <xsl:with-param name="combined_string" select="$stripped_string"/>
-                                <xsl:with-param name="aff_node" select="$aff_node"/>
-                                <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                </xsl:call-template>
-                            </xsl:otherwise>
-                        </xsl:choose>
-                    </xsl:when>
-                    <xsl:otherwise>
-                        <!-- if stripped_string is either empty or contains only punctuation, call template again with counter +1 -->
-                        <xsl:call-template name="build_aff_string">
-                            <xsl:with-param name="combined_string" select="$combined_string"/>
-                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                        </xsl:call-template>
-                    </xsl:otherwise>
-                </xsl:choose>
-                </xsl:for-each>
-            </xsl:otherwise>
+          <xsl:when test="$last_char = ',' or $last_char = '.' or $last_char = ';'">
+          <!-- if there's a separator at the end of the combined string -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string,' ', $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:when>
+          <xsl:when test="$first_char = ',' or $first_char = '.' or $first_char = ';'"> <!-- if there's a separator at the start of the new string -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string, $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:when>
+          <xsl:otherwise> <!-- normal case: add to combined_string with ', ' as separator -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string,', ', $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:otherwise>
         </xsl:choose>
-    </xsl:template>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
 
     <xsl:template name="parse-multiple-rids-for-affs">
         <xsl:param name="rid_string"/>
@@ -1133,8 +1117,6 @@ class XSLT(object):
             <mods:affiliation xmlns:mods="http://www.loc.gov/mods/v3">
             <xsl:call-template name="build_aff_string">
                 <xsl:with-param name="aff_node" select="key('kAffById', substring-before($rid_string, ' '))"/>
-                <xsl:with-param name="combined_string" select="''"/>
-                <xsl:with-param name="current_position" select="1"/>
             </xsl:call-template>
             </mods:affiliation>
             <xsl:call-template name="parse-multiple-rids-for-affs">
@@ -1145,8 +1127,6 @@ class XSLT(object):
             <mods:affiliation xmlns:mods="http://www.loc.gov/mods/v3">
             <xsl:call-template name="build_aff_string">
                 <xsl:with-param name="aff_node" select="key('kAffById', $rid_string)"/>
-                <xsl:with-param name="combined_string" select="''"/>
-                <xsl:with-param name="current_position" select="1"/>
             </xsl:call-template>
             </mods:affiliation>
         </xsl:otherwise>
