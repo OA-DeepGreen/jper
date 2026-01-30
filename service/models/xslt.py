@@ -501,22 +501,14 @@ class XSLT(object):
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
     <xsl:choose>
       <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
-            <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
-              </xsl:when>
-              <xsl:otherwise>
+        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*) != 'tex-math']">
                 <xsl:value-of select="."/>
-              </xsl:otherwise>
-            </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:when>
       <xsl:otherwise>
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
+        <xsl:for-each select="descendant-or-self::text()[
+          string-length(normalize-space())&gt;0 and
+          local-name(parent::*) != 'tex-math']">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title' "> <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
@@ -524,9 +516,6 @@ class XSLT(object):
                 <xsl:value-of select="normalize-space()"/>
                 <xsl:text>
                 </xsl:text>
-              </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
@@ -536,7 +525,6 @@ class XSLT(object):
                 <xsl:text> </xsl:text>
               </xsl:otherwise>
             </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:otherwise>
     </xsl:choose>
@@ -1021,32 +1009,22 @@ class XSLT(object):
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
       <xsl:choose>
       <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
-            <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
-              </xsl:when>
-              <xsl:otherwise>
-                <xsl:value-of select="."/>
-              </xsl:otherwise>
-            </xsl:choose>
-          </xsl:if>
+        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*)!='tex-math']">
+          <xsl:value-of select="."/>
         </xsl:for-each>
       </xsl:when>
       <xsl:otherwise>
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
+        <xsl:for-each select="descendant-or-self::text()[
+         string-length(normalize-space())&gt;0 and
+         local-name(parent::*)!='tex-math']">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*)='title' ">
+              <xsl:when test="local-name(parent::*)='title'">
                 <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
                 </xsl:text>
                 <xsl:value-of select="normalize-space()"/>
                 <xsl:text>
                 </xsl:text>
-              </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
@@ -1056,7 +1034,6 @@ class XSLT(object):
                 <xsl:text> </xsl:text>
               </xsl:otherwise>
             </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:otherwise>
     </xsl:choose>
