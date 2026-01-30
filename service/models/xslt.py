@@ -180,23 +180,20 @@ class XSLT(object):
       </titlesMain>
       <titles>
           <xsl:for-each select="//journal-meta//journal-title">
-            <title>
+            <title type="parent">
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:attribute name="type"><xsl:text>parent</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space()"/>
             </title>
           </xsl:for-each>
           <xsl:if test="//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')]">
-            <title>
+            <title type="sub">
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:attribute name="type"><xsl:text>sub</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space(//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')])"/>
             </title>
           </xsl:if>
           <xsl:for-each select="//article-meta/title-group/trans-title-group/trans-subtitle">
-            <title>
+            <title type="sub">
               <xsl:call-template name="insert-lang-attribute"/>
-              <xsl:attribute name="type"><xsl:text>sub</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space()"/>
             </title>
           </xsl:for-each>
@@ -223,16 +220,16 @@ class XSLT(object):
 
       <!-- Author Information, only editors and authors due to value constraints in OPUS-xml-->
       <persons>
-          <xsl:for-each select="//article-meta/contrib-group/contrib">
-            <xsl:if test="@contrib-type='guest-editor' or
+              <xsl:for-each select="//article-meta/contrib-group/contrib[
+                          @contrib-type='guest-editor' or
                           @contrib-type='editor' or
-                          @contrib-type='author'">
+                          @contrib-type='author']">
               <person>
                 <xsl:attribute name="role">
                   <xsl:choose>
                       <xsl:when test="@contrib-type='author'">
-                      <xsl:value-of select="@contrib-type"/>
-                    </xsl:when>
+                        <xsl:text>author</xsl:text>
+                        </xsl:when>
                     <xsl:when test="@contrib-type='guest-editor' or
                                     @contrib-type='editor'">
                       <xsl:text>editor</xsl:text>
@@ -262,52 +259,43 @@ class XSLT(object):
                   <xsl:attribute name="email"><xsl:value-of select=".//email"/></xsl:attribute>
                 </xsl:if>
 
-                <xsl:for-each select="./contrib-id">
-                  <xsl:if test="@contrib-id-type='orcid'">
+                <xsl:if test="./contrib-id[@contrib-id-type='orcid']">
                   <identifiers>
-                    <identifier>
-                      <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
-                      <xsl:variable name='orcid' select="./text()"/>
+                    <identifier type="orcid">
+                      <xsl:variable name='orcid' select="./contrib-id[@contrib-id-type='orcid']/text()"/>
                       <xsl:choose>
-                      <xsl:when test="substring($orcid, string-length($orcid))='/'">
-                        <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
-                        <xsl:call-template name="cut-orcid">
-                          <xsl:with-param name="orcid" select="$orcid2"/>
-                        </xsl:call-template>
-                      </xsl:when>
-                      <xsl:otherwise>
-                        <xsl:call-template name="cut-orcid">
-                          <xsl:with-param name="orcid" select="$orcid"/>
-                        </xsl:call-template>
-                      </xsl:otherwise>
+                        <xsl:when test="substring($orcid, string-length($orcid))='/'">
+                          <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
+                          <xsl:call-template name="cut-orcid">
+                            <xsl:with-param name="orcid" select="$orcid2"/>
+                          </xsl:call-template>
+                        </xsl:when>
+                        <xsl:otherwise>
+                          <xsl:call-template name="cut-orcid">
+                            <xsl:with-param name="orcid" select="$orcid"/>
+                          </xsl:call-template>
+                        </xsl:otherwise>
                       </xsl:choose>
                     </identifier>
                   </identifiers>
                   </xsl:if>
-                </xsl:for-each>
-                
-              </person>
-            </xsl:if>
+            </person>
           </xsl:for-each>
       </persons>
 
       <!-- Topical Keywords -->
+      <xsl:if test="//article-meta/kwd-group/kwd">
       <keywords>
-          <keyword>
-            <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-            <xsl:attribute name="type"><xsl:text>swd</xsl:text></xsl:attribute>
-            <xsl:text>-</xsl:text>
-          </keyword>
           <xsl:for-each select="//article-meta/kwd-group/kwd">
             <xsl:if test="string-length(normalize-space(text()))>0">
-              <keyword>
+              <keyword type="uncontrolled">
                 <xsl:call-template name="insert-lang-attribute"/>
-                <xsl:attribute name="type"><xsl:text>uncontrolled</xsl:text></xsl:attribute>
                 <xsl:value-of select="normalize-space(text())"/>
               </keyword>
             </xsl:if>
           </xsl:for-each>
       </keywords>
+      </xsl:if>
 
       <!--
       <dnbInstitutions>
@@ -317,50 +305,42 @@ class XSLT(object):
 
       <!-- Publication Dates -->
       <dates>
-        <xsl:for-each select="//article-meta/pub-date">
         <xsl:choose>
-          <xsl:when test="(contains(@pub-type,'epub') and year) or
+        <xsl:when test="//article-meta/pub-date[
+              (contains(@pub-type,'epub') and year) or
               (contains(@pub-type,'ppub') and year) or
               (contains(@pub-type, 'epub-ppub') and year) or
               (contains(@date-type,'pub') and year) or
-              not(@*)">
+              (not(@*) and year)]">
+        <xsl:for-each select="//article-meta/pub-date[
+              (contains(@pub-type,'epub') and year) or
+              (contains(@pub-type,'ppub') and year) or
+              (contains(@pub-type, 'epub-ppub') and year) or
+              (contains(@date-type,'pub') and year) or
+              (not(@*) and year)]">
               <xsl:call-template name="compose-date"> </xsl:call-template>
+            </xsl:for-each>
           </xsl:when>
           <xsl:otherwise>
-            <xsl:if test="not(year)">
-            <!--to comply with opus requirement that a date has to be given-->
-            <date>
-              <xsl:attribute name="type"><xsl:text>completed</xsl:text></xsl:attribute>
-              <xsl:attribute name="monthDay">
-                <xsl:text>--11-11</xsl:text>
-              </xsl:attribute>
-              <xsl:attribute name="year">
-                <xsl:text>1111</xsl:text>
-              </xsl:attribute>
-            </date>
-            </xsl:if>
+            <date type="completed" monthDay="--11-11" year="1111"/>
           </xsl:otherwise>
         </xsl:choose>
-        </xsl:for-each>
       </dates>
 
       <!-- Identifiers, ISSN, DOI, PMID -->
       <identifiers>
         <xsl:for-each select="//journal-meta/issn">
-          <identifier>
-            <xsl:attribute name="type"><xsl:text>issn</xsl:text></xsl:attribute>
+          <identifier type="issn">
             <xsl:value-of select="normalize-space(text())"/>
           </identifier>
         </xsl:for-each>
         <xsl:if test="//article-meta/article-id[@pub-id-type='doi']">
-          <identifier>
-             <xsl:attribute name="type"><xsl:text>doi</xsl:text></xsl:attribute>
+          <identifier type="doi">
              <xsl:value-of select="//article-meta/article-id[@pub-id-type='doi']"/>
           </identifier>
         </xsl:if>
         <xsl:if test="//article-meta/article-id[@pub-id-type='pmid']">
-          <identifier>
-             <xsl:attribute name="type"><xsl:text>pmid</xsl:text></xsl:attribute>
+          <identifier type="pmid">
              <xsl:value-of select="//article-meta/article-id[@pub-id-type='pmid']"/>
           </identifier>
         </xsl:if>
@@ -758,7 +738,7 @@ class XSLT(object):
             </mods:relatedItem>
 
             <!-- Creator / Contributor (Author, Editor...)-->
-            <xsl:for-each select="//article-meta/contrib-group/contrib">
+            <xsl:for-each select="//article-meta/contrib-group/contrib[not(@contrib-type='author non-byline')]">
               <xsl:choose>
                     <!-- if contributor is a non-person entity -->
                     <xsl:when test="collab">
@@ -797,13 +777,11 @@ class XSLT(object):
                             </xsl:if>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
-                          <xsl:for-each select="./contrib-id">
-                            <xsl:if test="@contrib-id-type='orcid'">
-                                <mods:nameIdentifier type="orcid">
-                                    <xsl:copy-of select="./text()"/>
-                                </mods:nameIdentifier>
-                            </xsl:if>
-                          </xsl:for-each>
+                          <xsl:if test="./contrib-id[@contrib-id-type='orcid']">
+                            <mods:nameIdentifier type="orcid">
+                                <xsl:copy-of select="./contrib-id[@contrib-id-type='orcid']/text()"/>
+                            </mods:nameIdentifier>
+                          </xsl:if>
                           <xsl:if test="string-length(.//email/text()) > 0">
                             <mods:nameIdentifier type="email">
                               <xsl:value-of select=".//email"/>
@@ -945,18 +923,20 @@ class XSLT(object):
                 <!-- another uncommon variation of the same:-->
                 <xsl:for-each select="//article-meta/pub-history/event/date">
                     <xsl:if test="year and month">
-                            <xsl:if test="@date-type">
+                      <xsl:choose>
+                            <xsl:when test="@date-type">
                                 <mods:dateOther encoding="w3cdtf">
                                 <xsl:attribute name="type"><xsl:value-of select="@date-type"/></xsl:attribute>
                                 <xsl:call-template name="compose-date"></xsl:call-template>
                                 </mods:dateOther>
-                            </xsl:if>
-                            <xsl:if test="../@event-type">
+                            </xsl:when>
+                            <xsl:when test="../@event-type">
                                 <mods:dateOther encoding="w3cdtf">
                                 <xsl:attribute name="type"><xsl:value-of select="../@event-type"/></xsl:attribute>
                                 <xsl:call-template name="compose-date"></xsl:call-template>
                             </mods:dateOther>
-                            </xsl:if>
+                            </xsl:when>
+                          </xsl:choose>
                     </xsl:if>
                 </xsl:for-each>
             </mods:originInfo>
