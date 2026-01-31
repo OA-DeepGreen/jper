@@ -200,22 +200,27 @@ class XSLT(object):
       </titles>
 
       <!-- Abstract(s) -->
-      <xsl:if test="//article-meta/abstract or //article-meta/trans-abstract">
-      <abstracts>
-          <xsl:for-each select="//article-meta/abstract[1]">
-          <!-- selecting only the first abstract since opus only accepts one abstract per language! -->
-            <abstract>
-              <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:call-template name="abstract-nested-whitespacing"/>
-            </abstract>
+      <xsl:if test="//article-meta/abstract[not(@abstract-type='graphical')
+                                            and not(@abstract-type='toc')
+                                            and not(@abstract-type='precis')]
+                    or //article-meta/trans-abstract">
+        <abstracts>
+          <xsl:for-each select="//article-meta/abstract[not(@abstract-type='graphical')
+                                                      and not(@abstract-type='toc')
+                                                      and not(@abstract-type='precis')][1]">
+        <!-- selecting the first non-toc non-grapical non-precis abstract -->
+          <abstract>
+            <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
+            <xsl:call-template name="abstract-nested-whitespacing"/>
+          </abstract>
           </xsl:for-each>
-          <xsl:for-each select="//article-meta/trans-abstract">
-            <abstract>
-              <xsl:call-template name="insert-lang-attribute"/>
-              <xsl:call-template name="abstract-nested-whitespacing"/>
-            </abstract>
-          </xsl:for-each>
-      </abstracts>
+            <xsl:for-each select="//article-meta/trans-abstract">
+              <abstract>
+                <xsl:call-template name="insert-lang-attribute"/>
+                <xsl:call-template name="abstract-nested-whitespacing"/>
+              </abstract>
+            </xsl:for-each>
+        </abstracts>
       </xsl:if>
 
       <!-- Author Information, only editors and authors due to value constraints in OPUS-xml-->
@@ -508,7 +513,8 @@ class XSLT(object):
       <xsl:otherwise>
         <xsl:for-each select="descendant-or-self::text()[
           string-length(normalize-space())&gt;0 and
-          local-name(parent::*) != 'tex-math']">
+          local-name(parent::*) != 'tex-math' and
+          not(local-name(parent::*)='title' and .='Abstract')]">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title' "> <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
@@ -722,11 +728,18 @@ class XSLT(object):
                             </xsl:if>
                         </mods:extent>
                     </xsl:if>
+                     <xsl:if test="//article-meta/elocation-id">
+                      <mods:detail type="article-number">
+                        <mods:number><xsl:value-of select="//article-meta/elocation-id"/></mods:number>
+                      </mods:detail>
+                    </xsl:if>
                 </mods:part>
             </mods:relatedItem>
 
             <!-- Creator / Contributor (Author, Editor...)-->
-            <xsl:for-each select="//article-meta/contrib-group/contrib[not(@contrib-type='author non-byline')]">
+            <xsl:for-each select="//article-meta/contrib-group/contrib[
+              not(@contrib-type='author non-byline') and
+              not(@contrib-type='investigator')]">
               <xsl:choose>
                   <!-- if contributor is a person -->
                   <xsl:when test="//string-name or //name">
@@ -817,14 +830,20 @@ class XSLT(object):
             <!-- Description: Abstract / TOC -->
             <xsl:for-each select="//article-meta/abstract">
                 <xsl:choose>
-                    <xsl:when test="@type = 'toc'">
-                        <mods:tableOfContents>
+                    <xsl:when test="@abstract-type='toc'">
+                       <mods:tableOfContents>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:value-of select="."/>
                         </mods:tableOfContents>
                     </xsl:when>
+                    <xsl:when test="@abstract-type='graphical'">
+                      <!-- exclude graphical abstracts -->
+                    </xsl:when>
                     <xsl:otherwise>
                         <mods:abstract>
+                          <xsl:if test="@abstract-type">
+                            <xsl:attribute name="type"><xsl:value-of select="@abstract-type"/></xsl:attribute>
+                          </xsl:if>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:call-template name="abstract-nested-whitespacing"/>
                         </mods:abstract>
@@ -993,7 +1012,8 @@ class XSLT(object):
       <xsl:otherwise>
         <xsl:for-each select="descendant-or-self::text()[
          string-length(normalize-space())&gt;0 and
-         local-name(parent::*)!='tex-math']">
+         local-name(parent::*)!='tex-math' and
+         not(local-name(parent::*)='title' and .='Abstract')]">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title'">
                 <!-- when text of title element is selected, add line breaks before and after-->
@@ -1036,7 +1056,8 @@ class XSLT(object):
                       $stripped_string = ';' or
                       $nn = 'label' or $nn ='institution-id' or
                       $nn='sub' or $nn = 'sup' or
-                      $nn='email' or $nn='postal-code'" >
+                      $nn='email' or $nn='postal-code'
+                      or $nn='ext-link'" >
           <!-- if stripped_string is empty or merely a punctuation character, or parent should be ignored -->
         <xsl:call-template name="build_aff_string">
           <xsl:with-param name="combined_string" select="$combined_string"/>
