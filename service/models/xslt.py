@@ -180,59 +180,61 @@ class XSLT(object):
       </titlesMain>
       <titles>
           <xsl:for-each select="//journal-meta//journal-title">
-            <title>
+            <title type="parent">
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:attribute name="type"><xsl:text>parent</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space()"/>
             </title>
           </xsl:for-each>
           <xsl:if test="//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')]">
-            <title>
+            <title type="sub">
               <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:attribute name="type"><xsl:text>sub</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space(//article-meta/title-group/subtitle[not(@content-type='running-title') and not(@content-type='running-author')])"/>
             </title>
           </xsl:if>
           <xsl:for-each select="//article-meta/title-group/trans-title-group/trans-subtitle">
-            <title>
+            <title type="sub">
               <xsl:call-template name="insert-lang-attribute"/>
-              <xsl:attribute name="type"><xsl:text>sub</xsl:text></xsl:attribute>
               <xsl:value-of select="normalize-space()"/>
             </title>
           </xsl:for-each>
       </titles>
 
       <!-- Abstract(s) -->
-      <xsl:if test="//article-meta/abstract or //article-meta/trans-abstract">
-      <abstracts>
-          <xsl:for-each select="//article-meta/abstract[1]">
-          <!-- selecting only the first abstract since opus only accepts one abstract per language! -->
-            <abstract>
-              <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-              <xsl:call-template name="abstract-nested-whitespacing"/>
-            </abstract>
+      <xsl:if test="//article-meta/abstract[not(@abstract-type='graphical')
+                                            and not(@abstract-type='toc')
+                                            and not(@abstract-type='precis')]
+                    or //article-meta/trans-abstract">
+        <abstracts>
+          <xsl:for-each select="//article-meta/abstract[not(@abstract-type='graphical')
+                                                      and not(@abstract-type='toc')
+                                                      and not(@abstract-type='precis')][1]">
+        <!-- selecting the first non-toc non-grapical non-precis abstract -->
+          <abstract>
+            <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
+            <xsl:call-template name="abstract-nested-whitespacing"/>
+          </abstract>
           </xsl:for-each>
-          <xsl:for-each select="//article-meta/trans-abstract">
-            <abstract>
-              <xsl:call-template name="insert-lang-attribute"/>
-              <xsl:call-template name="abstract-nested-whitespacing"/>
-            </abstract>
-          </xsl:for-each>
-      </abstracts>
+            <xsl:for-each select="//article-meta/trans-abstract">
+              <abstract>
+                <xsl:call-template name="insert-lang-attribute"/>
+                <xsl:call-template name="abstract-nested-whitespacing"/>
+              </abstract>
+            </xsl:for-each>
+        </abstracts>
       </xsl:if>
 
       <!-- Author Information, only editors and authors due to value constraints in OPUS-xml-->
       <persons>
-          <xsl:for-each select="//article-meta/contrib-group/contrib">
-            <xsl:if test="@contrib-type='guest-editor' or
+              <xsl:for-each select="//article-meta/contrib-group/contrib[
+                          @contrib-type='guest-editor' or
                           @contrib-type='editor' or
-                          @contrib-type='author'">
+                          @contrib-type='author']">
               <person>
                 <xsl:attribute name="role">
                   <xsl:choose>
                       <xsl:when test="@contrib-type='author'">
-                      <xsl:value-of select="@contrib-type"/>
-                    </xsl:when>
+                        <xsl:text>author</xsl:text>
+                        </xsl:when>
                     <xsl:when test="@contrib-type='guest-editor' or
                                     @contrib-type='editor'">
                       <xsl:text>editor</xsl:text>
@@ -262,52 +264,43 @@ class XSLT(object):
                   <xsl:attribute name="email"><xsl:value-of select=".//email"/></xsl:attribute>
                 </xsl:if>
 
-                <xsl:for-each select="./contrib-id">
-                  <xsl:if test="@contrib-id-type='orcid'">
+                <xsl:if test="./contrib-id[@contrib-id-type='orcid']">
                   <identifiers>
-                    <identifier>
-                      <xsl:attribute name="type"><xsl:text>orcid</xsl:text></xsl:attribute>
-                      <xsl:variable name='orcid' select="./text()"/>
+                    <identifier type="orcid">
+                      <xsl:variable name='orcid' select="./contrib-id[@contrib-id-type='orcid']/text()"/>
                       <xsl:choose>
-                      <xsl:when test="substring($orcid, string-length($orcid))='/'">
-                        <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
-                        <xsl:call-template name="cut-orcid">
-                          <xsl:with-param name="orcid" select="$orcid2"/>
-                        </xsl:call-template>
-                      </xsl:when>
-                      <xsl:otherwise>
-                        <xsl:call-template name="cut-orcid">
-                          <xsl:with-param name="orcid" select="$orcid"/>
-                        </xsl:call-template>
-                      </xsl:otherwise>
+                        <xsl:when test="substring($orcid, string-length($orcid))='/'">
+                          <xsl:variable name="orcid2" select="substring($orcid, 1, string-length($orcid)-1)"/>
+                          <xsl:call-template name="cut-orcid">
+                            <xsl:with-param name="orcid" select="$orcid2"/>
+                          </xsl:call-template>
+                        </xsl:when>
+                        <xsl:otherwise>
+                          <xsl:call-template name="cut-orcid">
+                            <xsl:with-param name="orcid" select="$orcid"/>
+                          </xsl:call-template>
+                        </xsl:otherwise>
                       </xsl:choose>
                     </identifier>
                   </identifiers>
                   </xsl:if>
-                </xsl:for-each>
-                
-              </person>
-            </xsl:if>
+            </person>
           </xsl:for-each>
       </persons>
 
       <!-- Topical Keywords -->
+      <xsl:if test="//article-meta/kwd-group/kwd">
       <keywords>
-          <keyword>
-            <xsl:attribute name="language"><xsl:value-of select="$langOut"/></xsl:attribute>
-            <xsl:attribute name="type"><xsl:text>swd</xsl:text></xsl:attribute>
-            <xsl:text>-</xsl:text>
-          </keyword>
           <xsl:for-each select="//article-meta/kwd-group/kwd">
             <xsl:if test="string-length(normalize-space(text()))>0">
-              <keyword>
+              <keyword type="uncontrolled">
                 <xsl:call-template name="insert-lang-attribute"/>
-                <xsl:attribute name="type"><xsl:text>uncontrolled</xsl:text></xsl:attribute>
                 <xsl:value-of select="normalize-space(text())"/>
               </keyword>
             </xsl:if>
           </xsl:for-each>
       </keywords>
+      </xsl:if>
 
       <!--
       <dnbInstitutions>
@@ -317,50 +310,42 @@ class XSLT(object):
 
       <!-- Publication Dates -->
       <dates>
-        <xsl:for-each select="//article-meta/pub-date">
         <xsl:choose>
-          <xsl:when test="(contains(@pub-type,'epub') and year) or
+        <xsl:when test="//article-meta/pub-date[
+              (contains(@pub-type,'epub') and year) or
               (contains(@pub-type,'ppub') and year) or
               (contains(@pub-type, 'epub-ppub') and year) or
               (contains(@date-type,'pub') and year) or
-              not(@*)">
+              (not(@*) and year)]">
+        <xsl:for-each select="//article-meta/pub-date[
+              (contains(@pub-type,'epub') and year) or
+              (contains(@pub-type,'ppub') and year) or
+              (contains(@pub-type, 'epub-ppub') and year) or
+              (contains(@date-type,'pub') and year) or
+              (not(@*) and year)]">
               <xsl:call-template name="compose-date"> </xsl:call-template>
+            </xsl:for-each>
           </xsl:when>
           <xsl:otherwise>
-            <xsl:if test="not(year)">
-            <!--to comply with opus requirement that a date has to be given-->
-            <date>
-              <xsl:attribute name="type"><xsl:text>completed</xsl:text></xsl:attribute>
-              <xsl:attribute name="monthDay">
-                <xsl:text>--11-11</xsl:text>
-              </xsl:attribute>
-              <xsl:attribute name="year">
-                <xsl:text>1111</xsl:text>
-              </xsl:attribute>
-            </date>
-            </xsl:if>
+            <date type="completed" monthDay="--11-11" year="1111"/>
           </xsl:otherwise>
         </xsl:choose>
-        </xsl:for-each>
       </dates>
 
       <!-- Identifiers, ISSN, DOI, PMID -->
       <identifiers>
         <xsl:for-each select="//journal-meta/issn">
-          <identifier>
-            <xsl:attribute name="type"><xsl:text>issn</xsl:text></xsl:attribute>
+          <identifier type="issn">
             <xsl:value-of select="normalize-space(text())"/>
           </identifier>
         </xsl:for-each>
         <xsl:if test="//article-meta/article-id[@pub-id-type='doi']">
-          <identifier>
-             <xsl:attribute name="type"><xsl:text>doi</xsl:text></xsl:attribute>
+          <identifier type="doi">
              <xsl:value-of select="//article-meta/article-id[@pub-id-type='doi']"/>
           </identifier>
         </xsl:if>
         <xsl:if test="//article-meta/article-id[@pub-id-type='pmid']">
-          <identifier>
-             <xsl:attribute name="type"><xsl:text>pmid</xsl:text></xsl:attribute>
+          <identifier type="pmid">
              <xsl:value-of select="//article-meta/article-id[@pub-id-type='pmid']"/>
           </identifier>
         </xsl:if>
@@ -521,22 +506,15 @@ class XSLT(object):
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
     <xsl:choose>
       <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
-            <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
-              </xsl:when>
-              <xsl:otherwise>
+        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*) != 'tex-math']">
                 <xsl:value-of select="."/>
-              </xsl:otherwise>
-            </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:when>
       <xsl:otherwise>
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
+        <xsl:for-each select="descendant-or-self::text()[
+          string-length(normalize-space())&gt;0 and
+          local-name(parent::*) != 'tex-math' and
+          not(local-name(parent::*)='title' and .='Abstract')]">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title' "> <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
@@ -544,9 +522,6 @@ class XSLT(object):
                 <xsl:value-of select="normalize-space()"/>
                 <xsl:text>
                 </xsl:text>
-              </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
@@ -556,7 +531,6 @@ class XSLT(object):
                 <xsl:text> </xsl:text>
               </xsl:otherwise>
             </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:otherwise>
     </xsl:choose>
@@ -754,33 +728,19 @@ class XSLT(object):
                             </xsl:if>
                         </mods:extent>
                     </xsl:if>
+                     <xsl:if test="//article-meta/elocation-id">
+                      <mods:detail type="article-number">
+                        <mods:number><xsl:value-of select="//article-meta/elocation-id"/></mods:number>
+                      </mods:detail>
+                    </xsl:if>
                 </mods:part>
             </mods:relatedItem>
 
             <!-- Creator / Contributor (Author, Editor...)-->
-            <xsl:for-each select="//article-meta/contrib-group/contrib">
+            <xsl:for-each select="//article-meta/contrib-group/contrib[
+              not(@contrib-type='author non-byline') and
+              not(@contrib-type='investigator')]">
               <xsl:choose>
-                    <!-- if contributor is a non-person entity -->
-                    <xsl:when test="collab">
-                        <mods:name type="corporate">
-                        <mods:namePart>
-                        <xsl:choose>
-                            <xsl:when test="collab/institution">
-                                <xsl:value-of select="collab/institution/text()"/>
-                            </xsl:when>
-                            <xsl:otherwise>
-                                <xsl:value-of select="collab/text()"/>
-                            </xsl:otherwise>
-                        </xsl:choose>
-                        </mods:namePart>
-                        <mods:role>
-                            <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
-                        </mods:role>
-                        </mods:name>
-
-                    </xsl:when>
-
-
                   <!-- if contributor is a person -->
                   <xsl:when test="//string-name or //name">
                       <mods:name type="personal">
@@ -797,13 +757,11 @@ class XSLT(object):
                             </xsl:if>
                           </mods:role>
                           <!-- Identifier: So far, support of ORCIDs (and email adresses?) only -->
-                          <xsl:for-each select="./contrib-id">
-                            <xsl:if test="@contrib-id-type='orcid'">
-                                <mods:nameIdentifier type="orcid">
-                                    <xsl:copy-of select="./text()"/>
-                                </mods:nameIdentifier>
-                            </xsl:if>
-                          </xsl:for-each>
+                          <xsl:if test="./contrib-id[@contrib-id-type='orcid']">
+                            <mods:nameIdentifier type="orcid">
+                                <xsl:copy-of select="./contrib-id[@contrib-id-type='orcid']/text()"/>
+                            </mods:nameIdentifier>
+                          </xsl:if>
                           <xsl:if test="string-length(.//email/text()) > 0">
                             <mods:nameIdentifier type="email">
                               <xsl:value-of select=".//email"/>
@@ -811,77 +769,81 @@ class XSLT(object):
                           </xsl:if>
 
                           <!-- Affiliations -->
-                          <xsl:for-each select="xref[@ref-type='aff']">
-                            <xsl:choose>
-                              <xsl:when test="contains(./@ref-type,'aff') and string-length(@rid) > 0">
+                          <xsl:choose>
+                            <xsl:when test="xref[@ref-type='aff' and string-length(@rid) > 0]">
+                              <xsl:for-each select="xref[@ref-type='aff' and string-length(@rid) > 0]">
                                 <mods:affiliation>
-
-                                  <xsl:call-template name="build_aff_string">
-                                    <xsl:with-param name="aff_node" select="key('kAffById',@rid)"/>
-                                    <xsl:with-param name="combined_string" select="''"/>
-                                    <xsl:with-param name="current_position" select="1"/>
-                                  </xsl:call-template>
+                                    <xsl:call-template name="build_aff_string">
+                                      <xsl:with-param name="aff_node" select="key('kAffById',@rid)"/>
+                                    </xsl:call-template>
                                 </mods:affiliation>
+                              </xsl:for-each>
                               </xsl:when>
-                              <xsl:when test="string-length(//aff[position()=last()]/text()) > 0">
+                              <xsl:when test="not(xref[@ref-type='aff']) and @rid">
+                              <!-- accommodate aff linking via @rid in contrib element, multiple ids separated by spaces -->
+                                <xsl:call-template name="parse-multiple-rids-for-affs">
+                                    <xsl:with-param name="rid_string" select="@rid"/>
+                                </xsl:call-template>
+                              </xsl:when>
+                              <!-- if the current contrib element contains the affiliation itself, without any rids: -->
+                              <xsl:when test=".//aff">
+                                <xsl:for-each select=".//aff">
                                   <mods:affiliation>
                                     <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select="//aff[position()=last()]"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
+                                      <xsl:with-param name="aff_node" select="."/>
                                     </xsl:call-template>
+                                  </mods:affiliation>
+                                </xsl:for-each>
+                              </xsl:when>
+                            <!-- if nothing has worked so far, take the first aff element that can be found in the whole document -->
+                              <xsl:when test="//aff">
+                                  <mods:affiliation>
+                                      <xsl:call-template name="build_aff_string">
+                                        <xsl:with-param name="aff_node" select="//aff[1]"/>
+                                      </xsl:call-template>
                                   </mods:affiliation>
                               </xsl:when>
                             </xsl:choose>
-                          </xsl:for-each>
-
-                          <!-- accommodate aff linking via @rid in contrib element, multiple ids separated by spaces -->
-                          <xsl:if test="not(xref[@ref-type='aff']) and @rid">
-                              <xsl:call-template name="parse-multiple-rids-for-affs">
-                                  <xsl:with-param name="rid_string" select="@rid"/>
-                              </xsl:call-template>
-                          </xsl:if>
-
-                          <!-- if the current contrib element contains the affiliation itself, without any rids: -->
-                          <xsl:choose>
-                            <xsl:when test=".//aff">
-                                <mods:affiliation>
-                                    <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select=".//aff"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
-                                    </xsl:call-template>
-                                </mods:affiliation>
+                    </mods:name>
+                  </xsl:when>
+                  <!-- if contributor is a non-person entity -->
+                    <xsl:when test="collab">
+                        <mods:name type="corporate">
+                        <mods:namePart>
+                        <xsl:choose>
+                            <xsl:when test="collab/institution">
+                                <xsl:value-of select="collab/institution/text()"/>
                             </xsl:when>
-                            <!-- if nothing has worked so far, take whatever aff element can be found in the whole document -->
-                            <xsl:when test="not(xref[@ref-type='aff']) and not(@rid) and //aff">
-                                <mods:affiliation>
-                                    <xsl:call-template name="build_aff_string">
-                                      <xsl:with-param name="aff_node" select="//aff"/>
-                                      <xsl:with-param name="combined_string" select="''"/>
-                                      <xsl:with-param name="current_position" select="1"/>
-                                    </xsl:call-template>
-                                </mods:affiliation>
-                            </xsl:when>
-                            </xsl:choose>
-                      </mods:name>
+                            <xsl:otherwise>
+                                <xsl:value-of select="collab/text()"/>
+                            </xsl:otherwise>
+                        </xsl:choose>
+                        </mods:namePart>
+                        <mods:role>
+                            <mods:roleTerm type="text"><xsl:value-of select="@contrib-type"/></mods:roleTerm>
+                        </mods:role>
+                        </mods:name>
                     </xsl:when>
-
                 </xsl:choose>
-
             </xsl:for-each>
 
             <!-- Description: Abstract / TOC -->
             <xsl:for-each select="//article-meta/abstract">
                 <xsl:choose>
-                    <xsl:when test="@type = 'toc'">
-                        <mods:tableOfContents>
+                    <xsl:when test="@abstract-type='toc'">
+                       <mods:tableOfContents>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:value-of select="."/>
                         </mods:tableOfContents>
                     </xsl:when>
+                    <xsl:when test="@abstract-type='graphical'">
+                      <!-- exclude graphical abstracts -->
+                    </xsl:when>
                     <xsl:otherwise>
                         <mods:abstract>
+                          <xsl:if test="@abstract-type">
+                            <xsl:attribute name="type"><xsl:value-of select="@abstract-type"/></xsl:attribute>
+                          </xsl:if>
                             <xsl:call-template name="insert-lang-attribute"/>
                             <xsl:call-template name="abstract-nested-whitespacing"/>
                         </mods:abstract>
@@ -945,18 +907,20 @@ class XSLT(object):
                 <!-- another uncommon variation of the same:-->
                 <xsl:for-each select="//article-meta/pub-history/event/date">
                     <xsl:if test="year and month">
-                            <xsl:if test="@date-type">
+                      <xsl:choose>
+                            <xsl:when test="@date-type">
                                 <mods:dateOther encoding="w3cdtf">
                                 <xsl:attribute name="type"><xsl:value-of select="@date-type"/></xsl:attribute>
                                 <xsl:call-template name="compose-date"></xsl:call-template>
                                 </mods:dateOther>
-                            </xsl:if>
-                            <xsl:if test="../@event-type">
+                            </xsl:when>
+                            <xsl:when test="../@event-type">
                                 <mods:dateOther encoding="w3cdtf">
                                 <xsl:attribute name="type"><xsl:value-of select="../@event-type"/></xsl:attribute>
                                 <xsl:call-template name="compose-date"></xsl:call-template>
                             </mods:dateOther>
-                            </xsl:if>
+                            </xsl:when>
+                          </xsl:choose>
                     </xsl:if>
                 </xsl:for-each>
             </mods:originInfo>
@@ -1041,32 +1005,23 @@ class XSLT(object):
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
       <xsl:choose>
       <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
-            <xsl:choose>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
-              <!--ignore tex-math elements-->
-              </xsl:when>
-              <xsl:otherwise>
-                <xsl:value-of select="."/>
-              </xsl:otherwise>
-            </xsl:choose>
-          </xsl:if>
+        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*)!='tex-math']">
+          <xsl:value-of select="."/>
         </xsl:for-each>
       </xsl:when>
       <xsl:otherwise>
-        <xsl:for-each select="descendant-or-self::text()">
-          <xsl:if test="string-length(normalize-space())&gt;0">
+        <xsl:for-each select="descendant-or-self::text()[
+         string-length(normalize-space())&gt;0 and
+         local-name(parent::*)!='tex-math' and
+         not(local-name(parent::*)='title' and .='Abstract')]">
             <xsl:choose>
-              <xsl:when test="local-name(parent::*)='title' ">
+              <xsl:when test="local-name(parent::*)='title'">
                 <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
                 </xsl:text>
                 <xsl:value-of select="normalize-space()"/>
                 <xsl:text>
                 </xsl:text>
-              </xsl:when>
-              <xsl:when test="local-name(parent::*) = 'tex-math'">
               </xsl:when>
               <xsl:when test="contains(name(parent::*),'mml:')">
                 <xsl:value-of select="."/>
@@ -1076,7 +1031,6 @@ class XSLT(object):
                 <xsl:text> </xsl:text>
               </xsl:otherwise>
             </xsl:choose>
-          </xsl:if>
         </xsl:for-each>
       </xsl:otherwise>
     </xsl:choose>
@@ -1084,87 +1038,72 @@ class XSLT(object):
 
   <xsl:template name="build_aff_string">
   <!-- builds string recursively, by going through each node and adding its text to the string. end condition: counter > total no of nodes. -->
-        <xsl:param name="combined_string"/>
-        <xsl:param name="aff_node"/>
-        <xsl:param name="current_position"/>
-        <xsl:variable name="total_nodes" select="count($aff_node/descendant-or-self::text())"/>
+    <xsl:param name="combined_string" select="''"/>
+    <xsl:param name="aff_node"/>
+    <xsl:param name="current_position" select="1"/>
+    <xsl:variable name="total_nodes" select="count($aff_node/descendant-or-self::text())"/>
+    <xsl:variable name="current_node" select="$aff_node/descendant-or-self::text()[$current_position]"/>
+    <xsl:variable name="stripped_string" select="normalize-space($aff_node/descendant-or-self::text()[$current_position])"/>
+    <xsl:variable name="nn" select="local-name($aff_node/descendant-or-self::text()[$current_position]/parent::*)"/>
+    <xsl:choose>
+      <xsl:when test="number($current_position) &gt; $total_nodes">
+          <!-- exit condition, prints out value of combined_string -->
+          <xsl:value-of select="$combined_string"/>
+      </xsl:when>
+      <xsl:when test="string-length($stripped_string) = 0 or
+                      $stripped_string = ',' or
+                      $stripped_string = '.' or
+                      $stripped_string = ';' or
+                      $nn = 'label' or $nn ='institution-id' or
+                      $nn='sub' or $nn = 'sup' or
+                      $nn='email' or $nn='postal-code'
+                      or $nn='ext-link'" >
+          <!-- if stripped_string is empty or merely a punctuation character, or parent should be ignored -->
+        <xsl:call-template name="build_aff_string">
+          <xsl:with-param name="combined_string" select="$combined_string"/>
+          <xsl:with-param name="aff_node" select="$aff_node"/>
+          <xsl:with-param name="current_position" select="number($current_position)+1"/>
+        </xsl:call-template>
+      </xsl:when>
+      <xsl:when test="$combined_string=''">
+      <!-- if combined_string is empty still-->
+        <xsl:call-template name="build_aff_string">
+          <xsl:with-param name="combined_string" select="$stripped_string"/>
+          <xsl:with-param name="aff_node" select="$aff_node"/>
+          <xsl:with-param name="current_position" select="number($current_position)+1"/>
+        </xsl:call-template>
+      </xsl:when>
+      <xsl:otherwise>
+      <!-- if there is already text in the combined string, add stripped_string with separators depending on preceding / succeeding punctuation -->
+        <xsl:variable name="last_char" select="substring($combined_string, string-length($combined_string))"/>
+        <xsl:variable name="first_char" select="substring($stripped_string, 1,1)"/>
         <xsl:choose>
-            <xsl:when test="number($current_position) &gt; $total_nodes">
-                <!-- exit condition, prints out value of combined_string -->
-                <xsl:value-of select="$combined_string"/>
-            </xsl:when>
-            <xsl:otherwise>
-            <xsl:for-each select="$aff_node/descendant-or-self::text()[$current_position]">
-            <!--selects current node-->
-                <xsl:variable name="stripped_string" select="normalize-space()"/>
-                <xsl:choose>
-                    <xsl:when test="local-name(parent::*)='sub' or local-name(parent::*)='label' or local-name(parent::*) = 'sup' or local-name(parent::*)='email' or local-name(parent::*)='institution-id' or local-name(parent::*)='postal-code'">
-                    <!-- if text belongs to irrelevant element, simply call template again with counter +1 -->
-                            <xsl:call-template name="build_aff_string">
-                                <xsl:with-param name="combined_string" select="$combined_string"/>
-                                <xsl:with-param name="aff_node" select="$aff_node"/>
-                                <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                            </xsl:call-template>
-                    </xsl:when>
-                    <xsl:when test="string-length($stripped_string) &gt; 0 and
-                    $stripped_string != ',' and
-                    $stripped_string != '.' and
-                    $stripped_string != ';'">
-                    <!-- if stripped_string is not empty and not only a punctuation character -->
-                        <xsl:choose>
-                            <xsl:when test="string-length($combined_string) &gt; 0"> <!-- if there is already text in the combined string, add stripped_string with separators depending on preceding / succeeding punctuation -->
-                                <xsl:variable name="last_char" select="substring($combined_string, string-length($combined_string))"/>
-                                <xsl:variable name="first_char" select="substring($stripped_string, 1,1)"/>
-                                <xsl:choose>
-                                    <xsl:when test="$last_char = ',' or $last_char = '.' or $last_char = ';'"> <!-- if there's a separator at the end of the combined string -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string,' ', $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:when test="$first_char = ',' or $first_char = '.' or $first_char = ';'"> <!-- if there's a separator at the start of the new string -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string, $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:otherwise> <!-- normal case: add to combined_string with ', ' as separator -->
-                                        <xsl:variable name="edited_string" select="concat($combined_string,', ', $stripped_string)"/>
-                                        <xsl:call-template name="build_aff_string">
-                                            <xsl:with-param name="combined_string" select="$edited_string"/>
-                                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                        </xsl:call-template>
-                                    </xsl:otherwise>
-                                </xsl:choose>
-                            </xsl:when>
-                            <xsl:otherwise>
-                            <!-- if combined_string is empty, then set stripped_string as combined_string and call template again. -->
-                                <xsl:call-template name="build_aff_string">
-                                <xsl:with-param name="combined_string" select="$stripped_string"/>
-                                <xsl:with-param name="aff_node" select="$aff_node"/>
-                                <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                                </xsl:call-template>
-                            </xsl:otherwise>
-                        </xsl:choose>
-                    </xsl:when>
-                    <xsl:otherwise>
-                        <!-- if stripped_string is either empty or contains only punctuation, call template again with counter +1 -->
-                        <xsl:call-template name="build_aff_string">
-                            <xsl:with-param name="combined_string" select="$combined_string"/>
-                            <xsl:with-param name="aff_node" select="$aff_node"/>
-                            <xsl:with-param name="current_position" select="number($current_position)+1"/>
-                        </xsl:call-template>
-                    </xsl:otherwise>
-                </xsl:choose>
-                </xsl:for-each>
-            </xsl:otherwise>
+          <xsl:when test="$last_char = ',' or $last_char = '.' or $last_char = ';'">
+          <!-- if there's a separator at the end of the combined string -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string,' ', $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:when>
+          <xsl:when test="$first_char = ',' or $first_char = '.' or $first_char = ';'"> <!-- if there's a separator at the start of the new string -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string, $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:when>
+          <xsl:otherwise> <!-- normal case: add to combined_string with ', ' as separator -->
+            <xsl:call-template name="build_aff_string">
+              <xsl:with-param name="combined_string" select="concat($combined_string,', ', $stripped_string)"/>
+              <xsl:with-param name="aff_node" select="$aff_node"/>
+              <xsl:with-param name="current_position" select="number($current_position)+1"/>
+            </xsl:call-template>
+          </xsl:otherwise>
         </xsl:choose>
-    </xsl:template>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
 
     <xsl:template name="parse-multiple-rids-for-affs">
         <xsl:param name="rid_string"/>
@@ -1176,8 +1115,6 @@ class XSLT(object):
             <mods:affiliation xmlns:mods="http://www.loc.gov/mods/v3">
             <xsl:call-template name="build_aff_string">
                 <xsl:with-param name="aff_node" select="key('kAffById', substring-before($rid_string, ' '))"/>
-                <xsl:with-param name="combined_string" select="''"/>
-                <xsl:with-param name="current_position" select="1"/>
             </xsl:call-template>
             </mods:affiliation>
             <xsl:call-template name="parse-multiple-rids-for-affs">
@@ -1188,8 +1125,6 @@ class XSLT(object):
             <mods:affiliation xmlns:mods="http://www.loc.gov/mods/v3">
             <xsl:call-template name="build_aff_string">
                 <xsl:with-param name="aff_node" select="key('kAffById', $rid_string)"/>
-                <xsl:with-param name="combined_string" select="''"/>
-                <xsl:with-param name="current_position" select="1"/>
             </xsl:call-template>
             </mods:affiliation>
         </xsl:otherwise>
