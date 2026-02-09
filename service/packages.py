@@ -911,7 +911,7 @@ class FilesAndJATS(PackageHandler):
 
         except Exception:
             zin.close()
-            raise PackageException("Unable to parse and/or transform XML file in package {x}".format(x=in_path))
+            raise PackageException("Unable to parse and/or transform XML file while creating OPUS4ZIP.")
 
 
     # 2017-05-15 TD : added an internal method converting to ESciDoc zip format;
@@ -968,7 +968,7 @@ class FilesAndJATS(PackageHandler):
 
         except Exception:
             zin.close()
-            raise PackageException("Unable to parse and/or transform XML file in package {x}".format(x=in_path))
+            raise PackageException("Unable to parse and/or transform XML file while creating EscidocZIP.")
 
 
     # 2017-05-15 TD : added an internal method converting to METSDSpaceSIP zip format;
@@ -1047,7 +1047,7 @@ class FilesAndJATS(PackageHandler):
 
         except Exception:
             zin.close()
-            raise PackageException("Unable to parse and/or transform XML file in package {x}".format(x=in_path))
+            raise PackageException("Unable to parse and/or transform XML file while creating METSDSPACEZIP.")
 
 
     # 2017-07-11 TD : added an internal method converting to METSMODS zip format;
@@ -1126,7 +1126,7 @@ class FilesAndJATS(PackageHandler):
 
         except Exception:
             zin.close()
-            raise PackageException("Unable to parse and/or transform XML file in package {x}".format(x=in_path))
+            raise PackageException("Unable to parse and/or transform XML file while creating METSMODS ZIP.")
 
 
     def _merge_metadata(self, emd, jmd):
