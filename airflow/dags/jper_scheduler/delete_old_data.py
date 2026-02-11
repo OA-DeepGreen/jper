@@ -14,12 +14,12 @@ from jper_scheduler.routing_deletions import RoutingDeletion
 from jper_scheduler.notification_helpers import notifications_before, iter_notifications_before
 from jper_scheduler.utils import set_task_name, get_log_url
 
-days_to_keep = app.config.getint("AIRMAINT_DATA_KEEP", 180)
+days_to_keep = app.config.get("AIRMAINT_DATA_KEEP", 180)
 
-@dag(dag_id="Clean_Old_Data", max_active_runs=1,
+@dag(dag_id="Delete_Old_Data", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRMAINT_OLD_CLEAN", 'None'),
      start_date=datetime(2025, 10, 22),
-     description="Cleanup all data stored older than 60 days",
+     description=f"Cleanup all data stored older than {days_to_keep} days",
      catchup=False,
      tags=["teamCottageLabs", "jper_cleanup"])
 def clean_old_data():
@@ -65,6 +65,8 @@ def clean_old_data():
         status = a.clean_all()
         app.logger.info(f"Routing history deletion status: {status['status']}, Message: {status['message']}")
 
+
+    # Clean all old routing history entries
     to_delete = get_old_routinghistory_list()
     delete_one_route_fileset.expand(route_pub=to_delete)
 

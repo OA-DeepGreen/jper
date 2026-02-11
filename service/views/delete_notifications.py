@@ -5,6 +5,10 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from service.lib.validation_helper import validate_date, is_newer
 
+# For the interface with Airflow REST API
+import requests, base64, json
+from requests.auth import HTTPBasicAuth
+from octopus.core import app
 
 blueprint = Blueprint('delete_notifications', __name__)
 
@@ -46,8 +50,34 @@ def index():
         return render_template('delete_notifications/index.html', publisher_id=publisher_id,
                            upto=default_upto, status_values=status_values)
 
-    #ToDo: Call airflow dag here to delete with these params
-    os.system("touch /tmp/aaaa.aaa")
+    # Call airflow dag here to delete with these params
+    airflow_rest_url = "http://localhost:80/airflow/api/v1/dags/"
+    deletion_dag = "Delete_Data_OnDemand"
+    user = app.config.get("AIRUSERDEL_USER", 'None')
+    password = app.config.get("AIRUSERDEL_PASSWORD", 'None')
+    if user and password:
+        auth_header_value = base64.b64encode(f"{user}:{password}".encode()).decode()
+    else:
+        flash("Airflow deletion user or passhttp://localhost/delete_notifications/word not set - cannot call deletion DAG. Please" \
+        " request system administrator to check configuration.")
+        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+                           upto=upto, status_values=status_values)
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Basic {auth_header_value}"
+    }
+
+    data = {
+        "conf": {"upto": upto, "status_values": status_values, "publisher_id": publisher_id},
+        "note": f"User request to delete notifications before {upto}"
+    }
+    command = "dagRuns"
+    api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
+    r = requests.post(api_url, headers=headers, data=json.dumps(data))
+    print(f"Airflow deletion request: {r.request.body}")
+    print(f"Airflow deletion url: {r.url}")
+    print(f"Airflow deletion response: {r.text}")
 
     return render_template('delete_notifications/deletion_sent.html', publisher_id=publisher_id,
                            upto=upto, status_values=status_values)
