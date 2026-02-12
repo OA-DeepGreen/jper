@@ -3,7 +3,7 @@ from octopus.lib import dataobj, dates
 from service import dao
 
 WORKFLOW_STATUS = ["started", "success", "failure"]
-STATUS = ["started", "success", "failure"]
+STATUS = ["started", "success", "failure", "deleted"]
 
 
 class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
@@ -31,7 +31,10 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             "notification_states" : [{
                 "status": "<one of STATUS>",,
                 "notification_id": "<notification_id>",
-                "doi": "<doi>"
+                "doi": "<doi>",
+                "number_matched_repositories": "<number of matched repositories>",
+                "deleted": "<boolean indicating if notification was deleted>",
+                "deleted_date": "<date notification was deleted>"
             }],
             workflow_states: [{
                 "date": "<date action was performed>",
@@ -83,7 +86,10 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                     "fields": {
                         "notification_id": {"coerce": "unicode"},
                         "doi": {"coerce": "unicode"},
-                        "status": {"coerce": "unicode", "allowed_values": STATUS}
+                        "status": {"coerce": "unicode", "allowed_values": STATUS},
+                        "number_matched_repositories": {"coerce": "int"},
+                        "deleted": {"coerce": "boolean"},
+                        "deleted_date": {"coerce": "utcdatetime"}
                     }
                 },
                 "workflow_states": {
@@ -139,25 +145,6 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
         :return: account email
         """
         self._set_single("publisher_email", val, coerce=dataobj.to_unicode())
-
-    @property
-    def doi(self):
-        """
-        The doi of the notification
-
-        :return: doi
-        """
-        return self._get_single("doi", coerce=dataobj.to_unicode())
-
-    @doi.setter
-    def doi(self, val):
-        """
-        Set the notification doi
-
-        :param val: doi
-        :return: doi
-        """
-        self._set_single("doi", val, coerce=dataobj.to_unicode())
 
     @property
     def sftp_server_url(self):
@@ -267,14 +254,20 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
 
     @notification_states.setter
     def notification_states(self, vals):
+        for val in vals:
+            print(val)
         self._set_list("notification_states", vals)
 
-    def add_notification_state(self, status, notification_id, doi=''):
+    def add_notification_state(self, status, notification_id, doi='', number_matched_repositories=0,
+                               deleted=False, deleted_date=None):
         """
         {
             "status": {"coerce": "unicode", "allowed_values": STATUS},
             "notification_id": {"coerce": "unicode"},
-            "doi": {"coerce": "unicode"}
+            "doi": {"coerce": "unicode"},
+            "number_matched_repositories": {"coerce": "int"},
+            "deleted": {"coerce": "boolean"},
+            "deleted_date": {"coerce": "utcdatetime"
         }
         """
         if not status:
@@ -291,7 +284,10 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                 updated_states.append({
                     'status': status,
                     'notification_id': notification_id,
-                    'doi': doi
+                    'doi': doi,
+                    'number_matched_repositories': number_matched_repositories,
+                    'deleted': deleted,
+                    'deleted_date': deleted_date
                 })
                 updated = True
             else:
@@ -300,7 +296,10 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
             updated_states.append({
                 'status': status,
                 'notification_id': notification_id,
-                'doi': doi
+                'doi': doi,
+                'number_matched_repositories': number_matched_repositories,
+                'deleted': deleted,
+                'deleted_date': deleted_date
             })
         self._set_list("notification_states", updated_states)
 

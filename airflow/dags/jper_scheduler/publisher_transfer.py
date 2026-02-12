@@ -66,6 +66,12 @@ class PublisherFiles:
         app.logger.debug("Routing History> individual workflow states :")
         for state in self.routing_history.workflow_states:
             app.logger.debug(f"{state['action']} > {state}")
+        app.logger.debug("Routing History> notification states :")
+        for state in self.routing_history.notification_states:
+            app.logger.debug(f"{state['status']} > {state}")
+        app.logger.debug("Routing History> final file locations :")
+        for state in self.routing_history.final_file_locations:
+            app.logger.debug(f"{state['location_type']} > {state}")
         app.logger.debug("END Routing History")
 
     def __update_routing_history__(self, action="", file_location="",
