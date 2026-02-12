@@ -2,7 +2,8 @@
 Blueprint for providing account management
 """
 
-import uuid, json, time, requests
+import uuid, json, time, requests, io
+from pathlib import Path
 
 from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file
 from service.forms.adduser import AdduserForm
@@ -1234,3 +1235,13 @@ def register():
         return redirect('/account')
 
     return render_template('account/register.html', vals=vals, form=form)
+
+@blueprint.route('/download_csv_template', methods=['GET'])
+def download_template_csv():
+    file_path = Path("/static/files/csvtemplate.csv")
+    if not file_path.is_file():
+        app.logger.warning(f'file not found [{file_path.as_posix()}]')
+        abort(404)
+    return send_file(io.BytesIO(file_path.read_bytes()),
+                     as_attachment=True, download_name="",
+                     mimetype="text/csv")
