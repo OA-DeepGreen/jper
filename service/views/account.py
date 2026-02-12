@@ -2,7 +2,7 @@
 Blueprint for providing account management
 """
 
-import uuid, json, time, requests
+import uuid, json, time, requests, io
 
 from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file
 from service.forms.adduser import AdduserForm
@@ -1234,3 +1234,10 @@ def register():
         return redirect('/account')
 
     return render_template('account/register.html', vals=vals, form=form)
+
+@blueprint.route('/download_csv_template', methods=['GET'])
+def download_template_csv():
+    file_path = "/static/files/csvtemplate.csv"
+    return send_file(io.BytesIO(file_path.read_bytes()),
+                     as_attachment=True, download_name="",
+                     mimetype="text/csv")
