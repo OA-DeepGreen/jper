@@ -40,7 +40,7 @@ def index():
         publisher_id = None
 
     # status values
-    accepted_status_values = ['success-routed', 'success-failed', 'failure']
+    accepted_status_values = ['success-routed', 'success-no-matches', 'failure']
     status_values = []
     for s in request.form.getlist('status'):
         if s.lower() in accepted_status_values:
@@ -58,7 +58,8 @@ def index():
     #                        upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to delete with these params
-    airflow_rest_url = "http://localhost:80/airflow/api/v1/dags/"
+    airflow_url = app.config.get("AIRFLOW_URL", "http://localhost:80/airflow")
+    airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     deletion_dag = "Delete_Data_OnDemand"
     user = app.config.get("AIRUSERDEL_USER", 'None')
     password = app.config.get("AIRUSERDEL_PASSWORD", 'None')
@@ -85,7 +86,7 @@ def index():
     print(f"Airflow deletion request: {r.request.body}")
     print(f"Airflow deletion url: {r.url}")
     print(f"Airflow deletion response: {r.text}")
-
+    airflow_del_url = f"{airflow_url}/dags/{deletion_dag}/graph"
     return render_template('delete_notifications/deletion_sent.html', publisher_id=publisher_id,
-                           upto=upto, status_values=status_values)
+                           upto=upto, status_values=status_values, airflow_url=airflow_del_url)
 
