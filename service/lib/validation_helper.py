@@ -26,8 +26,8 @@ def validate_page():
     return page
 
 
-def validate_page_size():
-    page_size = request.values.get("pageSize", app.config.get("DEFAULT_LIST_PAGE_SIZE", 25))
+def validate_page_size(default=app.config.get("DEFAULT_LIST_PAGE_SIZE", 25)):
+    page_size = request.values.get("pageSize", default)
     try:
         page_size = int(page_size)
     except:

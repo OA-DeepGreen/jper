@@ -10,7 +10,6 @@ from typing import Iterable, Type
 import collections
 from esprit import raw
 from esprit.dao import DomainObject
-
 from octopus.modules.es import dao
 
 
