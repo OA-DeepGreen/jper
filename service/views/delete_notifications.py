@@ -9,6 +9,7 @@ from service.lib.validation_helper import validate_date, is_newer
 import requests, base64, json
 from requests.auth import HTTPBasicAuth
 from octopus.core import app
+from service import models
 
 blueprint = Blueprint('delete_notifications', __name__)
 
@@ -23,7 +24,13 @@ def index():
 
     if request.method == 'GET':
         upto = validate_date(default_upto, param='upto')
-        return render_template('delete_notifications/index.html', publisher_id=None,
+        publisher_ids = {
+            'label': 'Publisher ID',
+            'values': models.RoutingHistory.get_all_publishers(),
+            'selected': request.args.get('publisher_id', ''),
+            'term': 'publisher_id.exact'
+        }
+        return render_template('delete_notifications/index.html', publisher_id=None, publisher_ids=publisher_ids,
                            upto=upto, status_values=[])
 
     # POST
@@ -45,10 +52,10 @@ def index():
         upto = default_upto
     upto = validate_date(upto, param='upto')
 
-    if is_newer(upto, default_upto):
-        flash(f"date {upto} has to be older than 6 months")
-        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
-                           upto=default_upto, status_values=status_values)
+    # if is_newer(upto, default_upto):
+    #     flash(f"date {upto} has to be older than 6 months")
+    #     return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+    #                        upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to delete with these params
     airflow_rest_url = "http://localhost:80/airflow/api/v1/dags/"
@@ -58,7 +65,7 @@ def index():
     if user and password:
         auth_header_value = base64.b64encode(f"{user}:{password}".encode()).decode()
     else:
-        flash("Airflow deletion user or passhttp://localhost/delete_notifications/word not set - cannot call deletion DAG. Please" \
+        flash("Airflow deletion user or password not set - cannot call deletion DAG. Please" \
         " request system administrator to check configuration.")
         return render_template('delete_notifications/index.html', publisher_id=publisher_id,
                            upto=upto, status_values=status_values)

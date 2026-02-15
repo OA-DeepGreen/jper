@@ -11,12 +11,17 @@
                         <input type="text" name="upto" value="{{upto}}"/>
                     </label>
                 </li>
-                <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">Publisher ID</span>
-                        <input type="text" name="publisher_id" value="{{publisher_id}}"/>
-                    </label>
-                </li>
+                    <li class="form-fields__item--text">
+                        <label>
+                            <span class="form-fields__label-text" style="width: 35%">{{ publisher_ids['label'] }}</span>
+                            <select name="{{filter_key}}">
+                                <option value="" {% if publisher_ids['selected'] == "" %}selected{% endif %}>Filter by {{ publisher_ids['label'] }}</option>
+                                {% for val in publisher_ids['values'] %}
+                                    <option value="{{ val }}" {% if publisher_ids['selected'] == val %}selected{% endif %}>{{ val }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </li>
                <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">Status: <br/><br/></span>

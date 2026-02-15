@@ -1020,3 +1020,26 @@ class RoutingHistoryDAO(dao.ESDAO):
         if len(ans) == 1:
             return ans[0]
         return None
+
+    @classmethod
+    def pull_on_demand(cls, page=1, page_size=10000, publisher_id=None, status=None, upto=None):
+        query = {
+            "sort": [{"last_updated": {"order": "desc"}}],
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
+
+        if publisher_id:
+            query['query'] = {'bool': {"must": {"match": {"publisher_id.exact": publisher_id}}}}
+        if status == "failure":
+            query['query'] = {'bool': {"must": {"match": {"workflow_states.status.exact": status}}}}
+        elif status == "success":
+            query['query'] = {'bool': {'must_not': [{"match": {"workflow_states.status.exact": "failure"}}]}}
+        if upto:
+            query['query'] = {'bool': {"filter": {"range": {"last_updated": {"lte": upto}}}}}
+        ans = cls.query(q=query)
+        return ans
+
+    @classmethod
+    def get_all_publishers(cls):
+        return cls.get_all_facet_values("publisher_id.exact")

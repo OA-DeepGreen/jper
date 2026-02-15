@@ -171,28 +171,28 @@ class RoutingDeletion(PublisherFiles):
 
         return { 'status': "success", 'message': f"Cleaned up routing history ID {self.routing_history.id}" }
 
-    # Delete stuff on demand
-    def delete_on_demand(self, params={}, keep=None):
-        # Params can have routing_id, publisher_id, notification_id etc.
-        app.logger.debug(f"On-demand deletion called with params: {params}")
-        since = "1970-01-01T00:00:00Z"
-        upto = params.get('upto', None)
-        publisher_id = params.get('publisher_id', None)
-        status_values = params.get('status_values', [])
-
-        if not upto and not publisher_id and len(status_values) == 0:
-            app.logger.error("At least one of upto, publisher_id or status_values must be provided for on-demand deletion")
-            return { 'status': "failure", 'message': "At least one of upto, publisher_id or status_values must be provided for on-demand deletion" }
-
-        if 'routing_id' in params and 'publisher_id' in params:
-            self.routing_history = models.RoutingHistory.pull(params['routing_id'], publisher_id=params['publisher_id'])
-            if not self.routing_history:
-                app.logger.error(f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found")
-                return { 'status': "failure", 'message': f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found" }
-            app.logger.debug(f"Routing history found: {self.routing_history}")
-            status = self.clean_all(keep=keep)
-            return status
-        else:
-            app.logger.error("routing_id and publisher_id must be provided for on-demand deletion")
-            return { 'status': "failure", 'message': "routing_id and publisher_id must be provided for on-demand deletion" }
+    # # Delete stuff on demand
+    # def delete_on_demand(self, params={}, keep=None):
+    #     # Params can have routing_id, publisher_id, notification_id etc.
+    #     app.logger.debug(f"On-demand deletion called with params: {params}")
+    #     since = "1970-01-01T00:00:00Z"
+    #     upto = params.get('upto', None)
+    #     publisher_id = params.get('publisher_id', None)
+    #     status_values = params.get('status_values', [])
+    #
+    #     if not upto and not publisher_id and len(status_values) == 0:
+    #         app.logger.error("At least one of upto, publisher_id or status_values must be provided for on-demand deletion")
+    #         return { 'status': "failure", 'message': "At least one of upto, publisher_id or status_values must be provided for on-demand deletion" }
+    #
+    #     if 'routing_id' in params and 'publisher_id' in params:
+    #         self.routing_history = models.RoutingHistory.pull(params['routing_id'], publisher_id=params['publisher_id'])
+    #         if not self.routing_history:
+    #             app.logger.error(f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found")
+    #             return { 'status': "failure", 'message': f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found" }
+    #         app.logger.debug(f"Routing history found: {self.routing_history}")
+    #         status = self.clean_all(keep=keep)
+    #         return status
+    #     else:
+    #         app.logger.error("routing_id and publisher_id must be provided for on-demand deletion")
+    #         return { 'status': "failure", 'message': "routing_id and publisher_id must be provided for on-demand deletion" }
         
