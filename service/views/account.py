@@ -554,6 +554,7 @@ def matching(repo_id):
 
     provider = acc.has_role('publisher')
     since = request.args.get('since')
+    upto = request.args.get('upto')
     try:
         since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
@@ -598,6 +599,8 @@ def failing(provider_id):
     if acc is None:
         abort(404)
 
+    since = request.args.get('since')
+    upto = request.args.get('upto')
     try:
         since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
