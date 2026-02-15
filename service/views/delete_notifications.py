@@ -58,7 +58,7 @@ def index():
     #                        upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to delete with these params
-    airflow_url = app.config.get("AIRFLOW_URL", "http://localhost:80/airflow")
+    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     deletion_dag = "Delete_Data_OnDemand"
     user = app.config.get("AIRUSERDEL_USER", 'None')
