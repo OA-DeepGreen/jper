@@ -553,7 +553,7 @@ def matching(repo_id):
         abort(404)
 
     provider = acc.has_role('publisher')
-
+    since = request.args.get('since')
     try:
         since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
