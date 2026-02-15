@@ -50,7 +50,12 @@ def index():
     upto = request.values.get('upto')
     if upto == '' or upto is None:
         upto = default_upto
-    upto = validate_date(upto, param='upto')
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        flash(f"Error validating 'upto' date: {e}")
+        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+                            upto=default_upto, status_values=status_values)
 
     # if is_newer(upto, default_upto):
     #     flash(f"date {upto} has to be older than 6 months")
@@ -58,7 +63,7 @@ def index():
     #                        upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to delete with these params
-    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
+    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:80/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     deletion_dag = "Delete_Data_OnDemand"
     user = app.config.get("AIRUSERDEL_USER", 'None')

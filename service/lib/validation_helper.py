@@ -3,17 +3,22 @@ from flask import request, make_response
 from octopus.lib import dates
 from octopus.core import app
 
-def validate_date(dt, param='since'):
+def validate_date(dt, param='since', return_400_if_invalid=True):
     if dt is None or dt == "":
-        return bad_request("Missing required parameter {param}".format(param=param))
+        if return_400_if_invalid:
+            return bad_request("Missing required parameter {param}".format(param=param))
+        else:
+            raise ValueError("Missing required parameter {param}".format(param=param))
     out_format = None
     if param == 'upto':
         out_format = "%Y-%m-%dT23:59:59Z"
     try:
         dt = dates.reformat(dt, out_format=out_format)
     except ValueError:
-        return bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
-
+        if return_400_if_invalid:
+            return bad_request("Unable to understand {y} date '{x}'".format(y=param, x=dt))
+        else :
+            raise ValueError("Unable to understand {y} date '{x}'".format(y=param, x=dt))
     return dt
 
 
