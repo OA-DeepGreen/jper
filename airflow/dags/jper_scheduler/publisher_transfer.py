@@ -85,7 +85,7 @@ class PublisherFiles:
     def __init_from_app__(self):
         # Initialise the needed constants from the app
         self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
+        self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", ''add_notification_state)
         self.dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
         self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
@@ -577,6 +577,7 @@ class PublisherFiles:
         total_number_of_notification = len(uids)
         notification_states = []
         app.logger.info(f"Processing {len(uids)} notifications")
+        overall_status = "success"
         for idx, uid in enumerate(uids):
             app.logger.info(f"Processing unrouted notification {idx} : {uid}")
             mun = models.UnroutedNotification()
@@ -592,9 +593,10 @@ class PublisherFiles:
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
+            app.logger.info(message)
             status = "success"
             doi = ''
-            message = None
+            msg = ""
             if routing_msg == "Done":
                 # This is now a routed notification. I need the repositories matched and the doi.
                 if res:
@@ -616,14 +618,15 @@ class PublisherFiles:
                         if len(dois) > 0:
                             doi = dois[0]
 
-                app.logger.info(message)
-                self.routing_history.add_notification_state("success", uid, doi=doi)
+                app.logger.info(msg)
+                self.routing_history.add_notification_state("success", uid, doi=doi, number_matched_repositories=len(notification_obj.repositories))
             else: # Exception during routing
                 msg = "Received exception from routing"
                 app.logger.warn(msg)
-                self.routing_history.add_notification_state("failure", uid, doi=doi)
+                self.routing_history.add_notification_state("failure", uid, doi=doi, number_matched_repositories=0)
                 status = "failure"
-                message = msg
+                overall_status = "failure"
+            message = message + ". " + msg
 
             if self.delete_routed:
                 msg = f"Deleting unrouted notification {obj.id}"
@@ -632,6 +635,7 @@ class PublisherFiles:
             else:
                 msg = f"Not deleting unrouted notification {obj.id}"
                 app.logger.debug(msg)
+            message = message + ". " + msg
 
             # Update routing history
             app.logger.info("Updating routing history")
@@ -639,9 +643,8 @@ class PublisherFiles:
                     notification_id=uid, status=status, message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
-            if not message:
-                message = f"Processed {total_number_of_notification} notifications."
-        return {'status': status, 'message': message}
+        message = f"Processed {total_number_of_notification} notifications."
+        return {'status': overall_status, 'message': message}
 
     ##### --- End checkunrouted. Clean up temporary files. ---
 
