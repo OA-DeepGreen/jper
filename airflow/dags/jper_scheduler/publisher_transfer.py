@@ -597,6 +597,7 @@ class PublisherFiles:
             status = "success"
             doi = ''
             msg = ""
+            num_matched_repositories = 0
             if routing_msg == "Done":
                 # This is now a routed notification. I need the repositories matched and the doi.
                 if res:
@@ -604,6 +605,7 @@ class PublisherFiles:
                     if notification_obj:
                         msg = f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories"
                         app.logger.info(msg)
+                        num_matched_repositories = len(notification_obj.repositories)
                         dois = notification_obj.get_identifiers('doi')
                         if len(dois) > 0:
                             doi = dois[0]
@@ -614,12 +616,13 @@ class PublisherFiles:
                     if failed_obj:
                         msg = f"Notification {failed_obj.id} matched to {len(failed_obj.repositories)} repositories"
                         app.logger.info(msg)
+                        num_matched_repositories = len(failed_obj.repositories)
                         dois = failed_obj.get_identifiers('doi')
                         if len(dois) > 0:
                             doi = dois[0]
 
                 app.logger.info(msg)
-                self.routing_history.add_notification_state("success", uid, doi=doi, number_matched_repositories=len(notification_obj.repositories))
+                self.routing_history.add_notification_state("success", uid, doi=doi, number_matched_repositories=num_matched_repositories)
             else: # Exception during routing
                 msg = "Received exception from routing"
                 app.logger.warn(msg)
