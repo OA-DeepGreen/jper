@@ -85,7 +85,7 @@ class PublisherFiles:
     def __init_from_app__(self):
         # Initialise the needed constants from the app
         self.sftp_server = app.config.get("DEFAULT_SFTP_SERVER_URL", '')
-        self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", ''add_notification_state)
+        self.sftp_port = app.config.get("DEFAULT_SFTP_SERVER_PORT", '')
         self.dg_pubkey_file = app.config.get("DEEPGREEN_SSH_PUBLIC_KEY_FILE", '')
         self.dg_passphrase = app.config.get("DEEPGREEN_SSH_PASSPHRASE", '')
         self.remote_basedir = app.config.get("DEFAULT_SFTP_BASEDIR", "/home")
