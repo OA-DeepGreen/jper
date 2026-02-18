@@ -960,19 +960,11 @@ class RoutingHistoryDAO(dao.ESDAO):
     __type__ = "routing_history"
 
     @classmethod
-    def pull_records(cls, since, upto, page, page_size, publisher_id=None,
+    def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
                      publisher_email=None, doi=None, notification_id=None, status=None):
         query = {
             "query": {
                 "bool": {
-                    "filter": {
-                        "range": {
-                            "last_updated": {
-                                "gte": since,
-                                "lte": upto
-                            }
-                        }
-                    },
                     "must": []
                 }
             },
@@ -980,6 +972,24 @@ class RoutingHistoryDAO(dao.ESDAO):
             "from": (page - 1) * page_size,
             "size": page_size
         }
+        if since:
+            if not 'filter' in query['query']['bool']:
+                query['query']['bool']["filter"] = {}
+            if not 'range' in query['query']['bool']["filter"]:
+                query['query']['bool']["filter"]["range"] = {}
+            if not 'last_updated' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["last_updated"] = {}
+            query['query']['bool']["filter"]["range"]["last_updated"]["gte"] = since
+
+        if upto:
+            if not 'filter' in query['query']['bool']:
+                query['query']['bool']["filter"] = {}
+            if not 'range' in query['query']['bool']["filter"]:
+                query['query']['bool']["filter"]["range"] = {}
+            if not 'last_updated' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["last_updated"] = {}
+            query['query']['bool']["filter"]["range"]["last_updated"]["lte"] = upto
+
 
         if publisher_id:
             query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
@@ -1020,25 +1030,6 @@ class RoutingHistoryDAO(dao.ESDAO):
         if len(ans) == 1:
             return ans[0]
         return None
-
-    @classmethod
-    def pull_on_demand(cls, page=1, page_size=10000, publisher_id=None, status=None, upto=None):
-        query = {
-            "sort": [{"last_updated": {"order": "desc"}}],
-            "from": (page - 1) * page_size,
-            "size": page_size
-        }
-
-        if publisher_id:
-            query['query'] = {'bool': {"must": {"match": {"publisher_id.exact": publisher_id}}}}
-        if status == "failure":
-            query['query'] = {'bool': {"must": {"match": {"workflow_states.status.exact": status}}}}
-        elif status == "success":
-            query['query'] = {'bool': {'must_not': [{"match": {"workflow_states.status.exact": "failure"}}]}}
-        if upto:
-            query['query'] = {'bool': {"filter": {"range": {"last_updated": {"lte": upto}}}}}
-        ans = cls.query(q=query)
-        return ans
 
     @classmethod
     def get_all_publishers(cls):

@@ -1,5 +1,7 @@
 # Python stuff
 from datetime import datetime
+import math
+import re
 from dateutil.relativedelta import relativedelta
 from octopus.core import app
 from service.models.routing_history import RoutingHistory
@@ -30,28 +32,35 @@ def delete_data_ondemand():
         print(f"Parameters given: {context['params']}")
         if len(context['params']) == 0:
             app.logger.info("No parameters given for on-demand cleanup - exiting")
-            return
-        for k, v in context['params'].items():
-            app.logger.info(f"{k}: {v}")
-            print(type(v))
+            return []
 
         publisher_id = context['params'].get('publisher_id', None)
         status_values = context['params'].get('status_values', [])
         upto = context['params'].get('upto', None)
 
-        b = models.RoutingHistory.pull_on_demand(publisher_id=publisher_id, status=status_values, upto=upto)
+        b = RoutingHistory.pull_records(since=None, upto=upto, page=1, page_size=100, publisher_id=publisher_id,)
         if b == None or len(b) == 0:
             app.logger.error("Open search returned null record- exiting")
-            return
-
-        print(b.keys())
+            return []
         num_records = b['hits']['total']['value']
-        print(f"We have {num_records} records to delete")
+        if num_records == 0:
+            app.logger.info("No records returned from open search matching query - exiting")
+            return []
+
+        page = 1
+        page_size = 10000
+        total = b.get('hits', {}).get('total', {}).get('value', 0)
+        num_pages = int(math.ceil(total / page_size))
         info_to_run = []
-        for hit in b['hits']['hits']:
-            routing_id = hit['_source']['id']
-            publisher_id = hit['_source']['publisher_id']
-            info_to_run.append((routing_id, publisher_id))
+        for page in range(1, 1+num_pages):
+            records = RoutingHistory.pull_records(since=None, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,)
+            if records == None or len(records) == 0:
+                app.logger.error(f"Open search returned null record for page {page} - exiting")
+                continue
+            for hit in records['hits']['hits']:
+                routing_id = hit['_source']['id']
+                publisher_id = hit['_source']['publisher_id']
+                info_to_run.append((routing_id, publisher_id, status_values))
         return info_to_run
 
     @task(task_id="delete_old_routing_id", retries=0, max_active_tis_per_dag=1)
@@ -60,9 +69,12 @@ def delete_data_ondemand():
         log_url = get_log_url(context)
         routing_id = routing_tuple[0]
         publisher_id = routing_tuple[1]
+        status_values = routing_tuple[2]
+        ti = context['ti']  # TaskInstance
+        context["map_index_template"] = set_task_name(ti.map_index, routing_id)
         a = RoutingDeletion(publisher_id=publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        status = a.clean_all()
+        status = a.clean_all(status_values=status_values)
         app.logger.info(f"Routing history deletion status: {status['status']}, Message: {status['message']}")
         return status['status']
 

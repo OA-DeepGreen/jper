@@ -7,6 +7,35 @@ from jper_scheduler.publisher_transfer import PublisherFiles
 
 dryRun = True
 
+
+# Check if notification is okay to delete based on status values provided for on-demand deletion
+def is_notification_okay(note, status_values):
+    # If status values are provided, only delete notifications with those status values
+    if note['status'] == 'failure' and 'failure' in status_values:
+        return True
+    if note['status'] == 'success':
+        num_repo = note.get('number_matched_repositories', None)
+        if not num_repo:
+            # Needed in case of failure in processftp_dir where the notification is created but the number of matched repositories
+            # is not added to the notification states in routing history. In that case, we will pull the notification object to
+            # get the number of matched repositories.
+            obj = models.RoutedNotification.pull(note['notification_id'])
+            if not obj:
+                obj = models.FailedNotification.pull(note['notification_id'])
+            if obj and obj.repositories:
+                num_repo = len(obj.repositories)
+        if not num_repo:
+            return False # If still failure, return False to avoid deleting notifications that we are not sure about
+        if 'success-routed' in status_values:
+            if num_repo > 0:
+                return True
+        if 'success-no-matches' in status_values:
+            if num_repo == 0:
+                return True
+    return False
+
+
+
 # This class inherits from PublisherFiles (publisher_transfer.py) and will only
 # perform deletions.
 # Hopefully this will keep the publisher_transfer.py clean.
@@ -151,7 +180,7 @@ class RoutingDeletion(PublisherFiles):
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
 
     # Clean everything for this routing history
-    def clean_all(self, keep=None):
+    def clean_all(self, status_values=None, keep=None):
 
         # Clean up all the final files except the ones in "keep" locations
         statusF = self.clean_all_files(keep=keep)
@@ -160,7 +189,13 @@ class RoutingDeletion(PublisherFiles):
         # Clean up the notifications
         note_list = []
         for note in self.routing_history.notification_states:
-            note_list.append((note['notification_id'], note['status']))
+            okay = True
+            if status_values and len(status_values) > 0 and len(status_values) < 3:
+                # If all 3 status values are provided, we will always match the notification
+                # 'success-routed', 'success-no-matches', 'failure'
+                okay = is_notification_okay(note, status_values)
+            if okay:
+                note_list.append((note['notification_id'], note['status']))
         if len(note_list) > 0:
             app.logger.debug(f"Notifications to delete: {note_list}")
             statusN = self.delete_notifications(note_list=note_list)

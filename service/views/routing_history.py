@@ -68,7 +68,7 @@ def index():
     if status:
         filled_params['status'] = status
 
-    records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id,
+    records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,
                                           publisher_email=publisher_email, doi=doi,
                                           notification_id=notification_id, status=status)
     total = records.get('hits', {}).get('total', {}).get('value', 0)
