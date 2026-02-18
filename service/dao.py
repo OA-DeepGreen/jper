@@ -977,18 +977,18 @@ class RoutingHistoryDAO(dao.ESDAO):
                 query['query']['bool']["filter"] = {}
             if not 'range' in query['query']['bool']["filter"]:
                 query['query']['bool']["filter"]["range"] = {}
-            if not 'last_updated' in query['query']['bool']["filter"]["range"]:
-                query['query']['bool']["filter"]["range"]["last_updated"] = {}
-            query['query']['bool']["filter"]["range"]["last_updated"]["gte"] = since
+            if not 'created_date' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["created_date"] = {}
+            query['query']['bool']["filter"]["range"]["created_date"]["gte"] = since
 
         if upto:
             if not 'filter' in query['query']['bool']:
                 query['query']['bool']["filter"] = {}
             if not 'range' in query['query']['bool']["filter"]:
                 query['query']['bool']["filter"]["range"] = {}
-            if not 'last_updated' in query['query']['bool']["filter"]["range"]:
-                query['query']['bool']["filter"]["range"]["last_updated"] = {}
-            query['query']['bool']["filter"]["range"]["last_updated"]["lte"] = upto
+            if not 'created_date' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["created_date"] = {}
+            query['query']['bool']["filter"]["range"]["created_date"]["lte"] = upto
 
 
         if publisher_id:
