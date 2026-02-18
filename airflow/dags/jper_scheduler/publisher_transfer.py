@@ -7,7 +7,6 @@ from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
 from service import routing_deepgreen as routing
-from service.lib import request_deposit_helper
 
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
@@ -603,9 +602,9 @@ class PublisherFiles:
                 if res:
                     notification_obj = models.RoutedNotification.pull(uid)
                     if notification_obj:
-                        msg = f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories"
-                        app.logger.info(msg)
                         num_matched_repositories = len(notification_obj.repositories)
+                        msg = f"Notification {notification_obj.id} matched to {num_matched_repositories} repositories"
+                        app.logger.info(msg)
                         dois = notification_obj.get_identifiers('doi')
                         if len(dois) > 0:
                             doi = dois[0]
@@ -614,15 +613,16 @@ class PublisherFiles:
                     failed_obj = models.FailedNotification.pull(uid)
                     app.logger.debug(msg)
                     if failed_obj:
-                        msg = f"Notification {failed_obj.id} matched to {len(failed_obj.repositories)} repositories"
-                        app.logger.info(msg)
                         num_matched_repositories = len(failed_obj.repositories)
+                        msg = f"Notification {failed_obj.id} matched to {num_matched_repositories} repositories"
+                        app.logger.info(msg)
                         dois = failed_obj.get_identifiers('doi')
                         if len(dois) > 0:
                             doi = dois[0]
 
                 app.logger.info(msg)
                 self.routing_history.add_notification_state("success", uid, doi=doi, number_matched_repositories=num_matched_repositories)
+
             else: # Exception during routing
                 msg = "Received exception from routing"
                 app.logger.warn(msg)
