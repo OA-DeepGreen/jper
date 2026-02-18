@@ -34,11 +34,13 @@ def delete_data_ondemand():
             app.logger.info("No parameters given for on-demand cleanup - exiting")
             return []
 
+        a = RoutingHistory()
+
         publisher_id = context['params'].get('publisher_id', None)
         status_values = context['params'].get('status_values', [])
         upto = context['params'].get('upto', None)
 
-        b = RoutingHistory.pull_records(since=None, upto=upto, page=1, page_size=100, publisher_id=publisher_id,)
+        b = a.pull_records(since=None, upto=upto, page=1, page_size=1000, publisher_id=publisher_id)
         if b == None or len(b) == 0:
             app.logger.error("Open search returned null record- exiting")
             return []
