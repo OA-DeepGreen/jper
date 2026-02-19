@@ -1,4 +1,5 @@
 import os, shutil, zipfile, tarfile
+from urllib.parse import urlparse
 from octopus.core import app
 
 
@@ -133,3 +134,25 @@ def flatten(destination, depth=None):
                     app.logger.debug(f"Moved file {originpath} to {destination}")
             except:
                 pass
+
+# Utility function to set task name
+def set_task_name(map_index, task_str):
+    task_name = f"{map_index} {task_str}"
+    sanitised_name = task_name
+    if len(task_name) > 250:
+        sanitised_name = f"{task_name[:245]} ..."
+    return sanitised_name
+
+# Utility function to get log url
+def get_log_url(context):
+    full_log_url = context['task_instance'].log_url
+    query_params = full_log_url.split("&")
+    query_params_filtered = []
+    for q in query_params:
+        if not 'base_date' in q:
+            query_params_filtered.append(q)
+    log_url = "&".join(query_params_filtered)
+    parsed_url = urlparse(log_url)
+    new_path = f"{parsed_url.path}?{parsed_url.query}"
+    app.logger.info(f"Log for this job : {new_path}")
+    return new_path

@@ -20,16 +20,24 @@ def index():
 
     # Get since
     since = request.args.get('since')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
-    since = validate_date(since, param='since')
     filled_params['since'] = since
 
     # Get upto
     upto = request.args.get('upto')
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
-    upto = validate_date(upto, param='upto')
     filled_params['upto'] = upto
 
     # get page and page size
@@ -60,7 +68,7 @@ def index():
     if status:
         filled_params['status'] = status
 
-    records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id,
+    records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,
                                           publisher_email=publisher_email, doi=doi,
                                           notification_id=notification_id, status=status)
     total = records.get('hits', {}).get('total', {}).get('value', 0)
