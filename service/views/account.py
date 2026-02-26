@@ -17,7 +17,8 @@ import math
 import csv
 import sys
 import os
-from jsonpath_rw_ext import parse
+import urllib.parse
+from jsonpath_rw_ext import parse as json_parse
 from itertools import zip_longest
 from service import models
 from io import StringIO, TextIOWrapper, BytesIO
@@ -92,8 +93,14 @@ def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -120,8 +127,14 @@ def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -151,8 +164,14 @@ def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=Fals
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -188,9 +207,10 @@ def _download_request(repo_id=None, provider=False):
         return bad_request("Missing required parameter 'since'")
 
     try:
-        since = dates.reformat(since)
+        since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
-        return bad_request("Unable to understand since date '{x}'".format(x=since))
+        return bad_request(f"Error validating 'since' date: {e}")
+
 
     try:
         nbulk = JPER.bulk_notifications(current_user, since, repository_id=repo_id)
@@ -314,6 +334,34 @@ def _notifications_for_display(results, table, include_deposit_details=True):
         notifications.append(row)
     return notifications
 
+def _get_users(account_filters, page, page_size):
+    records = models.Account().pull_all_accounts_filter(account_filters, page, page_size)
+    sword_status = {}
+    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
+        acc_id = s.get('_source', {}).get('id')
+        if acc_id:
+            sword_status[acc_id] = s.get('_source', {}).get('status', '')
+    users = []
+    total = records.get('hits', {}).get('total', {}).get('value', 0)
+    num_pages = int(math.ceil(total / page_size))
+    for u in records.get('hits', {}).get('hits', []):
+        user = {
+            'id': u.get('_source', {}).get('id', ''),
+            'email': u.get('_source', {}).get('email', ''),
+            'role': u.get('_source', {}).get('role', []),
+            'status': '',
+            'name': ''
+        }
+        if user["id"] in sword_status:
+            user["status"] = sword_status[user["id"]]
+        if "publisher" in user["role"]:
+            user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
+            user['name'] = u.get('_source', {}).get('publisher', {}).get('name', '')
+        if "repository" in user["role"]:
+            user['name'] = u.get('_source', {}).get('repository', {}).get('bibid', '')
+        users.append(user)
+    return users, total, num_pages
+
 @blueprint.before_request
 def restrict():
     if current_user.is_anonymous:
@@ -325,25 +373,47 @@ def restrict():
 def index():
     if not current_user.is_super:
         abort(401)
-    sword_status = {}
-    for s in models.sword.RepositoryStatus().query(q='*', size=10000).get('hits', {}).get('hits', []):
-        acc_id = s.get('_source', {}).get('id')
-        if acc_id:
-            sword_status[acc_id] = s.get('_source', {}).get('status', '')
-    users = []
-    for u in models.Account().query(q='*', size=10000).get('hits', {}).get('hits', []):
-        user = {
-            'id': u.get('_source', {}).get('id', ''),
-            'email': u.get('_source', {}).get('email', ''),
-            'role': u.get('_source', {}).get('role', []),
-            'status' : ''
+    filled_params = {}
+    account_filters = {
+        'roles': {
+            'label': 'Roles',
+            'values': models.Account.get_all_roles(),
+            'selected': request.args.get('roles', ''),
+            'term': 'role.exact'
+        },
+        'packaging_formats': {
+            'label': 'Packaging formats',
+            'values': models.Account.get_all_packaging_formats(),
+            'selected': request.args.get('packaging_formats', ''),
+            'term': 'packaging.exact',
+
+        },
+        'repository_software': {
+            'label': 'Repository software',
+            'values': models.Account.get_all_repository_software(),
+            'selected': request.args.get('repository_software', ''),
+            'term': 'repository.software.exact'
+        },
+        'publisher_routing_status': {
+            'label': 'Publisher routing status',
+            'values': models.Account.get_all_publisher_routing_status(),
+            'selected': request.args.get('publisher_routing_status', ''),
+            'term': 'publisher.routing_status.exact'
         }
-        if user["id"] in sword_status:
-            user["status"] = sword_status[user["id"]]
-        if "publisher" in user["role"]:
-            user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
-        users.append(user)
-    return render_template('account/users.html', users=users)
+    }
+    for k, v in account_filters.items():
+        filled_params[k] = v['selected']
+
+    # get page and page size
+    page = validate_page()
+    page_size = validate_page_size(default=1000)
+    filled_params['pageSize'] = page_size
+
+    encoded_params = urllib.parse.urlencode(filled_params)
+    link = f'/account?{encoded_params}'
+    users, total, num_pages = _get_users(account_filters, page, page_size)
+    return render_template('account/users.html', users=users, account_filters=account_filters,
+                           page_size=page_size, link=link, page=page, num_pages=num_pages, total=total)
 
 
 # 2016-11-15 TD : enable download option ("csv", for a start...)
@@ -357,10 +427,22 @@ def download(account_id):
     data = None
 
     since = request.args.get('since')
+    upto = request.args.get('upto')
+
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
 
@@ -407,13 +489,27 @@ def details(repo_id):
     if acc is None:
         abort(404)
     provider = acc.has_role('publisher')
+
     since = request.args.get('since')
+    upto = request.args.get('upto')
+
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
     if provider:
         notification_prefix = "matches"
         xtable = mtable
@@ -458,12 +554,24 @@ def matching(repo_id):
 
     provider = acc.has_role('publisher')
     since = request.args.get('since')
+    upto = request.args.get('upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     notification_prefix = "matches"
     xtable = mtable
@@ -490,11 +598,23 @@ def failing(provider_id):
     acc = models.Account.pull(provider_id)
     if acc is None:
         abort(404)
+
     since = request.args.get('since')
+    upto = request.args.get('upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
 
@@ -535,16 +655,28 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = validate_date(request.args.get('to', None), param='upto')
-        to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
+        try:
+            to_date = validate_date(request.args.get('to', None), param='upto')
+        except ValueError as e:
+            to_date = None
+            flash(f"Error validating 'to' date: {e}")
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = validate_date(request.args.get('from', None), param='since')
+        try:
+            from_date = validate_date(request.args.get('from', None), param='since')
+        except ValueError as e:
+            from_date = None
+            flash(f"Error validating 'from' date: {e}")
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = validate_date(request.args.get('date', None), param='since')
-        to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+        try:
+            from_date = validate_date(request.args.get('date', None), param='since')
+            to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+        except ValueError as e:
+            to_date = None
+            from_date = None
+            flash(f"Error validating 'date' date: {e}")
     # Default from and to dates
 
     if not from_date:
@@ -552,6 +684,7 @@ def sword_logs(repo_id):
     from_date_display = str(dates.parse(from_date).strftime("%d/%m/%Y"))
     if not to_date:
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+    to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # get logs for date range
     logs_data, deposit_record_logs = _sword_logs(repo_id, from_date, to_date)
     return render_template('account/sword_log.html', last_updated=last_updated, status=latest_log.status, logs_data=logs_data, deposit_record_logs=deposit_record_logs,
@@ -775,6 +908,15 @@ def repoinfo(username):
     if request.values.get('packaging', False):
         packaging = [s.strip() for s in request.values['packaging'].split(',')]
 
+    add_publisher = False
+    publisher = {}
+    if request.values.get('publisher_form', False):
+        add_publisher = True
+        if 'publisher_url' in request.values:
+            publisher['url'] = request.values['publisher_url'].strip()
+        if 'publisher_name' in request.values:
+            publisher['name'] = request.values['publisher_name']
+
     try:
         if add_repository:
             acc.data['repository'] = repository
@@ -782,11 +924,16 @@ def repoinfo(username):
             acc.data['sword'] = sword
         if add_packaging:
             acc.data['packaging'] = packaging
+        if add_publisher:
+            if publisher.get('name', None):
+                acc.publisher_name = publisher['name']
+            if publisher.get('url', None):
+                acc.publisher_url = publisher['url']
         acc.save()
-        flash('Thank you. Your repository details have been updated.', "success")
+        flash('Thank you. Your account details have been updated.', "success")
     except Exception as e:
         ex_type, ex_value, ex_traceback = sys.exc_info()
-        flash('Error updating repository details: ' + str(ex_value), 'error')
+        flash('Error updating account details: ' + str(ex_value), 'error')
     return redirect(url_for('.username', username=username))
 
 
@@ -820,7 +967,7 @@ def config(username):
 
         rows = []
         for hdr in xtable["header"]:
-            rows.append((m.value for m in parse(xtable[hdr]).find(res)), )
+            rows.append((m.value for m in json_parse(xtable[hdr]).find(res)), )
 
         rows = list(zip_longest(*rows, fillvalue=''))
 

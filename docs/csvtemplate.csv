@@ -1,9 +1,9 @@
-Name Variants,Domains,Grant Numbers,Dummy1,Institution IDs,Keywords
-,,,,,
-In this column place name variants your institution is known by,"In this column put all domain names that your institution owns or operates under, as may appear in URLs or email addresses",In this column place the grant numbers of any grants you wish to receive content for,This column is left empty for the time being,In this column all institutional IDs (e.g. ROR) may appear whether these pieces of information will ever be delivered with articles' metadata or not,"In this column place keywords - if applicable at all - of a non-institutional repository on behalf you wish to receive content for" 
-,,,,,
-University of Edinburgh,ed.ac.uk,BB/34/abcd,,EDIN-123/b.c,administrative law 
-Edinburgh University,edinburgh.ac.uk,WT/9845,,,biology
-,,,,,
-"In order to use this template, please remove all content except the headers in row 1, and then complete the columns for each type.  You do not have to complete all of the columns if you do not wish to.  You can have as many or as few entries in each column as you like.",,,,,
-"When exporting this CSV from your spreadsheet program, please ensure that you save it as a CSV with text encoding “UTF-8”",,,,,
+Name Variants,Domains,Grant Numbers,ROR,Ringgold,Excluded Name Variants,Excluded Domains
+,,,,,,
+In this column place name variants your institution is known by,"In this column put all domain names that your institution owns or operates under, as may appear in URLs or email addresses",In this column place the grant numbers of any grants you wish to receive content for,In this column place all ROR institutional IDs you wish to match  with the RoR in the author affiliation in the articles' metadata ,In this column place all Ringgold organisational IDs you wish to match with the Ringgold in the author affiliation in the articles' metadata ,"In this column place name variants you would like to exclude from the match. This is used after a match is made, to further refine the matching process and eliminate articles which you would like excluded, based on the `excluded name variants`","In this column place domains you would like to exclude from the match. This is used after a match is made, to further refine the matching process and eliminate articles which you would like excluded, based on the `excluded domains`"
+,,,,,,
+University of Edinburgh,ed.ac.uk,BB/34/abcd,,,,
+Edinburgh University,edinburgh.ac.uk,WT/9845,,,,
+,,,,,,
+"In order to use this template, please remove all content except the headers in row 1, and then complete the columns for each type.  You do not have to complete all of the columns if you do not wish to.  You can have as many or as few entries in each column as you like.",,,,,,
+"When exporting this CSV from your spreadsheet program, please ensure that you save it as a CSV with text encoding “UTF-8”",,,,,,

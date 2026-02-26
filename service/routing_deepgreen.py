@@ -278,49 +278,53 @@ def _match(notification_data, repository_config, provenance, acc_id):
     if exclusion_matched:
         return False, provenance
 
+    # Removing further match refinements - keywords, excluded keywords and content_types
+    # See issue https://github.com/CottageLabs/deepgreen/issues/188
+    # - Issue #188 -------------------------------------------------
     # do further match refinements
     # if the configuration specifies a keyword,
     #     it must match the notification data, otherwise the match fails
-    if len(rc.keywords) > 0:
-        # app.logger.debug(" -- Refine with keywords")
-        keyword_matched = False
-        for rk in rc.keywords:
-            for mk in md.keywords:
-                m = _exact(rk, mk)
-                if m is not False: # then it is a string
-                    keyword_matched = True
-                    provenance.add_provenance("keywords", rk, "keywords", mk, m)
-        # app.logger.debug(" ---- matched: {x}".format(x=keyword_matched))
-        if not keyword_matched:
-            return False, provenance
-
+    # if len(rc.keywords) > 0:
+    #     # app.logger.debug(" -- Refine with keywords")
+    #     keyword_matched = False
+    #     for rk in rc.keywords:
+    #         for mk in md.keywords:
+    #             m = _exact(rk, mk)
+    #             if m is not False: # then it is a string
+    #                 keyword_matched = True
+    #                 provenance.add_provenance("keywords", rk, "keywords", mk, m)
+    #     # app.logger.debug(" ---- matched: {x}".format(x=keyword_matched))
+    #     if not keyword_matched:
+    #         return False, provenance
+    #
     # if the configuration specifies an excluded keyword,
     #     it must not match the notification data
-    if len(rc.excluded_keywords) > 0:
-        excluded_keyword_matched = False
-        for rk in rc.excluded_keywords:
-            for mk in md.keywords:
-                m = _exact(rk, mk)
-                if m is not False: # then it is a string
-                    excluded_keyword_matched = True
-                    m = "Excluding this match: " + m
-                    provenance.add_provenance("keywords", rk, "keywords", mk, m)
-        if excluded_keyword_matched:
-            return False, provenance
-
+    # if len(rc.excluded_keywords) > 0:
+    #     excluded_keyword_matched = False
+    #     for rk in rc.excluded_keywords:
+    #         for mk in md.keywords:
+    #             m = _exact(rk, mk)
+    #             if m is not False: # then it is a string
+    #                 excluded_keyword_matched = True
+    #                 m = "Excluding this match: " + m
+    #                 provenance.add_provenance("keywords", rk, "keywords", mk, m)
+    #     if excluded_keyword_matched:
+    #         return False, provenance
+    #
     # as above, if the config requires a content type it must match the notification data or the match fails
-    if len(rc.content_types) > 0:
-        # app.logger.debug(" -- Refine with content types")
-        content_type_matched = False
-        for rc in rc.content_types:
-            for mc in md.content_types:
-                m = _exact(rc, mc)
-                if m is True:
-                    content_type_matched = True
-                    provenance.add_provenance("content_types", rc, "content_types", mc, m)
-        # app.logger.debug(" ---- matched: {x}".format(x=content_type_matched))
-        if not content_type_matched:
-            return False, provenance
+    # if len(rc.content_types) > 0:
+    #     # app.logger.debug(" -- Refine with content types")
+    #     content_type_matched = False
+    #     for rc in rc.content_types:
+    #         for mc in md.content_types:
+    #             m = _exact(rc, mc)
+    #             if m is True:
+    #                 content_type_matched = True
+    #                 provenance.add_provenance("content_types", rc, "content_types", mc, m)
+    #     # app.logger.debug(" ---- matched: {x}".format(x=content_type_matched))
+    #     if not content_type_matched:
+    #         return False, provenance
+    # - Issue #188 -------------------------------------------------
 
     return len(provenance.provenance) > 0, provenance
 

@@ -1,10 +1,15 @@
 <div class="accordion-row">Profile settings
   <button class="accordion-section" data-panel="section-update-email">Update email</button>
   <button class="accordion-section" data-panel="section-update-password">Update password</button>
+  <button class="accordion-section" data-panel="section-update-name">Update name</button>
   <div class="panel section-update-email">
    {% include 'account/user/_update_email.html' %}
   </div>
   <div class="panel section-update-password">
    {% include 'account/user/_update_password.html' %}
   </div>
+  <div class="panel section-update-name">
+   {% include 'account/user/publisher/_profile_form.html' %}
+  </div>
+
 </div>

@@ -5,23 +5,33 @@
 				<h2>
 					{% if account.has_role('admin') %} Admin {% endif %}
 					{% if account.has_role('repository') %} Institution Repository {% endif %}
-					{% if account.has_role('publisher') %}
-					{% if account.has_role('repository')
-					%} / {% endif %} Publisher {% endif %} account details
+					{% if account.has_role('publisher') %} Publisher {% endif %}
+					account details
 				</h2>
 			</div>
 	    	<div class="col span-4 cms">
 				<dl>
-	            	<dt class="visuallyhidden">Email address</dt>
-	            	<dd>{{account.data['email']}}</dd>
+                	<dt class="visuallyhidden">Email address</dt>
+	            	<dd>{{ account.email }}</dd>
+                    {% if account.has_role('repository') %}
+                      <dt class="visuallyhidden">Bibid</dt>
+                      <dd>{{ account.repository_bibid }}</dd>
+                    {% endif %}
 	            </dl>
 			</div>
 			<div class="col span-8 cms">
             	<dl class="dl-horizontal dl-horizontal--account-details">
-	            	{% if current_user.is_super %}
-	                <dt>Created</dt>
-					<dd>{{account.data['created_date']}}</dd>
+                    {% if current_user.is_super %}
+	                  <dt>Created</dt>
+					  <dd>{{account.data['created_date']}}</dd>
 					{% endif %}
+                    {% if account.has_role('publisher') %}
+                      <dt>Name</dt>
+                      <dd>{{ account.publisher_name }}</dd>
+                    {% elif account.has_role('repository') %}
+                      <dt>Name</dt>
+                      <dd>{{ account.repository_name }}</dd>
+                    {% endif %}
 					<dt>Account <abbr title="Identifier">ID</abbr></dt>
 					<dd>{{account.id}}</dd>
 					<dt><abbr title="Application Programming Interface">API</abbr> key</dt>

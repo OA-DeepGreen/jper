@@ -3,6 +3,7 @@ from flask_login import current_user
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import math
+import urllib.parse
 from service.lib.validation_helper import validate_date, validate_page, validate_page_size, bad_request
 from service.models import RoutingHistory, Account
 
@@ -15,26 +16,34 @@ def index():
     if not current_user.is_super:
         abort(401)
 
-    # # Get publisher_id
-    # publisher_id = request.args.get('publisher_id')
-    # if publisher_id == '':
-    #     publisher_id = None
+    filled_params = {}
 
     # Get since
     since = request.args.get('since')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
-    since = validate_date(since, param='since')
+    filled_params['since'] = since
 
     # Get upto
     upto = request.args.get('upto')
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
-    upto = validate_date(upto, param='upto')
+    filled_params['upto'] = upto
 
     # get page and page size
     page = validate_page()
     page_size = validate_page_size()
+    filled_params['pageSize'] = page_size
 
     publisher_id = ''
     publisher_email = ''
@@ -51,14 +60,23 @@ def index():
     elif search_term == 'doi':
         doi = search_val
 
-    status = request.args.get('status', '')
+    if search_term and search_val:
+        filled_params['search_term'] = search_term
+        filled_params['search_val'] = search_val
 
-    records = RoutingHistory.pull_records(since, upto, page, page_size, publisher_id=publisher_id,
+    status = request.args.get('status', '')
+    if status:
+        filled_params['status'] = status
+
+    records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,
                                           publisher_email=publisher_email, doi=doi,
                                           notification_id=notification_id, status=status)
     total = records.get('hits', {}).get('total', {}).get('value', 0)
     num_pages = int(math.ceil(total / page_size))
-    link = f"/routing_history?since={since}&upto={upto}&pageSize={page_size}"
+    link = f"/routing_history"
+    encoded_params = urllib.parse.urlencode(filled_params)
+    link = f'{link}?{encoded_params}'
+
     if publisher_id:
         link = link + f"&publisher_id={publisher_id}"
     if not search_val:
@@ -107,14 +125,29 @@ def view_routing_history_by_nid(notification_id):
 
 def _shorten_workflow_message(rec):
     file_locations = {'original_file_location': rec.original_file_location}
-    for fl in rec.final_file_locations:
-        file_locations[fl['location_type']] = fl['file_location']
+    file_labels = {'original_file_location': 1}
+    for f in rec.final_file_locations:
+        fk = f['location_type']
+        fl = f['file_location']
+        count = 1
+        if fk in file_labels.keys():
+            count = file_labels[fk] + 1
+            file_labels[fk] = count
+            file_locations[f"{fk}_{count}"] = fl
+            f['location_type'] = f"{fk}_{count}"
+        else:
+            file_labels[fk] = 1
+            file_locations[fk] = fl
 
     workflow_states = []
     for workflow in rec.workflow_states:
         msg = workflow.get('message', '')
         for fk, fl in file_locations.items():
-            if fl in msg:
+            if f" {fl} " in msg or \
+                f"{fl}\n" in msg or \
+                f"\n{fl}" in msg or \
+                f"{fl}. " in msg or \
+                msg.startswith(fl) or msg.endswith(fl):
                 msg = msg.replace(fl, f"<{fk}>")
         workflow['short_message'] = msg
         workflow_states.append(workflow)

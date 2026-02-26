@@ -1,0 +1,11 @@
+<div class="row line-space">
+  <div class="col span-9">
+    {% if total > 9999 %}
+      {% set msg="( only the latest 10000 routing history logs are displayed )" %}
+    {%  else %}
+      {% set msg="" %}
+    {% endif %}
+    <b>Total number of accounts: {{total}}</b><br/>
+    {{ msg }}
+  </div>
+</div>
