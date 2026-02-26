@@ -205,7 +205,7 @@ def process_notification(n):
 
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
     if len(match_ids) > 0:
-        request_type = "machine rematched routed notification"
+        request_type = "machine"
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
