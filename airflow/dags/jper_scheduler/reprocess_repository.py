@@ -16,30 +16,30 @@ from airflow.configuration import conf
 from jper_scheduler.utils import set_task_name, get_log_url
 
 # Create a connection - ES stuff
-host = 'vl159.kobv.de'
-# host = 'localhost'
-port = '9200'
-index = 'jper-routed2024*,jper-routed2025*,jper-routed2026*'
-max_query = 5000 # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
+host = app.config.get("AIRFLOW_REPROCESS_ES_HOST", 'localhost')
+port = app.config.get("AIRFLOW_REPROCESS_ES_PORT", '9200')
+index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed2024*,jper-routed2025*,jper-routed2026*')
+max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 conn = esprit.raw.Connection(host, index, port=port)
 
 repository = app.config.get("AIRFLOW_REPROCESS_REPO", 'bb76e412c03b4999a92f67e092ddcc57')
 repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
 bibids = {repo_username: repository}
-repository = bibids[list(bibids.keys())[0]]
 subject_repo_bibids = {}
-# Date range required is 25 Nov 2024 to 15 Feb 2026
-begin_date = dates.parse("2024-11-25T00:00:00Z").isoformat()
-end_date = dates.parse("2026-02-16T00:00:00Z").isoformat()
+
+begin_date = app.config.get("AIRFLOW_REPROCESS_BEGIN_DATE", "2024-11-25T00:00:00Z")
+end_date = app.config.get("AIRFLOW_REPROCESS_END_DATE", "2026-02-15T00:00:00Z")
+begin_date = dates.parse(begin_date).isoformat()
+end_date = dates.parse(end_date).isoformat()
 
 n = list(string.digits + string.ascii_lowercase)
 n3 = itertools.combinations(n, 3)
-outputPath = "/logs/tubfr_routing/TODO"
-# outputPath = "/tmp/tubfr_routing/TODO"
 out_subdir = "".join(n3.__next__())
+
+outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/tubfr_routing/TODO')
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
-write_count = 0  # Local writing counter
-notifications_to_process = 250 # Notifications to process at a given time.
+write_count = 0  # Local (=global here) writing counter
+notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 250) # Notifications to process at a given time.
 
 def write_notifications(notifications):
     # Write the given notifications to JSON files in the output directory, creating
@@ -209,7 +209,7 @@ def process_notification(n):
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
-     schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_REPO", 'None'),
+     schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
      description=f"Reprocess notifications for repository {repository}",
      catchup=False,
