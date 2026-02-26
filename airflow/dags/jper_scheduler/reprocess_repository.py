@@ -36,7 +36,7 @@ n = list(string.digits + string.ascii_lowercase)
 n3 = itertools.combinations(n, 3)
 out_subdir = "".join(n3.__next__())
 
-outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/tubfr_routing/TODO')
+outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/tubfr_routing')
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
 write_count = 0  # Local (=global here) writing counter
 notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 250) # Notifications to process at a given time.
@@ -46,7 +46,7 @@ def write_notifications(notifications):
     # subdirectories as needed and ensuring no existing files are overwritten
     global write_count, out_subdir
     for notification in notifications:
-        out_dir = f"{outputPath}/{out_subdir}"
+        out_dir = f"{outputPath}/TODO/{out_subdir}"
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         if write_count == 0:
@@ -225,12 +225,14 @@ def reprocess_repository():
             print(f"Error: notifications_to_process ({notifications_to_process}) exceeds Airflow's max_map_length ({max_map_length}).")
             print(f"Processing only the first {max_map_length} notifications to avoid Airflow errors.")
             notifications_to_process = max_map_length
-        if not os.path.exists(outputPath):
+        
+        input_path = f"{outputPath}/TODO"
+        if not os.path.exists(input_path):
             get_all_notifications(since=begin_date, upto=end_date)
 
         # At this point, the notifications already exist.
         # Retrieve the next <notifications_to_process> (if any) files to process.
-        path = Path(outputPath).rglob('*.json')
+        path = Path(input_path).rglob('*.json')
         local_count = 0
         files_to_process = []
         for file in path:
@@ -249,12 +251,15 @@ def reprocess_repository():
         ti = context['ti']  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, note)
 
-        file_name = f"{outputPath}/{note}.json"
+        file_name = f"{outputPath}/TODO/{note}.json"
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
         process_notification(data)
-
+        # Move the processed file to a "processed" directory to avoid reprocessing in future runs
+        processed_dir = f"{outputPath}/DONE"
+        os.makedirs(processed_dir, exist_ok=True)
+        os.rename(file_name, f"{processed_dir}/{note}.json")
 
     notes_to_process = get_all_notifications_in_date_range()
     process_one_notification.expand(note=notes_to_process)
