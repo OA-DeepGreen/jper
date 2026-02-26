@@ -258,7 +258,8 @@ def reprocess_repository():
         process_notification(data)
         # Move the processed file to a "processed" directory to avoid reprocessing in future runs
         processed_dir = f"{outputPath}/DONE"
-        os.makedirs(processed_dir, exist_ok=True)
+        n3_dir = note.split("/")[0]
+        os.makedirs(f"{processed_dir}/{n3_dir}", exist_ok=True)
         os.rename(file_name, f"{processed_dir}/{note}.json")
 
     notes_to_process = get_all_notifications_in_date_range()
