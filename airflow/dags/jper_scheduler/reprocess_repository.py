@@ -205,7 +205,8 @@ def process_notification(n):
 
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
     if len(match_ids) > 0:
-        request_deposit_helper.request_deposit_for_notification(notification_id, match_ids)
+        request_type = "machine rematched routed notification"
+        request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_REPO", 'None'),
