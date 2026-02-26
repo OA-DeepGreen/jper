@@ -16,37 +16,37 @@ from airflow.configuration import conf
 from jper_scheduler.utils import set_task_name, get_log_url
 
 # Create a connection - ES stuff
-host = 'vl159.kobv.de'
-# host = 'localhost'
-port = '9200'
-index = 'jper-routed2024*,jper-routed2025*,jper-routed2026*'
-max_query = 5000 # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
+host = app.config.get("AIRFLOW_REPROCESS_ES_HOST", 'localhost')
+port = app.config.get("AIRFLOW_REPROCESS_ES_PORT", '9200')
+index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed2024*,jper-routed2025*,jper-routed2026*')
+max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 conn = esprit.raw.Connection(host, index, port=port)
 
 repository = app.config.get("AIRFLOW_REPROCESS_REPO", 'bb76e412c03b4999a92f67e092ddcc57')
 repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
 bibids = {repo_username: repository}
-repository = bibids[list(bibids.keys())[0]]
 subject_repo_bibids = {}
-# Date range required is 25 Nov 2024 to 15 Feb 2026
-begin_date = dates.parse("2024-11-25T00:00:00Z").isoformat()
-end_date = dates.parse("2026-02-16T00:00:00Z").isoformat()
+
+begin_date = app.config.get("AIRFLOW_REPROCESS_BEGIN_DATE", "2024-11-25T00:00:00Z")
+end_date = app.config.get("AIRFLOW_REPROCESS_END_DATE", "2026-02-15T00:00:00Z")
+begin_date = dates.parse(begin_date).isoformat()
+end_date = dates.parse(end_date).isoformat()
 
 n = list(string.digits + string.ascii_lowercase)
 n3 = itertools.combinations(n, 3)
-outputPath = "/logs/tubfr_routing/TODO"
-# outputPath = "/tmp/tubfr_routing/TODO"
 out_subdir = "".join(n3.__next__())
+
+outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/tubfr_routing')
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
-write_count = 0  # Local writing counter
-notifications_to_process = 250 # Notifications to process at a given time.
+write_count = 0  # Local (=global here) writing counter
+notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 250) # Notifications to process at a given time.
 
 def write_notifications(notifications):
     # Write the given notifications to JSON files in the output directory, creating
     # subdirectories as needed and ensuring no existing files are overwritten
     global write_count, out_subdir
     for notification in notifications:
-        out_dir = f"{outputPath}/{out_subdir}"
+        out_dir = f"{outputPath}/TODO/{out_subdir}"
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         if write_count == 0:
@@ -205,10 +205,11 @@ def process_notification(n):
 
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
     if len(match_ids) > 0:
-        request_deposit_helper.request_deposit_for_notification(notification_id, match_ids)
+        request_type = "machine"
+        request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
-     schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_REPO", 'None'),
+     schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
      description=f"Reprocess notifications for repository {repository}",
      catchup=False,
@@ -224,12 +225,14 @@ def reprocess_repository():
             print(f"Error: notifications_to_process ({notifications_to_process}) exceeds Airflow's max_map_length ({max_map_length}).")
             print(f"Processing only the first {max_map_length} notifications to avoid Airflow errors.")
             notifications_to_process = max_map_length
-        if not os.path.exists(outputPath):
+        
+        input_path = f"{outputPath}/TODO"
+        if not os.path.exists(input_path):
             get_all_notifications(since=begin_date, upto=end_date)
 
         # At this point, the notifications already exist.
         # Retrieve the next <notifications_to_process> (if any) files to process.
-        path = Path(outputPath).rglob('*.json')
+        path = Path(input_path).rglob('*.json')
         local_count = 0
         files_to_process = []
         for file in path:
@@ -248,12 +251,16 @@ def reprocess_repository():
         ti = context['ti']  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, note)
 
-        file_name = f"{outputPath}/{note}.json"
+        file_name = f"{outputPath}/TODO/{note}.json"
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
         process_notification(data)
-
+        # Move the processed file to a "processed" directory to avoid reprocessing in future runs
+        processed_dir = f"{outputPath}/DONE"
+        n3_dir = note.split("/")[0]
+        os.makedirs(f"{processed_dir}/{n3_dir}", exist_ok=True)
+        os.rename(file_name, f"{processed_dir}/{note}.json")
 
     notes_to_process = get_all_notifications_in_date_range()
     process_one_notification.expand(note=notes_to_process)

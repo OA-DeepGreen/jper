@@ -1,7 +1,7 @@
 from service import models
 from octopus.lib import dates
 import os, csv, sys
-def request_deposit(notification_ids, repo_account_id):
+def request_deposit(notification_ids, repo_account_id, request_type='user'):
     count = 0
     duplicate = 0
     for n_id in list(notification_ids):
@@ -11,7 +11,7 @@ def request_deposit(notification_ids, repo_account_id):
             rec.account_id = repo_account_id
             rec.notification_id = n_id
             rec.status = 'queued'
-            rec.request_type = 'user'
+            rec.request_type = request_type
             rec.save()
             count += 1
         else:
