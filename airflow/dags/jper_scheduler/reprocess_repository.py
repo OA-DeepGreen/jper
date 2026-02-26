@@ -5,6 +5,7 @@ from octopus.core import app
 from octopus.lib import dates
 
 from service import models
+from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
 
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
@@ -15,14 +16,16 @@ from airflow.configuration import conf
 from jper_scheduler.utils import set_task_name, get_log_url
 
 # Create a connection - ES stuff
-# host = 'vl159.kobv.de'
-host = 'localhost'
+host = 'vl159.kobv.de'
+# host = 'localhost'
 port = '9200'
 index = 'jper-routed2024*,jper-routed2025*,jper-routed2026*'
 max_query = 5000 # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 conn = esprit.raw.Connection(host, index, port=port)
 
-bibids = {'TUBFR': 'bb76e412c03b4999a92f67e092ddcc57'}
+repository = app.config.get("AIRFLOW_REPROCESS_REPO", 'bb76e412c03b4999a92f67e092ddcc57')
+repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
+bibids = {repo_username: repository}
 repository = bibids[list(bibids.keys())[0]]
 subject_repo_bibids = {}
 # Date range required is 25 Nov 2024 to 15 Feb 2026
@@ -31,8 +34,8 @@ end_date = dates.parse("2026-02-16T00:00:00Z").isoformat()
 
 n = list(string.digits + string.ascii_lowercase)
 n3 = itertools.combinations(n, 3)
-# outputPath = "/logs/tubfr_routing/TODO"
-outputPath = "/tmp/tubfr_routing/TODO"
+outputPath = "/logs/tubfr_routing/TODO"
+# outputPath = "/tmp/tubfr_routing/TODO"
 out_subdir = "".join(n3.__next__())
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
 write_count = 0  # Local writing counter
@@ -201,9 +204,8 @@ def process_notification(n):
             time.sleep(30)
 
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
-    # if len(match_ids) > 0:
-    #     routing._make_routed(match_ids, obj, issn_data, metadata)
-
+    if len(match_ids) > 0:
+        request_deposit_helper.request_deposit_for_notification(notification_id, match_ids)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_REPO", 'None'),
