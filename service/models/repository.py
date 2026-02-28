@@ -40,12 +40,12 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 "name_variants": {"contains": "field", "coerce": "unicode"},
                 "excluded_name_variants": {"contains": "field", "coerce": "unicode"},
                 "author_ids": {"contains": "object"},
-                "postcodes": {"contains": "field", "coerce": "unicode"},
+                "grants": {"contains": "field", "coerce": "unicode"},
+                # "postcodes": {"contains": "field", "coerce": "unicode"},
                 # "keywords": {"contains": "field", "coerce": "unicode"},
                 # "excluded_keywords": {"contains": "field", "coerce": "unicode"},
-                "grants": {"contains": "field", "coerce": "unicode"},
                 # "content_types": {"contains": "field", "coerce": "unicode"},
-                "strings": {"contains": "field", "coerce": "unicode"},
+                # "strings": {"contains": "field", "coerce": "unicode"},
                 "excluded_license": {"contains": "field", "coerce": "unicode"},
             },
             "structs": {
@@ -207,13 +207,22 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         return ringgolds
 
     @property
-    def postcodes(self):
+    def grants(self):
         """
-        List of postcodes associated with this repository/institution
+        List of grant codes associated with this repository/institution
 
-        :return: postcodes
+        :return: grant codes
         """
-        return self._get_list("postcodes", coerce=dataobj.to_unicode())
+        return self._get_list("grants", coerce=dataobj.to_unicode())
+
+    # @property
+    # def postcodes(self):
+    #     """
+    #     List of postcodes associated with this repository/institution
+    #
+    #     :return: postcodes
+    #     """
+    #     return self._get_list("postcodes", coerce=dataobj.to_unicode())
 
     # @property
     # def keywords(self):
@@ -223,7 +232,7 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
     #     :return: keywords
     #     """
     #     return self._get_list("keywords", coerce=dataobj.to_unicode())
-    #
+
     # @property
     # def excluded_keywords(self):
     #     """
@@ -232,15 +241,6 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
     #     :return: keywords
     #     """
     #     return self._get_list("excluded_keywords", coerce=dataobj.to_unicode())
-
-    @property
-    def grants(self):
-        """
-        List of grant codes associated with this repository/institution
-
-        :return: grant codes
-        """
-        return self._get_list("grants", coerce=dataobj.to_unicode())
 
     # @property
     # def content_types(self):
@@ -251,14 +251,14 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
     #     """
     #     return self._get_list("content_types", coerce=dataobj.to_unicode())
 
-    @property
-    def strings(self):
-        """
-        List of arbitrary strings which may be used to match against this repository
-
-        :return: list of match strings
-        """
-        return self._get_list("strings", coerce=dataobj.to_unicode())
+    # @property
+    # def strings(self):
+    #     """
+    #     List of arbitrary strings which may be used to match against this repository
+    #
+    #     :return: list of match strings
+    #     """
+    #     return self._get_list("strings", coerce=dataobj.to_unicode())
 
     # @property
     # def institutional_identifier(self):
