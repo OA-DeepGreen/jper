@@ -67,18 +67,17 @@ ftable = {
 
 # Config table/csv for repositories
 ctable = {
-        "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                    "Excluded Name Variants", "Excluded Keywords"],
-        "header": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                   "Excluded Name Variants", "Excluded Keywords"],
+        "screen": ["Name Variants", "Domains", "Grant Numbers", "RoR", "Ringgold",
+                    "Excluded Name Variants", "Excluded domains"],
+        "header": ["Name Variants", "Domains", "Grant Numbers", "RoR", "Ringgold",
+                   "Excluded Name Variants", "Excluded domains"],
  "Name Variants": "repoconfig[0].name_variants[*]",
        "Domains": "repoconfig[0].domains[*]",
  "Grant Numbers": "repoconfig[0].grants[*]",
-      "Keywords": "repoconfig[0].keywords[*]",
            "RoR": "repoconfig[0].author_ids[?(@.type=='ror')].id",
       "Ringgold": "repoconfig[0].author_ids[?(@.type=='ringgold')].id",
 "Excluded Name Variants": "repoconfig[0].excluded_name_variants[*]",
-    "Excluded Keywords": "repoconfig[0].excluded_keywords[*]",
+    "Excluded domains": "repoconfig[0].excluded_domains[*]",
 }
 
 
