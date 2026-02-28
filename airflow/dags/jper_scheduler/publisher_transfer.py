@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import paramiko
 import logging
+import traceback
 from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
@@ -44,12 +45,18 @@ class PublisherFiles:
         # Initialise the sFTP connection
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect(hostname=self.sftp_server, port=self.sftp_port,
+        try:
+            c.connect(hostname=self.sftp_server, port=self.sftp_port,
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
+        except exception as e:
+            app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
+            app.logger.error(traceback.format_exc())
+            return -1
         self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
         self._is_scp = True
+        return 0
 
     def __init_constants__(self):
         # Stuff that is not picked up from elsewhere
@@ -164,7 +171,10 @@ class PublisherFiles:
         # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
         # Loop over the path
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.debug("Error with sftp. Returning.")
+                return -1
         subdirs = r_dir.split("/")
         path = ""
         for subdir in subdirs:
@@ -196,7 +206,11 @@ class PublisherFiles:
         if len(file_subdir.strip()) > 0:
             new_dir = f"{r_new}/{file_subdir}"
         try:
-            self._make_dir_in_server(new_dir)
+            result = self._make_dir_in_server(new_dir)
+            if result == -1:
+                app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
+                               f'Error creating sftp connection for publisher {self.id}')
+                return
         except Exception as e:
             app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
                                f'Error: {str(e)}')
@@ -210,7 +224,10 @@ class PublisherFiles:
 
         try:
             if not self._is_scp:
-                self.__init_sftp_connection__()
+                result = self.__init_sftp_connection__()
+                if result == -1:
+                    app.logger.error(f"Failed to move {file} to {new_file}. Error creating sftp connection.")
+                    return
             self.scp.rename(remote_path + '/' + file, new_file)
             app.logger.info(f"Successfully moved {file} to {new_file}.")
         except Exception as e:
@@ -233,13 +250,16 @@ class PublisherFiles:
     def list_remote_dir(self, rdir):
         # Idempotent function to recursively get the list of files in a remote directory
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.error(f"Failed to access directory {rdir}. Error creating sftp connection.")
+                return [-403]
         rdir = rdir.rstrip('/')
         try:
             x = self.scp.stat(rdir)
         except Exception as e:
             app.logger.error(f"Failed to access directory {rdir}. Error: {str(e)}")
-            return []
+            return [-404]
 
         folders = []
         for item in self.scp.listdir_attr(rdir):
@@ -263,7 +283,10 @@ class PublisherFiles:
     def get_file(self, remote_file):
         # Initialise the sFTP connection if not already done
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.error(f"Error initialising sftp connection for publisher {self.id} {self.publisher_email}")
+                return {"status": "failure", "message": str(e)}
         remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
         local_file = self.l_dir + remote_item
         l_filename = os.path.basename(local_file)
