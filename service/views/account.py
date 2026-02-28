@@ -1237,11 +1237,11 @@ def register():
     return render_template('account/register.html', vals=vals, form=form)
 
 @blueprint.route('/download_csv_template', methods=['GET'])
-def download_template_csv():
-    file_path = Path("/static/files/csvtemplate.csv")
+def download_csv_template():
+    file_path = Path("service/static/files/csvtemplate.csv")
     if not file_path.is_file():
         app.logger.warning(f'file not found [{file_path.as_posix()}]')
         abort(404)
     return send_file(io.BytesIO(file_path.read_bytes()),
-                     as_attachment=True, download_name="",
+                     as_attachment=True, download_name="DeepGreen_config_template.csv",
                      mimetype="text/csv")
