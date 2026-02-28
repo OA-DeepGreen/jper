@@ -359,7 +359,14 @@ def _get_users(account_filters, page, page_size):
             user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
             user['name'] = u.get('_source', {}).get('publisher', {}).get('name', '')
         if "repository" in user["role"]:
-            user['name'] = u.get('_source', {}).get('repository', {}).get('bibid', '')
+            bibid = u.get('_source', {}).get('repository', {}).get('bibid', '')
+            name = u.get('_source', {}).get('repository', {}).get('name', '')
+            names = []
+            if name:
+                names.append(name)
+            if bibid:
+                names.append(bibid)
+            user['name'] = '<br/>'.join(names)
         users.append(user)
     return users, total, num_pages
 
