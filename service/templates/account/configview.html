@@ -5,12 +5,7 @@
 {% include 'account/user/repository/config_view/_details.html' %}
 <div class="row">
 	<div class="span col-12" id="container">
-        <!-- strings -->
-        {% if repo.strings|length > 0 %}
-            {% with data=repo.strings, id='strings', title='Strings' %}
-                {% include "account/user/repository/config_view/_section_details.html" %}
-            {% endwith %}
-        {% endif %}
+        <!-- Not doing strings -->
         <!-- name_variants -->
         {% if repo.name_variants|length > 0 %}
             {% with data=repo.name_variants, id='name_variants', title='Name Variants' %}
@@ -30,18 +25,8 @@
                 {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
-        <!-- keywords -->
-        {% if repo.keywords|length > 0 %}
-            {% with data=repo.keywords, id='keywords', title='Keywords' %}
-                {% include "account/user/repository/config_view/_section_details.html" %}
-            {% endwith %}
-        {% endif %}
-        <!-- institutional_identifier -->
-        {% if repo.institutional_identifier %}
-            {% with data=[institutional_identifier], id='institutional_identifier', title='Institutional identifier' %}
-                {% include "account/user/repository/config_view/_section_details.html" %}
-            {% endwith %}
-        {% endif %}
+        <!-- Not doing keywords -->
+        <!-- Not doing institutional_identifier -->
         <!-- ringgolds -->
         {% if repo.ringgolds|length > 0 %}
             {% with data=repo.ringgolds, id='ringgold', title='Ringgold' %}
@@ -60,12 +45,7 @@
                 {% include "account/user/repository/config_view/_section_details.html" %}
             {% endwith %}
         {% endif %}
-        <!-- excluded_keywords -->
-        {% if repo.excluded_keywords|length > 0 %}
-            {% with data=repo.excluded_keywords, id='excluded_keywords', title='Excluded Keywords' %}
-                {% include "account/user/repository/config_view/_section_details.html" %}
-            {% endwith %}
-        {% endif %}
+        <!-- Not doing excluded_keywords -->
         <!-- excluded_domains -->
         {% if False and repo.excluded_domains|length > 0 %}
             {% with data=repo.excluded_domains, id='excluded_domains', title='Excluded Domains' %}
