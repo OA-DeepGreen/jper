@@ -10,35 +10,11 @@ from airflow.utils.session import provide_session
 from airflow.configuration import conf
 # My code
 from jper_scheduler.publisher_transfer import PublisherFiles
+from jper_scheduler.utils import get_log_url, set_task_name
 
 donot_rerun_processftp_dirs = [
     "No handler for package format unknown"
 ]
-
-def get_log_url(context):
-    # Simple function to obtain the log url path from the context
-    full_log_url = context['task_instance'].log_url
-    print(f"Full log url : {full_log_url}")
-    dag_id = f"dag_id={context['dag'].dag_id}"
-    ti = context['task_instance']
-    task_id = f"task_id={ti.task_id}"
-    execution_date = urlencode({"execution_date": ti.run_id.split('__')[1]})
-    map_index = None
-    if ti.map_index > -1:
-        map_index = f"map_index={ti.map_index}"
-    new_path = f"/airflow/log?{dag_id}&{task_id}&{execution_date}"
-    if map_index:
-        new_path = f"{new_path}&{map_index}"
-    app.logger.info(f"Log for this job : {new_path}")
-    return new_path
-
-def set_task_name(map_index, task_str):
-    # Set the task name based on the map_index and the task string
-    task_name = f"{map_index} {task_str}"
-    sanitised_name = task_name
-    if len(task_name) > 250:
-        sanitised_name = f"{task_name[:245]} ..."
-    return sanitised_name
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_ROUTING_SCHEDULE", 'None'),
@@ -65,7 +41,7 @@ def get_and_process_deposit_records():
             publisher_list.append(publisher['id'])
         return publisher_list # An XCom object
 
-    @task(task_id="get_list_of_files", retries=3, max_active_tis_per_dag=4)
+    @task(task_id="get_list_of_files", retries=0, max_active_tis_per_dag=4)
     def get_list_of_files(publisher=None):
         # For each publisher, get list of files deposited in the sftp server
         context = get_current_context()
