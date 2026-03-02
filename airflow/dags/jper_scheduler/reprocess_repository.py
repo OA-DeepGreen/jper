@@ -1,4 +1,4 @@
-import os, glob, json, time, datetime
+import os, glob, json, uuid, time, datetime
 from pathlib import Path
 import esprit
 from octopus.core import app
@@ -139,7 +139,43 @@ def is_article_license_gold(metadata, provider_id):
             return True
     return False
 
-def process_notification(n=note, bibids=bibids):
+def add_update_routing_history(notification, repository_id, request_type, doi="", log_url=None):
+    # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
+    routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
+    notification_id = notification.id
+    action = f"Reprocessed for repository {repository_id} with request type {request_type}"
+    file_location = ""
+    status = "success-routed"
+    message = f"Notification reprocessed for repository {repository_id} with request type {request_type}"
+
+    if routing_history:
+        routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
+                                           status=status, message=message, log_url=log_url)
+        routing_history.save()
+    else: # If no existing routing history record exists for this notification, create a new one
+        routing_history_id = uuid.uuid4().hex
+        rh = models.RoutingHistory()
+        acc = models.Account().pull(notification.provider.id)
+        rh.id = routing_history_id
+        rh.publisher_id = acc.id
+        rh.publisher_email = acc.email
+        rh.sftp_server_url = acc.sftp_server_url
+        rh.sftp_server_port = acc.sftp_server_port
+        rh.sftp_username = acc.sftp_username
+        rh.repositories = [repository_id]
+        rh.original_file_location = ""
+        rh.final_file_locations = []
+        rh.notification_states = [{
+            "status": "success",
+            "notification_id": notification_id,
+            "doi": doi,
+            "number_matched_repositories": 1
+        }]
+        rh.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
+                                           status=status, message=message, log_url=log_url)
+        rh.save()
+
+def process_notification(n=note, bibids=bibids, log_url=None):
     # Process a single notification, extract the relevant metadata, and check if it matches TUBFR routing criteria
     note = n['_source']
     obj = models.RoutedNotification(note)
@@ -202,6 +238,7 @@ def process_notification(n=note, bibids=bibids):
             match_ids = routing._match_repositories(al_repos, obj, match_data)
         except Exception as e:
             print(f"Error in matching repositories for notification id: {notification_id} : {str(e)}")
+            print(f"Sleeping for 30 seconds before retrying matching for notification id: {notification_id}")
             match_ids = []
             time.sleep(30)
 
@@ -209,7 +246,7 @@ def process_notification(n=note, bibids=bibids):
     if len(match_ids) > 0:
         request_type = "machine"
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
-----------------------------------
+        add_update_routing_history(obj, match_ids[0], request_type, doi=doi, log_url=log_url)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
@@ -262,6 +299,7 @@ def reprocess_repository():
         context = get_current_context()
         ti = context['ti']  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, note)
+        log_url = get_log_url(context)
 
         # note = /<outputPath>/repository_id/TODO/xxxx/note.json
         file_name = note
@@ -271,7 +309,7 @@ def reprocess_repository():
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
-        process_notification(n=data, bibids=bibids)
+        process_notification(n=data, bibids=bibids, log_url=log_url)
 
         # Move the processed file to a "processed" directory to avoid reprocessing in future runs
         out_file_name = note.replace("/TODO/", "/DONE/")
