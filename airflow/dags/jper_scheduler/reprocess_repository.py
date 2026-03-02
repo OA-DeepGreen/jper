@@ -1,4 +1,4 @@
-import os, sys, json, time, datetime, string, itertools
+import os, glob, json, time, datetime
 from pathlib import Path
 import esprit
 from octopus.core import app
@@ -8,8 +8,7 @@ from service import models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
 
-from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
-from airflow.decorators import dag, task, task_group
+from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
 from airflow.utils.session import provide_session
 from airflow.configuration import conf
@@ -18,13 +17,11 @@ from jper_scheduler.utils import set_task_name, get_log_url
 # Create a connection - ES stuff
 host = app.config.get("AIRFLOW_REPROCESS_ES_HOST", 'localhost')
 port = app.config.get("AIRFLOW_REPROCESS_ES_PORT", '9200')
-index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed2024*,jper-routed2025*,jper-routed2026*')
+index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed*')
 max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 conn = esprit.raw.Connection(host, index, port=port)
 
-repository = app.config.get("AIRFLOW_REPROCESS_REPO", 'bb76e412c03b4999a92f67e092ddcc57')
 repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
-bibids = {repo_username: repository}
 subject_repo_bibids = {}
 
 begin_date = app.config.get("AIRFLOW_REPROCESS_BEGIN_DATE", "2024-11-25T00:00:00Z")
@@ -32,42 +29,47 @@ end_date = app.config.get("AIRFLOW_REPROCESS_END_DATE", "2026-02-15T00:00:00Z")
 begin_date = dates.parse(begin_date).isoformat()
 end_date = dates.parse(end_date).isoformat()
 
-n = list(string.digits + string.ascii_lowercase)
-n3 = itertools.combinations(n, 3)
-out_subdir = "".join(n3.__next__())
+out_subdir = 1
 
-outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/tubfr_routing')
+outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/reprocess_repository')
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
 write_count = 0  # Local (=global here) writing counter
 notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 250) # Notifications to process at a given time.
 
-def write_notifications(notifications):
+def delete_empty_folders(root):
+    # Clean up all empty folders in the outputPath
+    for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+        for dirname in dirnames:
+            full_path = os.path.join(dirpath, dirname)
+            if not os.listdir(full_path): # Test if the directory is empty
+                os.rmdir(full_path)
+
+def write_notifications(out_dir=None, notifications=None):
     # Write the given notifications to JSON files in the output directory, creating
     # subdirectories as needed and ensuring no existing files are overwritten
     global write_count, out_subdir
     for notification in notifications:
-        out_dir = f"{outputPath}/TODO/{out_subdir}"
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        if write_count == 0:
-            print(f"Writing notifications to directory: {out_dir}")
-        file_name = f"{out_dir}/{notification['_id']}.json"
-        if os.path.exists(file_name):
-            print(f"File {file_name} already exists, stopping... please debug!")
-            sys.exit(1)
-        with open(file_name, 'w') as f:
-            json.dump(notification, f, indent=2)
+        file_exists = glob.glob(f"{out_dir}/**/{notification['_id']}.json")
+        if file_exists:
+            print(f"Notification already exists, skipping : {file_exists[0]}")
+        else:
+            tmp_dir = f"{out_dir}/{out_subdir:04d}"
+            if not os.path.exists(tmp_dir):
+                os.makedirs(tmp_dir)
+            if write_count == 0:
+                print(f"Writing notifications to directory: {tmp_dir}")
+            file_name = f"{tmp_dir}/{notification['_id']}.json"
+            with open(file_name, 'w') as f:
+                json.dump(notification, f, indent=2)
         write_count += 1
         if write_count == files_per_dir:
-            print(f"Written {write_count} notifications to directory: {out_dir}")
-            out_subdir = "".join(n3.__next__())
+            print(f"Written {write_count} notifications to directory: {tmp_dir}")
+            out_subdir = out_subdir + 1
             write_count = 0
 
 def get_notifications_for(upto=None, since=None, scroll_id=None, page=1, page_size=10000):
     # Fetch notifications from Elasticsearch for the given date range and pagination parameters
-    from_idx = (page - 1) * page_size
     qr = {
-        "from": from_idx,
         "size": page_size,
         "query": {
             "bool": {
@@ -83,14 +85,14 @@ def get_notifications_for(upto=None, since=None, scroll_id=None, page=1, page_si
         },
         "sort": [{"created_date": {"order": "desc"}}]
     }
-    if page == 1:
+    if page == 1: # Initial query to fetch the first page and get the scroll_id for pagination
         response = esprit.raw.initialise_scroll(conn, query=qr, keepalive='2m')
     else:
         response = esprit.raw.scroll_next(conn, scroll_id=scroll_id, keepalive='2m')
     data = response.json()
     return data
 
-def get_all_notifications(since=None, upto=None):
+def get_all_notifications(out_dir=None, since=None, upto=None):
     # Loop to fetch notifications in given date range and write to files,
     # paginating through results until no more notifications are returned
     page = 1
@@ -102,7 +104,7 @@ def get_all_notifications(since=None, upto=None):
     print(f"Fetching notifications between {since} and {upto} : page {page}")
     b = get_notifications_for(upto=upto, since=since, page=page, page_size=max_query)
     print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
-    write_notifications(b['hits']['hits'])
+    write_notifications(out_dir=out_dir, notifications=b['hits']['hits'])
 
     scroll_id = b['_scroll_id']
     while len(b['hits']['hits']) == max_query:
@@ -112,7 +114,7 @@ def get_all_notifications(since=None, upto=None):
         print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
         if len(b['hits']['hits']) == 0:
             break
-        write_notifications(b['hits']['hits'])
+        write_notifications(out_dir=out_dir, notifications=b['hits']['hits'])
 
 def get_identifier(identifier, type):
     # Given a list of identifier objects, return the id for the given type
@@ -137,7 +139,7 @@ def is_article_license_gold(metadata, provider_id):
             return True
     return False
 
-def process_notification(n):
+def process_notification(n=note, bibids=bibids):
     # Process a single notification, extract the relevant metadata, and check if it matches TUBFR routing criteria
     note = n['_source']
     obj = models.RoutedNotification(note)
@@ -207,11 +209,12 @@ def process_notification(n):
     if len(match_ids) > 0:
         request_type = "machine"
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
+----------------------------------
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
-     description=f"Reprocess notifications for repository {repository}",
+     description=f"Jper Reprocess notifications on demand",
      catchup=False,
      tags=["teamCottageLabs", "jper_reprocess"])
 def reprocess_repository():
@@ -220,24 +223,33 @@ def reprocess_repository():
     @provide_session
     def get_all_notifications_in_date_range(session=None, **context):
         global notifications_to_process
+        # Always do the cleanup
+        delete_empty_folders(outputPath)
+        # Basic sanity check to avoid processing too many notifications at once and overwhelming Airflow
         max_map_length = conf.getint("core", "max_map_length")
         if notifications_to_process > max_map_length:
             print(f"Error: notifications_to_process ({notifications_to_process}) exceeds Airflow's max_map_length ({max_map_length}).")
             print(f"Processing only the first {max_map_length} notifications to avoid Airflow errors.")
             notifications_to_process = max_map_length
-        
-        input_path = f"{outputPath}/TODO"
-        if not os.path.exists(input_path):
-            get_all_notifications(since=begin_date, upto=end_date)
+
+        # Get parameters from context - these are passed when triggering the DAG
+        print(f"Parameters received: {context['params']}")
+        if len(context['params']) > 0:
+            repository_id = context['params'].get('repository_id', None)
+            upto = context['params'].get('upto', None)
+            since = context['params'].get('from', None)
+
+            # Construct the path for storing the notifications to reprocess
+            input_path = f"{outputPath}/{repository_id}/TODO"
+            get_all_notifications(out_dir=input_path, since=since, upto=upto)
 
         # At this point, the notifications already exist.
         # Retrieve the next <notifications_to_process> (if any) files to process.
-        path = Path(input_path).rglob('*.json')
+        path = Path(outputPath).rglob('TODO/**/*.json')
         local_count = 0
         files_to_process = []
         for file in path:
-            local_path = f"{file.parts[-2]}/{file.stem}"
-            files_to_process.append(local_path)
+            files_to_process.append(file._str)
             local_count += 1
             if local_count == notifications_to_process:
                 break
@@ -251,16 +263,21 @@ def reprocess_repository():
         ti = context['ti']  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, note)
 
-        file_name = f"{outputPath}/TODO/{note}.json"
+        # note = /<outputPath>/repository_id/TODO/xxxx/note.json
+        file_name = note
+        file_path = Path(file_name)
+        repository_id = file_path.parts[-4]
+        bibids = {repo_username: repository_id}
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
-        process_notification(data)
+        process_notification(n=data, bibids=bibids)
+
         # Move the processed file to a "processed" directory to avoid reprocessing in future runs
-        processed_dir = f"{outputPath}/DONE"
-        n3_dir = note.split("/")[0]
-        os.makedirs(f"{processed_dir}/{n3_dir}", exist_ok=True)
-        os.rename(file_name, f"{processed_dir}/{note}.json")
+        out_file_name = note.replace("/TODO/", "/DONE/")
+        out_dir = os.path.dirname(out_file_name)
+        os.makedirs(out_dir, exist_ok=True)
+        os.rename(file_name, out_file_name)
 
     notes_to_process = get_all_notifications_in_date_range()
     process_one_notification.expand(note=notes_to_process)
