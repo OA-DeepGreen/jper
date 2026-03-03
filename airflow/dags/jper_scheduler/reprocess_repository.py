@@ -288,12 +288,12 @@ def reprocess_repository():
         local_count = 0
         files_to_process = []
         for file in path:
-            files_to_process.append(file._str)
+            files_to_process.append(file.__str__())
             local_count += 1
             if local_count == notifications_to_process:
                 break
-        print(f"Found {local_count} notification files to process")
-        return files_to_process[:3]
+        print(f"Found {len(files_to_process)} notification files to process")
+        return files_to_process
 
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
         retries=3, max_active_tis_per_dag=4)
@@ -307,8 +307,8 @@ def reprocess_repository():
         file_name = note
         file_path = Path(file_name)
         repository_tuple = file_path.parts[-4]
-        repository_name = repository_tuple.split()[0]
-        repository_id = repository_tuple.split()[1]
+        repository_name = repository_tuple.split("_")[0]
+        repository_id = repository_tuple.split("_")[1]
         bibids = {repository_name: repository_id}
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
