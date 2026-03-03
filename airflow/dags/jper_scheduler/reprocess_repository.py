@@ -18,7 +18,7 @@ from jper_scheduler.utils import set_task_name, get_log_url
 host = app.config.get("ELASTIC_SEARCH_HOST", 'localhost') # includes port
 index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed*')
 max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
-port = int(host.split(':')[-1]) if ':' in host else 9200
+port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
 conn = esprit.raw.Connection(host_name, index, port=port)
 
