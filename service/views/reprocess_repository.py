@@ -26,16 +26,17 @@ def index():
                                  param='upto')
 
     if request.method == 'GET':
-        brom = validate_date(default_from, param='from')
+        brom = validate_date(default_from, param='brom')
         upto = validate_date(default_upto, param='upto')
+        values = dict(sorted(models.Account.pull_all_active_repositories().items()))
         repository_ids = {
             'label': 'Repository ID',
-            'values': models.Account.pull_all_active_repositories(),
+            'values': values,
             'selected': request.args.get('repository_id', ''),
             'term': 'repo.exact'
         }
         return render_template('reprocess_repository/index.html', repository_id=None, repository_ids=repository_ids,
-                           upto=upto, status_values=[])
+                        brom=brom, upto=upto, status_values=[])
 
     # POST
     # Get repository_id
@@ -44,7 +45,7 @@ def index():
         repository_id = None
 
     # Sanitise the from date
-    brom = request.values.get('from')
+    brom = request.values.get('brom')
     if brom == '' or brom is None:
         brom = default_from
     try:
@@ -66,9 +67,10 @@ def index():
                             upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to reprocess with these params
-    airflow_port = airflow_conf.get("webserver", "WEB_SERVER_PORT")
+    jper_url = app.config.get("BASE_URL", "http://localhost")
     airflow_host = airflow_conf.get("webserver", "WEB_SERVER_HOST")
-    airflow_url = f"http://{airflow_host}:{airflow_port}/airflow"
+    airflow_host = "localhost"
+    airflow_url = f"http://{airflow_host}/airflow"
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     reprocess_dag = "Reprocess_Repository"
     user = app.config.get("AIR_USER_USER", 'None')
@@ -93,7 +95,9 @@ def index():
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{reprocess_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
-    jper_url = app.config.get("BASE_URL", "http://localhost")
+    print(f"Called Airflow REST API with url {api_url} and data {data}. Response status code: {r.status_code}, response text: {r.text}")
+    print(f"Airflow reprocessing request: {r.request.body}")
+    print(f"Airflow reprocessing url: {r.url}")
     if jper_url.endswith('/'):
         jper_url = jper_url[:-1]
     airflow_display_url = f"{jper_url}/airflow/dags/{reprocess_dag}/graph"

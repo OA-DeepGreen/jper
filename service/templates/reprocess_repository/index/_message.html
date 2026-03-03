@@ -1,20 +1,18 @@
 <div class="row line-space">
   <div class="col span-12">
     <dl class="dl-details">
-     {% if upto %}
-        <dt>Reprocessing requested for notifications with specifications:</dt>
+    <dt>Reprocessing requested for notifications with specifications:<br></dt>
+     {% if brom %}
+        <dt>From:</dt>
         <dd>{{ brom }}</dd>
+     {% endif %}
+     {% if upto %}
+        <dt>Upto:</dt>
         <dd>{{ upto }}</dd>
       {% endif %}
       {% if repository_id %}
         <dt>repository ID:</dt>
         <dd>{{ repository_id }}</dd>
-      {% endif %}
-      {% if status_values|length > 0 %}
-        <dt>Status:</dt>
-        {% for status_value in status_values %}
-          <dd>{{ status_value }}</dd>
-        {% endfor %}
       {% endif %}
       <dt>Airflow URL to look at:</dt>
       <dd><a href="{{ airflow_url }}">{{ airflow_url }}</a></dd>

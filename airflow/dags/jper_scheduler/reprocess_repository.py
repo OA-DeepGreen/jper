@@ -15,11 +15,12 @@ from airflow.configuration import conf
 from jper_scheduler.utils import set_task_name, get_log_url
 
 # Create a connection - ES stuff
-host = app.config.get("AIRFLOW_REPROCESS_ES_HOST", 'localhost')
-port = app.config.get("AIRFLOW_REPROCESS_ES_PORT", '9200')
+host = app.config.get("ELASTIC_SEARCH_HOST", 'localhost') # includes port
 index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed*')
 max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
-conn = esprit.raw.Connection(host, index, port=port)
+port = int(host.split(':')[-1]) if ':' in host else 9200
+host_name = host.split(port)[0][:-1]
+conn = esprit.raw.Connection(host_name, index, port=port)
 
 repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
 subject_repo_bibids = {}
@@ -175,7 +176,7 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
                                            status=status, message=message, log_url=log_url)
         rh.save()
 
-def process_notification(n=note, bibids=bibids, log_url=None):
+def process_notification(n=None, bibids={}, log_url=None):
     # Process a single notification, extract the relevant metadata, and check if it matches TUBFR routing criteria
     note = n['_source']
     obj = models.RoutedNotification(note)

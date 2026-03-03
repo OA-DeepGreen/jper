@@ -7,8 +7,13 @@
                 </li>
                 <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text">To:</span>
-                        <input type="text" name="from" value="{{from}}"/>
+                        <span class="form-fields__label-text">From:</span>
+                        <input type="text" name="brom" value="{{brom}}"/>
+                    </label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Upto:</span>
                         <input type="text" name="upto" value="{{upto}}"/>
                     </label>
                 </li>
@@ -16,9 +21,10 @@
                     <label>
                         <span class="form-fields__label-text" style="width: 35%">{{ repository_ids['label'] }}</span>
                         <select name="repository_id">
-                            <option value="" {% if repository_ids['selected'] == "" %}selected{% endif %}>Filter by {{ repository_ids['label'] }}</option>
+                            <option value="" {% if repository_ids['selected'] == '' %}selected{% endif %}>Filter by {{ repository_ids['label'] }}</option>
                             {% for key, val in repository_ids['values'].items() %}
-                                <option value="{{ val, key }}" {% if repository_ids['selected'] == f"{val}, {key}" %}selected{% endif %}>{{ val }}</option>
+                                <% s = f"{key} {val}" %>
+                                <option value="{{key}} {{val}}" {% if repository_ids['selected'] == s %}selected{% endif %}>{{ key }}</option>
                             {% endfor %}
                         </select>
                     </label>
