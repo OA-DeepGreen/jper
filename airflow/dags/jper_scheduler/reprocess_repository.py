@@ -22,20 +22,13 @@ port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
 conn = esprit.raw.Connection(host_name, index, port=port)
 
-repo_username = app.config.get("AIRFLOW_REPROCESS_REPO_USERNAME", 'TUBFR')
 subject_repo_bibids = {}
-
-begin_date = app.config.get("AIRFLOW_REPROCESS_BEGIN_DATE", "2024-11-25T00:00:00Z")
-end_date = app.config.get("AIRFLOW_REPROCESS_END_DATE", "2026-02-15T00:00:00Z")
-begin_date = dates.parse(begin_date).isoformat()
-end_date = dates.parse(end_date).isoformat()
-
 out_subdir = 1
 
 outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/reprocess_repository')
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
 write_count = 0  # Local (=global here) writing counter
-notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 250) # Notifications to process at a given time.
+notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 1000) # Notifications to process at a given time.
 
 def delete_empty_folders(root):
     # Clean up all empty folders in the outputPath
@@ -163,7 +156,6 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
         rh.sftp_server_url = acc.sftp_server_url
         rh.sftp_server_port = acc.sftp_server_port
         rh.sftp_username = acc.sftp_username
-        rh.repositories = [repository_id]
         rh.original_file_location = ""
         rh.final_file_locations = []
         rh.notification_states = [{
@@ -273,13 +265,22 @@ def reprocess_repository():
         # Get parameters from context - these are passed when triggering the DAG
         print(f"Parameters received: {context['params']}")
         if len(context['params']) > 0:
-            repository_id = context['params'].get('repository_id', None)
+            repository_tuple = context['params'].get('repository_id', None)
             upto = context['params'].get('upto', None)
             since = context['params'].get('from', None)
+            repository_name = repository_tuple.split()[0]
+            repository_id = repository_tuple.split()[1]
 
-            # Construct the path for storing the notifications to reprocess
-            input_path = f"{outputPath}/{repository_id}/TODO"
-            get_all_notifications(out_dir=input_path, since=since, upto=upto)
+            if since and upto and repository_tuple:
+                print(f"Fetching notifications for repository_id: {repository_tuple} between {since} and {upto}")
+                # Construct the path for storing the notifications to reprocess
+                input_path = f"{outputPath}/{repository_name}_{repository_id}/TODO"
+                print(f"Notifications will be written to: {input_path}")
+                get_all_notifications(out_dir=input_path, since=since, upto=upto)
+            else:
+                print("Error: Missing required parameters. 'repository_id', 'from' (since), and 'upto' are required to fetch notifications.")
+                print("Please trigger this reprocessing DAG with the required parameters.")
+                print("Continuing - looking for any existing notifications to process.")
 
         # At this point, the notifications already exist.
         # Retrieve the next <notifications_to_process> (if any) files to process.
@@ -292,7 +293,7 @@ def reprocess_repository():
             if local_count == notifications_to_process:
                 break
         print(f"Found {local_count} notification files to process")
-        return files_to_process
+        return files_to_process[:3]
 
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
         retries=3, max_active_tis_per_dag=4)
@@ -302,11 +303,13 @@ def reprocess_repository():
         context["map_index_template"] = set_task_name(ti.map_index, note)
         log_url = get_log_url(context)
 
-        # note = /<outputPath>/repository_id/TODO/xxxx/note.json
+        # note = /<outputPath>/name_id/TODO/xxxx/note.json
         file_name = note
         file_path = Path(file_name)
-        repository_id = file_path.parts[-4]
-        bibids = {repo_username: repository_id}
+        repository_tuple = file_path.parts[-4]
+        repository_name = repository_tuple.split()[0]
+        repository_id = repository_tuple.split()[1]
+        bibids = {repository_name: repository_id}
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
