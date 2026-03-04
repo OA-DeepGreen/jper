@@ -151,13 +151,12 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
         routing_history_id = uuid.uuid4().hex
         rh = models.RoutingHistory()
         rh.id = routing_history_id
-        print(dir(notification))
         try:
             acc = models.Account().pull(notification.provider.id)
         except AttributeError as e:
             acc = models.Account().pull(notification.provider_id)
         except Exception as e:
-            print(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
+            app.logger.debug(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
             acc = None
         if acc:
             rh.publisher_id = acc.id if acc else None
@@ -196,22 +195,22 @@ def process_notification(n=None, bibids={}, log_url=None):
         print(f"Could not pull notification object for id: {note['id']}")
         return
     notification_id = obj.id
-    print(f"Processing notification id: {notification_id}")
+    app.logger.info(f"Processing notification id: {notification_id}")
     metadata = note['metadata']
     if "identifier" not in metadata.keys():
-        print(f"No identifier found in metadata for notification id: {notification_id}")
+        app.logger.warning(f"No identifier found in metadata for notification id: {notification_id}")
         return
     if "publication_date" not in metadata.keys():
-        print(f"No publication_date or identifier found in metadata for notification id: {notification_id}")
+        app.logger.warning(f"No publication_date or identifier found in metadata for notification id: {notification_id}")
         return
     issn_data = get_identifier(metadata["identifier"], "issn")
     publ_date = metadata.get("publication_date", None)
     dt = datetime.datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
     publ_year = str(dt.year)
-    print(f"Notification id: {notification_id} has publication year: {publ_year} and ISSN(s): {issn_data}")
+    app.logger.info(f"Notification id: {notification_id} has publication year: {publ_year} and ISSN(s): {issn_data}")
     doi = get_identifier(metadata["identifier"], "doi")
     if 'provider' not in note.keys() or 'id' not in note['provider'].keys():
-        print(f"No provider id found in notification for id: {notification_id}")
+        app.logger.warning(f"No provider id found in notification for id: {notification_id}")
         return
     provider_id = note.get('provider', None).get('id', None)
     if doi is None:
@@ -221,35 +220,36 @@ def process_notification(n=None, bibids={}, log_url=None):
     else:
         doi = doi[0]
     if len(issn_data) == 0:
-        print(f"No ISSN found in metadata for notification id: {notification_id}")
+        app.logger.warning(f"No ISSN found in metadata for notification id: {notification_id}")
         return
     gold_article_license = is_article_license_gold(metadata, provider_id)
-    print(f"Notification id: {notification_id} has DOI: {doi} and gold article license: {gold_article_license}")
+    app.logger.info(f"Notification id: {notification_id} has DOI: {doi} and gold article license: {gold_article_license}")
     al_repos = None
     for count in range(5):
         if al_repos:
             break
         try:
-            print(f"Counter : {count} Calling select_active_participant_bibids for notification id: {notification_id}")
+            app.logger.debug(f"Counter : {count} Calling select_active_participant_bibids for notification id: {notification_id}")
             al_repos = routing._select_active_participant_bibids(issn_data, publ_year, doi, gold_article_license,
                                                     bibids, subject_repo_bibids)
-            print(f"Counter : {count} select_active_participant_bibids returned {len(al_repos)} repositories for notification id: {notification_id}")
+            app.logger.debug(f"Counter : {count} select_active_participant_bibids returned {len(al_repos)} repositories for notification id: {notification_id}")
         except Exception as e:
-                print(f"Counter : {count} Error in select_active_participant_bibids for notification id: {notification_id} : {str(e)}")
+                app.logger.error(f"Counter : {count} Error in select_active_participant_bibids for notification id: {notification_id} : {str(e)}")
+                app.logger.info(f"Sleeping for 30 seconds before retrying select_active_participant_bibids for notification id: {notification_id}")
                 al_repos = None
                 time.sleep(30)
 
     match_ids = []
     match_data = obj.match_data()
-    print(f"Match data for notification id: {notification_id} : {match_data}")
+    app.logger.info(f"Match data for notification id: {notification_id} : {match_data}")
     for count in range(5):
         if len(match_ids) > 0:
             break
         try:
             match_ids = routing._match_repositories(al_repos, obj, match_data)
         except Exception as e:
-            print(f"Error in matching repositories for notification id: {notification_id} : {str(e)}")
-            print(f"Sleeping for 30 seconds before retrying matching for notification id: {notification_id}")
+            app.logger.error(f"Error in matching repositories for notification id: {notification_id} : {str(e)}")
+            app.logger.info(f"Sleeping for 30 seconds before retrying matching for notification id: {notification_id}")
             match_ids = []
             time.sleep(30)
 
