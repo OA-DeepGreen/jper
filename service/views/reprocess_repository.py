@@ -36,7 +36,7 @@ def index():
             'term': 'repo.exact'
         }
         return render_template('reprocess_repository/index.html', repository_id=None, repository_ids=repository_ids,
-                        brom=brom, upto=upto, status_values=[])
+                        brom=brom, upto=upto)
 
     # POST
     # Get repository_id
@@ -53,7 +53,7 @@ def index():
     except ValueError as e:
         flash(f"Error validating 'from' date: {e}")
         return render_template('reprocess_repository/index.html', repository_id=repository_id,
-                            upto=default_upto, status_values=status_values)
+                            brom=brom, upto=default_upto)
 
     # Get upto
     upto = request.values.get('upto')
@@ -64,7 +64,7 @@ def index():
     except ValueError as e:
         flash(f"Error validating 'upto' date: {e}")
         return render_template('reprocess_repository/index.html', repository_id=repository_id,
-                            upto=default_upto, status_values=status_values)
+                            brom=brom, upto=default_upto)
 
     # Call airflow dag here to reprocess with these params
     jper_url = app.config.get("BASE_URL", "http://localhost")
@@ -81,7 +81,7 @@ def index():
         flash("Airflow REST API user or password not set - cannot call reprocessing DAG. Please" \
         " request system administrator to check configuration.")
         return render_template('reprocess_repository/index.html', repository_id=repository_id,
-                           upto=upto, status_values=status_values)
+                            brom=brom, upto=upto)
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -100,7 +100,7 @@ def index():
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('reprocess_repository/index.html', repository_id=repository_id,
-                           upto=upto, status_values=status_values)
+                           upto=upto, brom=brom)
     print(f"Called Airflow REST API with url {api_url} and data {data}. Response status code: {r.status_code}, response text: {r.text}")
     print(f"Airflow reprocessing request: {r.request.body}")
     print(f"Airflow reprocessing url: {r.url}")

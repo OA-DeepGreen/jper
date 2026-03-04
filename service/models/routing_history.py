@@ -87,7 +87,7 @@ class RoutingHistory(dataobj.DataObj, dao.RoutingHistoryDAO):
                         "notification_id": {"coerce": "unicode"},
                         "doi": {"coerce": "unicode"},
                         "status": {"coerce": "unicode", "allowed_values": STATUS},
-                        "number_matched_repositories": {"coerce": "int"},
+                        "number_matched_repositories": {"coerce": "integer"},
                         "deleted": {"coerce": "boolean"},
                         "deleted_date": {"coerce": "utcdatetime"}
                     }
