@@ -139,10 +139,10 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
     notification_id = notification.id
     routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
     action = f"Reprocessed for repository {repository_id} with request type {request_type}"
-    file_location = "Reprocessing - no original file"
-    status = "success-routed"
+    file_location = "None"
+    status = "success"
     message = f"Notification reprocessed for repository {repository_id} with request type {request_type}"
-    
+
     if routing_history:
         routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
                                            status=status, message=message, log_url=log_url)
@@ -174,7 +174,7 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
                 rh.sftp_username = acc.sftp_username
             except AttributeError as e:
                 rh.sftp_username = ""
-        rh.original_file_location = "Reprocessing - no original file"
+        rh.original_file_location = "None"
         rh.final_file_locations = []
         rh.notification_states = [{
             "status": status,
@@ -183,7 +183,7 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
             "number_matched_repositories": 1
         }]
         rh.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                           status='success', message=message, log_url=log_url)
+                                           status=status, message=message, log_url=log_url)
         rh.save()
 
 def process_notification(n=None, bibids={}, log_url=None):
