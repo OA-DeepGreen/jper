@@ -11,7 +11,6 @@ from airflow.utils.session import provide_session
 from airflow.configuration import conf
 # My code
 from jper_scheduler.routing_deletions import RoutingDeletion
-from jper_scheduler.notification_helpers import notifications_before, iter_notifications_before
 from jper_scheduler.utils import set_task_name, get_log_url
 
 days_to_keep = app.config.get("AIRMAINT_DATA_KEEP", 180)
@@ -42,13 +41,7 @@ def clean_old_data():
             routing_ids.append((routing_history['id'], routing_history['publisher_id']))
         app.logger.info(f"Going to delete {len(routing_ids)} old routing history IDs")
         app.logger.debug(f"List of routing history IDs to delete are {routing_ids}")
-        nn = notifications_before(upto, since=since)
-        app.logger.info(f"Also got {len(nn)} old notifications from helper")
-        n2 = []
-        for note in nn:
-            n2.append(note['id'])
-        app.logger.debug(f"Notifications from helper: {n2}")
-        return routing_ids[:3]
+        return routing_ids
 
     @task(task_id="delete_one_route_fileset", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
