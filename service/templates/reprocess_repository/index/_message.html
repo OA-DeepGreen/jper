@@ -1,0 +1,22 @@
+<div class="row line-space">
+  <div class="col span-12">
+    <dl class="dl-details">
+    <dt>Reprocessing requested for notifications with specifications:<br></dt>
+     {% if brom %}
+        <dt>From:</dt>
+        <dd>{{ brom }}</dd>
+     {% endif %}
+     {% if upto %}
+        <dt>Upto:</dt>
+        <dd>{{ upto }}</dd>
+      {% endif %}
+      {% if repository_id %}
+        <dt>repository ID:</dt>
+        <dd>{{ repository_id }}</dd>
+      {% endif %}
+      <dt>Airflow URL to look at:</dt>
+      <dd><a href="{{ airflow_url }}">{{ airflow_url }}</a></dd>
+    </dl>
+    <div><a href="/reprocess_repository">Back to reprocessing form</a></div>
+  </div>
+</div>
