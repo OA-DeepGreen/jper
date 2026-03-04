@@ -137,7 +137,10 @@ def is_article_license_gold(metadata, provider_id):
 def add_update_routing_history(notification, repository_id, request_type, doi="", log_url=None):
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
     notification_id = notification.id
-    routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
+    routing_history = None
+    rh = models.RoutingHistory.pull_records(notification_id=notification_id)['hits']['hits']
+    if len(rh) > 0:
+        routing_history = models.RoutingHistory(rh[0]['_source'])
     action = f"Reprocess"
     file_location = "None"
     status = "success"
