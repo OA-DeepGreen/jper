@@ -29,18 +29,23 @@ def delete_data_ondemand():
     def list_old_routing_data_on_demand():
         context = get_current_context()
         app.logger.info("Starting on-demand old routing data cleanup")
-        print(f"Parameters given: {context['params']}")
         if len(context['params']) == 0:
             app.logger.info("No parameters given for on-demand cleanup - exiting")
             return []
 
-        a = RoutingHistory()
-
         publisher_id = context['params'].get('publisher_id', None)
         status_values = context['params'].get('status_values', [])
         upto = context['params'].get('upto', None)
+        brom = context['params'].get('from', None)
 
-        b = a.pull_records(since=None, upto=upto, page=1, page_size=1000, publisher_id=publisher_id)
+        app.logger.info(f"Parameters to search for routing history records:")
+        app.logger.info(f"publisher_id: {publisher_id}")
+        app.logger.info(f"status_values: {status_values}")
+        app.logger.info(f"from: {brom}")
+        app.logger.info(f"upto: {upto}")
+
+        a = RoutingHistory()
+        b = a.pull_records(since=brom, upto=upto, page=1, page_size=1000, publisher_id=publisher_id)
         if b == None or len(b) == 0:
             app.logger.error("Open search returned null record- exiting")
             return []
@@ -55,9 +60,9 @@ def delete_data_ondemand():
         num_pages = int(math.ceil(total / page_size))
         info_to_run = []
         for page in range(1, 1+num_pages):
-            records = RoutingHistory.pull_records(since=None, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,)
+            records = RoutingHistory.pull_records(since=brom, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,)
             if records == None or len(records) == 0:
-                app.logger.error(f"Open search returned null record for page {page} - exiting")
+                app.logger.error(f"Open search returned null record for page {page} - finishing")
                 continue
             for hit in records['hits']['hits']:
                 routing_id = hit['_source']['id']

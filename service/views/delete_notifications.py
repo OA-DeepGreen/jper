@@ -100,18 +100,18 @@ def index():
     }
 
     data = {
-        "conf": {"upto": upto, "status_values": status_values, "publisher_id": publisher_id},
-        "note": f"User request to delete notifications before {upto}"
+        "conf": {"upto": upto, "from": brom, "status_values": status_values, "publisher_id": publisher_id},
+        "note": f"User request to delete notifications between {brom} and {upto}"
     }
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
     if r.status_code >= 200 and r.status_code < 300:
-        flash(f"Successfully triggered Airflow DAG to delete notifications before {upto}.")
+        flash(f"Successfully triggered Airflow DAG to delete notifications between {brom} and {upto}.")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('delete_notifications/index.html', publisher_id=publisher_id,
-                           upto=upto, status_values=status_values)
+                           brom=brom, upto=upto, status_values=status_values)
     print(f"Airflow deletion request: {r.request.body}")
     print(f"Airflow deletion url: {r.url}")
     print(f"Airflow deletion response: {r.text}")
