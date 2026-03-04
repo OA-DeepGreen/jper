@@ -1,9 +1,9 @@
 <div class="row line-space">
   <div class="col span-12">
     <dl class="dl-details">
-     {% if upto %}
-        <dt>Delete notifications older than:</dt>
-        <dd>{{ upto }}</dd>
+     {% if brom %}
+        <dt>Delete notifications between:</dt>
+        <dd>{{ brom }} and {{ upto }}</dd>
       {% endif %}
       {% if publisher_id %}
         <dt>Publisher ID:</dt>

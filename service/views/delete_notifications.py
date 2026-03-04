@@ -10,19 +10,23 @@ import requests, base64, json
 from requests.auth import HTTPBasicAuth
 from octopus.core import app
 from service import models
+from airflow.configuration import conf as airflow_conf
 
 blueprint = Blueprint('delete_notifications', __name__)
-
 
 @blueprint.route('/', methods=["GET", "POST"])
 def index():
     if not current_user.is_super:
         abort(401)
 
+    default_from = validate_date((datetime.now() - relativedelta(years=6)).strftime("%d/%m/%Y"),
+                                 param='from')
+
     default_upto = validate_date((datetime.now() - relativedelta(months=6)).strftime("%d/%m/%Y"),
                                  param='upto')
 
     if request.method == 'GET':
+        brom = validate_date(default_from, param='brom')
         upto = validate_date(default_upto, param='upto')
         publisher_ids = {
             'label': 'Publisher ID',
@@ -31,7 +35,7 @@ def index():
             'term': 'publisher_id.exact'
         }
         return render_template('delete_notifications/index.html', publisher_id=None, publisher_ids=publisher_ids,
-                           upto=upto, status_values=[])
+                        brom=brom, upto=upto, status_values=[])
 
     # POST
     # Get publisher_id
@@ -46,6 +50,17 @@ def index():
         if s.lower() in accepted_status_values:
             status_values.append(s.lower())
 
+    # Sanitise the from date
+    brom = request.values.get('brom')
+    if brom == '' or brom is None:
+        brom = default_from
+    try:
+        brom = validate_date(brom, param='from', return_400_if_invalid=False)
+    except ValueError as e:
+        flash(f"Error validating 'from' date: {e}")
+        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+                        brom=brom, upto=default_upto, status_values=status_values)
+
     # Get upto
     upto = request.values.get('upto')
     if upto == '' or upto is None:
@@ -55,7 +70,7 @@ def index():
     except ValueError as e:
         flash(f"Error validating 'upto' date: {e}")
         return render_template('delete_notifications/index.html', publisher_id=publisher_id,
-                            upto=default_upto, status_values=status_values)
+                        brom=brom, upto=default_upto, status_values=status_values)
 
     # if is_newer(upto, default_upto):
     #     flash(f"date {upto} has to be older than 6 months")
@@ -77,7 +92,7 @@ def index():
         flash("Airflow deletion user or password not set - cannot call deletion DAG. Please" \
         " request system administrator to check configuration.")
         return render_template('delete_notifications/index.html', publisher_id=publisher_id,
-                           upto=upto, status_values=status_values)
+                        brom=brom, upto=upto, status_values=status_values)
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -104,4 +119,4 @@ def index():
         jper_url = jper_url[:-1]
     airflow_display_url = f"{jper_url}/airflow/dags/{deletion_dag}/graph"
     return render_template('delete_notifications/deletion_sent.html', publisher_id=publisher_id,
-                           upto=upto, status_values=status_values, airflow_url=airflow_display_url)
+                        brom=brom, upto=upto, status_values=status_values, airflow_url=airflow_display_url)
