@@ -138,10 +138,10 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
     notification_id = notification.id
     routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
-    action = f"Reprocessed for repository {repository_id} with request type {request_type}"
+    action = f"Reprocess"
     file_location = "None"
     status = "success"
-    message = f"Notification reprocessed for repository {repository_id} with request type {request_type}"
+    message = f"Notification reprocessed for repository {repository_id}"
 
     if routing_history:
         routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
