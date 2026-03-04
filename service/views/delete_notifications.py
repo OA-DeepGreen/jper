@@ -63,11 +63,14 @@ def index():
     #                        upto=default_upto, status_values=status_values)
 
     # Call airflow dag here to delete with these params
-    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:80/airflow")
+    jper_url = app.config.get("BASE_URL", "http://localhost")
+    airflow_host = airflow_conf.get("webserver", "WEB_SERVER_HOST")
+    airflow_host = "localhost"
+    airflow_url = f"http://{airflow_host}/airflow"
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     deletion_dag = "Delete_Data_OnDemand"
-    user = app.config.get("AIRUSERDEL_USER", 'None')
-    password = app.config.get("AIRUSERDEL_PASSWORD", 'None')
+    user = app.config.get("AIR_USER_USER", 'None')
+    password = app.config.get("AIR_USER_PASSWORD", 'None')
     if user and password:
         auth_header_value = base64.b64encode(f"{user}:{password}".encode()).decode()
     else:
@@ -88,10 +91,17 @@ def index():
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
+    if r.status_code >= 200 and r.status_code < 300:
+        flash(f"Successfully triggered Airflow DAG to delete notifications before {upto}.")
+    else:
+        flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
+        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+                           upto=upto, status_values=status_values)
     print(f"Airflow deletion request: {r.request.body}")
     print(f"Airflow deletion url: {r.url}")
     print(f"Airflow deletion response: {r.text}")
-    airflow_del_url = f"{airflow_url}/dags/{deletion_dag}/graph"
+    if jper_url.endswith('/'):
+        jper_url = jper_url[:-1]
+    airflow_display_url = f"{jper_url}/airflow/dags/{deletion_dag}/graph"
     return render_template('delete_notifications/deletion_sent.html', publisher_id=publisher_id,
-                           upto=upto, status_values=status_values, airflow_url=airflow_del_url)
-
+                           upto=upto, status_values=status_values, airflow_url=airflow_display_url)
