@@ -8,6 +8,7 @@ from service import models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
 
+from airflow.exceptions import AirflowSkipException
 from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
 from airflow.utils.session import provide_session
@@ -240,6 +241,7 @@ def process_notification(n=None, bibids={}, log_url=None):
         request_type = "machine"
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
         add_update_routing_history(obj, match_ids[0], request_type, doi=doi, log_url=log_url)
+    return len(match_ids)
 
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
@@ -313,13 +315,16 @@ def reprocess_repository():
         app.logger.debug(f"Processing notification {file_name}")
         with open(file_name, 'r') as file:
           data = json.load(file)
-        process_notification(n=data, bibids=bibids, log_url=log_url)
+        num_matched = process_notification(n=data, bibids=bibids, log_url=log_url)
 
         # Move the processed file to a "processed" directory to avoid reprocessing in future runs
         out_file_name = note.replace("/TODO/", "/DONE/")
         out_dir = os.path.dirname(out_file_name)
         os.makedirs(out_dir, exist_ok=True)
         os.rename(file_name, out_file_name)
+
+        if num_matched == 0:
+            raise AirflowSkipException(f"No repositories matched for notification {file_name}. Check log for details.")
 
     notes_to_process = get_all_notifications_in_date_range()
     process_one_notification.expand(note=notes_to_process)
