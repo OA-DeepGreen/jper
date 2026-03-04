@@ -5,8 +5,8 @@ from octopus.core import app
 from octopus.modules.store import store
 from jper_scheduler.publisher_transfer import PublisherFiles
 
-dryRun = True
-
+# dryRun = True
+dryRun = False
 
 # Check if notification is okay to delete based on status values provided for on-demand deletion
 def is_notification_okay(note, status_values):
@@ -145,8 +145,8 @@ class RoutingDeletion(PublisherFiles):
         for notification_id, status in note_list:
             notification_obj = models.RoutedNotification.pull(notification_id)
             if notification_obj:
-                app.logger.debug(f"Deleting routed notification {notification_id}")
-                app.logger.debug(f"DRY RUN: Routed notification object: {notification_obj}")
+                app.logger.info(f"Deleting routed notification {notification_id}")
+                app.logger.debug(f"Routed notification object: {notification_obj}")
                 if dryRun:
                     app.logger.info(f"DRY RUN: Would delete routed notification {notification_id}")
                 else:
@@ -156,25 +156,29 @@ class RoutingDeletion(PublisherFiles):
                         app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
                         del_status = "failure"
             else:
-                app.logger.debug(f"Deleting failed notification {notification_id}")
                 notification_obj = models.FailedNotification.pull(notification_id)
-                app.logger.debug(f"DRY RUN: Failed notification object: {notification_obj}")
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete failed notification {notification_id}")
+                if notification_obj:
+                    app.logger.info(f"Deleting failed notification {notification_id}")
+                    app.logger.debug(f"Failed notification object: {notification_obj}")
+                    if dryRun:
+                        app.logger.info(f"DRY RUN: Would delete failed notification {notification_id}")
+                    else:
+                        try:
+                            notification_obj.delete()
+                        except Exception as e:
+                            app.logger.error(f"Failed to delete failed notification {notification_id}. Error: {str(e)}")
+                            del_status = "failure"
                 else:
-                    try:
-                        notification_obj.delete()
-                    except Exception as e:
-                        app.logger.error(f"Failed to delete failed notification {notification_id}. Error: {str(e)}")
-                        del_status = "failure"
+                    app.logger.warn(f"Notification {notification_id} not found in either RoutedNotification or FailedNotification. Cannot delete it.")
 
             if not dryRun:
                 # Set the notification to deleted
+                app.logger.info(f"Setting notification {notification_id} to deleted in routing history")
                 now_utc = datetime.now(timezone.utc).isoformat()
                 self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
                 # Add a tombstone state to workflow states
                 self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status=del_status,
-                                                        message="Notification deleted as part of routing history cleanup",
+                                                        message="Notification deleted as part of cleanup",
                                                         log_url=self.airflow_log_location)
                 self.routing_history.save()
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
@@ -205,29 +209,3 @@ class RoutingDeletion(PublisherFiles):
         app.logger.info(f"Notification cleanup status: {statusN['status']}, Message: {statusN['message']}")
 
         return { 'status': "success", 'message': f"Cleaned up routing history ID {self.routing_history.id}" }
-
-    # # Delete stuff on demand
-    # def delete_on_demand(self, params={}, keep=None):
-    #     # Params can have routing_id, publisher_id, notification_id etc.
-    #     app.logger.debug(f"On-demand deletion called with params: {params}")
-    #     since = "1970-01-01T00:00:00Z"
-    #     upto = params.get('upto', None)
-    #     publisher_id = params.get('publisher_id', None)
-    #     status_values = params.get('status_values', [])
-    #
-    #     if not upto and not publisher_id and len(status_values) == 0:
-    #         app.logger.error("At least one of upto, publisher_id or status_values must be provided for on-demand deletion")
-    #         return { 'status': "failure", 'message': "At least one of upto, publisher_id or status_values must be provided for on-demand deletion" }
-    #
-    #     if 'routing_id' in params and 'publisher_id' in params:
-    #         self.routing_history = models.RoutingHistory.pull(params['routing_id'], publisher_id=params['publisher_id'])
-    #         if not self.routing_history:
-    #             app.logger.error(f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found")
-    #             return { 'status': "failure", 'message': f"Routing history ID {params['routing_id']} for publisher {params['publisher_id']} not found" }
-    #         app.logger.debug(f"Routing history found: {self.routing_history}")
-    #         status = self.clean_all(keep=keep)
-    #         return status
-    #     else:
-    #         app.logger.error("routing_id and publisher_id must be provided for on-demand deletion")
-    #         return { 'status': "failure", 'message': "routing_id and publisher_id must be provided for on-demand deletion" }
-        
