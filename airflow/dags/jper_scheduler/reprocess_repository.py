@@ -136,13 +136,13 @@ def is_article_license_gold(metadata, provider_id):
 
 def add_update_routing_history(notification, repository_id, request_type, doi="", log_url=None):
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
-    routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
     notification_id = notification.id
+    routing_history = models.RoutingHistory.pull_record_for_notification(notification_id)
     action = f"Reprocessed for repository {repository_id} with request type {request_type}"
-    file_location = ""
+    file_location = "Reprocessing - no original file"
     status = "success-routed"
     message = f"Notification reprocessed for repository {repository_id} with request type {request_type}"
-
+    
     if routing_history:
         routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
                                            status=status, message=message, log_url=log_url)
@@ -150,23 +150,40 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
     else: # If no existing routing history record exists for this notification, create a new one
         routing_history_id = uuid.uuid4().hex
         rh = models.RoutingHistory()
-        acc = models.Account().pull(notification.provider.id)
         rh.id = routing_history_id
-        rh.publisher_id = acc.id
-        rh.publisher_email = acc.email
-        rh.sftp_server_url = acc.sftp_server_url
-        rh.sftp_server_port = acc.sftp_server_port
-        rh.sftp_username = acc.sftp_username
-        rh.original_file_location = ""
+        print(dir(notification))
+        try:
+            acc = models.Account().pull(notification.provider.id)
+        except AttributeError as e:
+            acc = models.Account().pull(notification.provider_id)
+        except Exception as e:
+            print(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
+            acc = None
+        if acc:
+            rh.publisher_id = acc.id if acc else None
+            rh.publisher_email = acc.email if acc else None
+            try:
+                rh.sftp_server_url = acc.sftp_server_url
+            except AttributeError as e:
+                rh.sftp_server_url = ""
+            try:
+                rh.sftp_server_port = acc.sftp_server_port
+            except AttributeError as e:
+                rh.sftp_server_port = ""
+            try:
+                rh.sftp_username = acc.sftp_username
+            except AttributeError as e:
+                rh.sftp_username = ""
+        rh.original_file_location = "Reprocessing - no original file"
         rh.final_file_locations = []
         rh.notification_states = [{
-            "status": "success",
+            "status": status,
             "notification_id": notification_id,
             "doi": doi,
             "number_matched_repositories": 1
         }]
         rh.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                           status=status, message=message, log_url=log_url)
+                                           status='success', message=message, log_url=log_url)
         rh.save()
 
 def process_notification(n=None, bibids={}, log_url=None):

@@ -95,6 +95,12 @@ def index():
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{reprocess_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
+    if r.status_code >= 200 and r.status_code < 300:
+        flash(f"Successfully triggered Airflow DAG to reprocess repository {repository_id} with data up to {upto}.")
+    else:
+        flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
+        return render_template('reprocess_repository/index.html', repository_id=repository_id,
+                           upto=upto, status_values=status_values)
     print(f"Called Airflow REST API with url {api_url} and data {data}. Response status code: {r.status_code}, response text: {r.text}")
     print(f"Airflow reprocessing request: {r.request.body}")
     print(f"Airflow reprocessing url: {r.url}")
