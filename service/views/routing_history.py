@@ -20,24 +20,24 @@ def index():
 
     # Get since
     since = request.args.get('since')
+    if since == '' or since is None:
+        since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     try:
         since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
         since = None
         flash(f"Error validating 'since' date: {e}")
-    if since == '' or since is None:
-        since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     filled_params['since'] = since
 
     # Get upto
     upto = request.args.get('upto')
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
     try:
         upto = validate_date(upto, param='upto', return_400_if_invalid=False)
     except ValueError as e:
         upto = None
         flash(f"Error validating 'upto' date: {e}")
-    if upto == '' or upto is None:
-        upto = datetime.today().strftime("%d/%m/%Y")
     filled_params['upto'] = upto
 
     # get page and page size
