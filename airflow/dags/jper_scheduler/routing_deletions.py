@@ -1,4 +1,4 @@
-import os
+import os, shutil
 from datetime import datetime, timezone
 from service import models
 from octopus.core import app
@@ -34,8 +34,6 @@ def is_notification_okay(note, status_values):
                 return True
     return False
 
-
-
 # This class inherits from PublisherFiles (publisher_transfer.py) and will only
 # perform deletions.
 # Hopefully this will keep the publisher_transfer.py clean.
@@ -62,14 +60,14 @@ class RoutingDeletion(PublisherFiles):
         try:
             if not self._is_scp:
                 self.__init_sftp_connection__()
-            # self.scp.remove(remote_file)
+            self.scp.remove(remote_file)
             app.logger.info(f"Successfully removed {remote_file}.")
         except Exception as e:
             app.logger.error(f"Failed to remove {remote_file}. Error : {str(e)}")
             return -1
         remote_dir = os.path.dirname(remote_file)
         try:
-            # self.scp.rmdir(remote_dir)
+            self.scp.rmdir(remote_dir)
             app.logger.info(f"Successfully removed {remote_dir}.")
         except Exception as e:
             app.logger.info(f"Failed to remove directory {remote_dir}. Error : {str(e)}")
@@ -102,10 +100,10 @@ class RoutingDeletion(PublisherFiles):
             return -1
         if os.path.isfile(file_name) or os.path.islink(file_name):
             app.logger.debug(f'Deleting file {file_name} from {file_location}')
-            # os.remove(file_name)
+            os.remove(file_name)
         else:
             app.logger.debug(f'Deleting directory {file_name} from {file_location}')
-            # shutil.rmtree(file_name, ignore_errors=True)
+            shutil.rmtree(file_name, ignore_errors=True)
         return 0
 
     # Clean all files
