@@ -2,7 +2,8 @@
 Blueprint for providing account management
 """
 
-import uuid, json, time, requests
+import uuid, json, time, requests, io
+from pathlib import Path
 
 from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_file
 from service.forms.adduser import AdduserForm
@@ -67,18 +68,17 @@ ftable = {
 
 # Config table/csv for repositories
 ctable = {
-        "screen": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                    "Excluded Name Variants", "Excluded Keywords"],
-        "header": ["Name Variants", "Domains", "Grant Numbers", "Keywords", "RoR", "Ringgold",
-                   "Excluded Name Variants", "Excluded Keywords"],
+        "screen": ["Name Variants", "Domains", "Grant Numbers", "RoR", "Ringgold",
+                    "Excluded Name Variants", "Excluded domains"],
+        "header": ["Name Variants", "Domains", "Grant Numbers", "RoR", "Ringgold",
+                   "Excluded Name Variants", "Excluded domains"],
  "Name Variants": "repoconfig[0].name_variants[*]",
        "Domains": "repoconfig[0].domains[*]",
  "Grant Numbers": "repoconfig[0].grants[*]",
-      "Keywords": "repoconfig[0].keywords[*]",
            "RoR": "repoconfig[0].author_ids[?(@.type=='ror')].id",
       "Ringgold": "repoconfig[0].author_ids[?(@.type=='ringgold')].id",
 "Excluded Name Variants": "repoconfig[0].excluded_name_variants[*]",
-    "Excluded Keywords": "repoconfig[0].excluded_keywords[*]",
+    "Excluded domains": "repoconfig[0].excluded_domains[*]",
 }
 
 
@@ -93,8 +93,14 @@ def _list_failrequest(provider_id=None, since=None, upto=None, bulk=False):
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -121,8 +127,14 @@ def _list_matchrequest(repo_id=None, since=None, upto=None, provider=False, bulk
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
 
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -152,8 +164,14 @@ def _list_request(repo_id=None, since=None, upto=None, provider=False, bulk=Fals
     :param bulk: (boolean) whether bulk (e.g. *not* paginated) is returned or not
     :return: Flask response containing the list of notifications that are appropriate to the parameters
     """
-    since = validate_date(since, param='since')
-    upto = validate_date(upto, param='upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        return bad_request(f"Error validating 'upto' date: {e}")
     page = validate_page()
     page_size = validate_page_size()
 
@@ -189,9 +207,10 @@ def _download_request(repo_id=None, provider=False):
         return bad_request("Missing required parameter 'since'")
 
     try:
-        since = dates.reformat(since)
+        since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
-        return bad_request("Unable to understand since date '{x}'".format(x=since))
+        return bad_request(f"Error validating 'since' date: {e}")
+
 
     try:
         nbulk = JPER.bulk_notifications(current_user, since, repository_id=repo_id)
@@ -339,7 +358,14 @@ def _get_users(account_filters, page, page_size):
             user["status"] = u.get('_source', {}).get("publisher", {}).get("routing_status", "")
             user['name'] = u.get('_source', {}).get('publisher', {}).get('name', '')
         if "repository" in user["role"]:
-            user['name'] = u.get('_source', {}).get('repository', {}).get('bibid', '')
+            bibid = u.get('_source', {}).get('repository', {}).get('bibid', '')
+            name = u.get('_source', {}).get('repository', {}).get('name', '')
+            names = []
+            if name:
+                names.append(name)
+            if bibid:
+                names.append(bibid)
+            user['name'] = '<br/>'.join(names)
         users.append(user)
     return users, total, num_pages
 
@@ -408,10 +434,22 @@ def download(account_id):
     data = None
 
     since = request.args.get('since')
+    upto = request.args.get('upto')
+
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
 
@@ -458,13 +496,27 @@ def details(repo_id):
     if acc is None:
         abort(404)
     provider = acc.has_role('publisher')
+
     since = request.args.get('since')
+    upto = request.args.get('upto')
+
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
     if provider:
         notification_prefix = "matches"
         xtable = mtable
@@ -509,12 +561,24 @@ def matching(repo_id):
 
     provider = acc.has_role('publisher')
     since = request.args.get('since')
+    upto = request.args.get('upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
+
     data = _list_matchrequest(repo_id=repo_id, since=since, upto=upto, provider=provider)
     notification_prefix = "matches"
     xtable = mtable
@@ -541,11 +605,23 @@ def failing(provider_id):
     acc = models.Account.pull(provider_id)
     if acc is None:
         abort(404)
+
     since = request.args.get('since')
+    upto = request.args.get('upto')
+    try:
+        since = validate_date(since, param='since', return_400_if_invalid=False)
+    except ValueError as e:
+        since = None
+        flash(f"Error validating 'since' date: {e}")
+    try:
+        upto = validate_date(upto, param='upto', return_400_if_invalid=False)
+    except ValueError as e:
+        upto = None
+        flash(f"Error validating 'upto' date: {e}")
+
     if since == '' or since is None:
         # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = '01/06/2019'
-    upto = request.args.get('upto')
+        since = "01/06/2019"
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
 
@@ -586,16 +662,28 @@ def sword_logs(repo_id):
     to_date = None
     to_date_display = ''
     if request.args.get('to', None) and len(request.args.get('to')) > 0:
-        to_date = validate_date(request.args.get('to', None), param='upto')
-        to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
+        try:
+            to_date = validate_date(request.args.get('to', None), param='upto')
+        except ValueError as e:
+            to_date = None
+            flash(f"Error validating 'to' date: {e}")
     # From date
     from_date = None
     if request.args.get('from', None) and len(request.args.get('from')) > 0:
-        from_date = validate_date(request.args.get('from', None), param='since')
+        try:
+            from_date = validate_date(request.args.get('from', None), param='since')
+        except ValueError as e:
+            from_date = None
+            flash(f"Error validating 'from' date: {e}")
     # From and to date
     if request.args.get('date', None) and len(request.args.get('date')) > 0:
-        from_date = validate_date(request.args.get('date', None), param='since')
-        to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+        try:
+            from_date = validate_date(request.args.get('date', None), param='since')
+            to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+        except ValueError as e:
+            to_date = None
+            from_date = None
+            flash(f"Error validating 'date' date: {e}")
     # Default from and to dates
 
     if not from_date:
@@ -603,6 +691,7 @@ def sword_logs(repo_id):
     from_date_display = str(dates.parse(from_date).strftime("%d/%m/%Y"))
     if not to_date:
         to_date = dates.format(dates.parse(from_date) + timedelta(days=1))
+    to_date_display = str(dates.parse(to_date).strftime("%d/%m/%Y"))
     # get logs for date range
     logs_data, deposit_record_logs = _sword_logs(repo_id, from_date, to_date)
     return render_template('account/sword_log.html', last_updated=last_updated, status=latest_log.status, logs_data=logs_data, deposit_record_logs=deposit_record_logs,
@@ -1234,3 +1323,13 @@ def register():
         return redirect('/account')
 
     return render_template('account/register.html', vals=vals, form=form)
+
+@blueprint.route('/download_csv_template', methods=['GET'])
+def download_csv_template():
+    file_path = Path("service/static/files/csvtemplate.csv")
+    if not file_path.is_file():
+        app.logger.warning(f'file not found [{file_path.as_posix()}]')
+        abort(404)
+    return send_file(io.BytesIO(file_path.read_bytes()),
+                     as_attachment=True, download_name="DeepGreen_config_template.csv",
+                     mimetype="text/csv")

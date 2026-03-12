@@ -32,7 +32,7 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 "created_date": {"coerce": "unicode"},
                 "last_updated": {"coerce": "unicode"},
                 "repo": {"coerce": "unicode"},
-                "institutional_identifier": {"coerce": "unicode"},
+                # "institutional_identifier": {"coerce": "unicode"},
             },
             "lists": {
                 "domains": {"contains": "field", "coerce": "unicode"},
@@ -40,12 +40,12 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                 "name_variants": {"contains": "field", "coerce": "unicode"},
                 "excluded_name_variants": {"contains": "field", "coerce": "unicode"},
                 "author_ids": {"contains": "object"},
-                "postcodes": {"contains": "field", "coerce": "unicode"},
-                "keywords": {"contains": "field", "coerce": "unicode"},
-                "excluded_keywords": {"contains": "field", "coerce": "unicode"},
                 "grants": {"contains": "field", "coerce": "unicode"},
-                "content_types": {"contains": "field", "coerce": "unicode"},
-                "strings": {"contains": "field", "coerce": "unicode"},
+                # "postcodes": {"contains": "field", "coerce": "unicode"},
+                # "keywords": {"contains": "field", "coerce": "unicode"},
+                # "excluded_keywords": {"contains": "field", "coerce": "unicode"},
+                # "content_types": {"contains": "field", "coerce": "unicode"},
+                # "strings": {"contains": "field", "coerce": "unicode"},
                 "excluded_license": {"contains": "field", "coerce": "unicode"},
             },
             "structs": {
@@ -207,33 +207,6 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         return ringgolds
 
     @property
-    def postcodes(self):
-        """
-        List of postcodes associated with this repository/institution
-
-        :return: postcodes
-        """
-        return self._get_list("postcodes", coerce=dataobj.to_unicode())
-
-    @property
-    def keywords(self):
-        """
-        List of keywords associated with this repository
-
-        :return: keywords
-        """
-        return self._get_list("keywords", coerce=dataobj.to_unicode())
-
-    @property
-    def excluded_keywords(self):
-        """
-        List of keywords not associated with this repository
-
-        :return: keywords
-        """
-        return self._get_list("excluded_keywords", coerce=dataobj.to_unicode())
-
-    @property
     def grants(self):
         """
         List of grant codes associated with this repository/institution
@@ -242,32 +215,59 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         """
         return self._get_list("grants", coerce=dataobj.to_unicode())
 
-    @property
-    def content_types(self):
-        """
-        List of content types associated with this repository
+    # @property
+    # def postcodes(self):
+    #     """
+    #     List of postcodes associated with this repository/institution
+    #
+    #     :return: postcodes
+    #     """
+    #     return self._get_list("postcodes", coerce=dataobj.to_unicode())
 
-        :return: content types
-        """
-        return self._get_list("content_types", coerce=dataobj.to_unicode())
+    # @property
+    # def keywords(self):
+    #     """
+    #     List of keywords associated with this repository
+    #
+    #     :return: keywords
+    #     """
+    #     return self._get_list("keywords", coerce=dataobj.to_unicode())
 
-    @property
-    def strings(self):
-        """
-        List of arbitrary strings which may be used to match against this repository
+    # @property
+    # def excluded_keywords(self):
+    #     """
+    #     List of keywords not associated with this repository
+    #
+    #     :return: keywords
+    #     """
+    #     return self._get_list("excluded_keywords", coerce=dataobj.to_unicode())
 
-        :return: list of match strings
-        """
-        return self._get_list("strings", coerce=dataobj.to_unicode())
+    # @property
+    # def content_types(self):
+    #     """
+    #     List of content types associated with this repository
+    #
+    #     :return: content types
+    #     """
+    #     return self._get_list("content_types", coerce=dataobj.to_unicode())
 
-    @property
-    def institutional_identifier(self):
-        """
-        Institutional identifier which may be used to match against this repository
+    # @property
+    # def strings(self):
+    #     """
+    #     List of arbitrary strings which may be used to match against this repository
+    #
+    #     :return: list of match strings
+    #     """
+    #     return self._get_list("strings", coerce=dataobj.to_unicode())
 
-        :return: institutional_identifier
-        """
-        return self._get_single("institutional_identifier", coerce=dataobj.to_unicode())
+    # @property
+    # def institutional_identifier(self):
+    #     """
+    #     Institutional identifier which may be used to match against this repository
+    #
+    #     :return: institutional_identifier
+    #     """
+    #     return self._get_single("institutional_identifier", coerce=dataobj.to_unicode())
 
     @property
     def excluded_license(self):
@@ -356,9 +356,11 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
         # 2019-03-27 TD : Due to data privacy issues, Author Emails and ORCIDs will not be read
         # until further notice (see also the comment below)
         #
-        fields = ['domains', 'name_variants', 'author_ids', 'postcodes', 'grants', 'keywords',
-                  'content_types', 'strings', 'institutional_identifier', 'excluded_domains',
-                  'excluded_name_variants', 'excluded_keywords']
+        # Removing these fields as we no longer use
+        # ['keywords', 'content_types', 'institutional_identifier',
+        #           'excluded_name_variants', 'excluded_keywords', 'postcodes', 'strings' ]
+        fields = ['domains', 'name_variants', 'author_ids', 'grants',
+                  'excluded_domains', 'excluded_name_variants', ]
         for f in fields:
             if f in self.data: del self.data[f]
         if csvfile is not None:
@@ -368,31 +370,31 @@ class RepositoryConfig(dataobj.DataObj, dao.RepositoryConfigDAO):
                     fld = field.strip().lower().replace(' ', '').rstrip('s').replace('number', '')
                     val = row.get(field, '').strip()
                     if len(val) > 1:
-                        if fld == 'grant':
-                            self.data['grants'] = self.data.get('grants', []) + [val]
-                        elif fld == 'keyword':
-                            self.data['keywords'] = self.data.get('keywords', []) + [val]
-                        elif fld == 'excludedkeyword':
-                            self.data['excluded_keywords'] = self.data.get('excluded_keywords', []) + [val]
+                        if fld == 'domain':
+                            self.data['domains'] = self.data.get('domains', []) + [val]
                         elif fld == 'namevariant':
                             self.data['name_variants'] = self.data.get('name_variants', []) + [val]
-                        elif fld == 'excludednamevariant':
-                            self.data['excluded_name_variants'] = self.data.get('excluded_name_variants', []) + [val]
-                        elif fld == 'domain':
-                            self.data['domains'] = self.data.get('domains', []) + [val]
-                        # elif fld == 'excludeddomain':
-                        #     self.data['excluded_domains'] = self.data.get('excluded_domains', []) + [val]
-                        elif fld == 'institutionalidentifier':
-                            self.data['institutional_identifier'] = val
                         elif fld == 'ror':
                             id_hash = {'type': 'ror', 'id': val}
                             self.data['author_ids'] = self.data.get('author_ids', []) + [id_hash]
                         elif fld == 'ringgold':
                             id_hash = {'type': 'ringgold', 'id': val}
                             self.data['author_ids'] = self.data.get('author_ids', []) + [id_hash]
+                        elif fld == 'grant':
+                            self.data['grants'] = self.data.get('grants', []) + [val]
+                        elif fld == 'excludeddomain':
+                            self.data['excluded_domains'] = self.data.get('excluded_domains', []) + [val]
+                        elif fld == 'excludednamevariant':
+                            self.data['excluded_name_variants'] = self.data.get('excluded_name_variants', []) + [val]
+                        # elif fld == 'institutionalidentifier':
+                        #     self.data['institutional_identifier'] = val
                         # 2019-02-25 TD : Instead of 'postcode' we will support 'keywords' here!
                         # elif fld == 'postcode':
                         #    self.data['postcodes'] = self.data.get('postcodes',[]) + [val]
+                        # elif fld == 'keyword':
+                        #     self.data['keywords'] = self.data.get('keywords', []) + [val]
+                        # elif fld == 'excludedkeyword':
+                        #     self.data['excluded_keywords'] = self.data.get('excluded_keywords', []) + [val]
             app.logger.debug("Extracted complex config from .csv file for repo: {x}".format(x=repoid))
             # app.logger.debug("Extracted complex config from .csv file for repo: {x}".format(x=self.id))
             self.data['repo'] = repoid

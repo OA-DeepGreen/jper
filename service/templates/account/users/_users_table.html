@@ -20,7 +20,7 @@
                     {# column: name / email #}
                     <td>
                       {% if user.get('name', '') %}
-                        {{ user['name'] }}
+                        {{ user['name'] | safe}}
                       {% else %}
                         {{ user['email'] }}
                       {% endif %}

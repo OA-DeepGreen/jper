@@ -3,11 +3,11 @@ from pathlib import Path
 from datetime import datetime
 import paramiko
 import logging
+import traceback
 from jper_scheduler.utils import zip, flatten, pkgformat
 from octopus.core import app
 from service import models
 from service import routing_deepgreen as routing
-from service.lib import request_deposit_helper
 
 # jper stuff - save the routing history
 from service.models.routing_history import RoutingHistory
@@ -45,12 +45,18 @@ class PublisherFiles:
         # Initialise the sFTP connection
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect(hostname=self.sftp_server, port=self.sftp_port,
+        try:
+            c.connect(hostname=self.sftp_server, port=self.sftp_port,
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
+        except exception as e:
+            app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
+            app.logger.error(traceback.format_exc())
+            return -1
         self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
         self._is_scp = True
+        return 0
 
     def __init_constants__(self):
         # Stuff that is not picked up from elsewhere
@@ -66,6 +72,12 @@ class PublisherFiles:
         app.logger.debug("Routing History> individual workflow states :")
         for state in self.routing_history.workflow_states:
             app.logger.debug(f"{state['action']} > {state}")
+        app.logger.debug("Routing History> notification states :")
+        for state in self.routing_history.notification_states:
+            app.logger.debug(f"{state['status']} > {state}")
+        app.logger.debug("Routing History> final file locations :")
+        for state in self.routing_history.final_file_locations:
+            app.logger.debug(f"{state['location_type']} > {state}")
         app.logger.debug("END Routing History")
 
     def __update_routing_history__(self, action="", file_location="",
@@ -159,7 +171,10 @@ class PublisherFiles:
         # A recursive mkdir implementation, as sftp-only access only allows a simple mkdir
         # Loop over the path
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.debug("Error with sftp. Returning.")
+                return -1
         subdirs = r_dir.split("/")
         path = ""
         for subdir in subdirs:
@@ -191,7 +206,11 @@ class PublisherFiles:
         if len(file_subdir.strip()) > 0:
             new_dir = f"{r_new}/{file_subdir}"
         try:
-            self._make_dir_in_server(new_dir)
+            result = self._make_dir_in_server(new_dir)
+            if result == -1:
+                app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
+                               f'Error creating sftp connection for publisher {self.id}')
+                return
         except Exception as e:
             app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
                                f'Error: {str(e)}')
@@ -205,7 +224,10 @@ class PublisherFiles:
 
         try:
             if not self._is_scp:
-                self.__init_sftp_connection__()
+                result = self.__init_sftp_connection__()
+                if result == -1:
+                    app.logger.error(f"Failed to move {file} to {new_file}. Error creating sftp connection.")
+                    return
             self.scp.rename(remote_path + '/' + file, new_file)
             app.logger.info(f"Successfully moved {file} to {new_file}.")
         except Exception as e:
@@ -228,13 +250,16 @@ class PublisherFiles:
     def list_remote_dir(self, rdir):
         # Idempotent function to recursively get the list of files in a remote directory
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.error(f"Failed to access directory {rdir}. Error creating sftp connection.")
+                return [-403]
         rdir = rdir.rstrip('/')
         try:
             x = self.scp.stat(rdir)
         except Exception as e:
             app.logger.error(f"Failed to access directory {rdir}. Error: {str(e)}")
-            return []
+            return [-404]
 
         folders = []
         for item in self.scp.listdir_attr(rdir):
@@ -258,7 +283,10 @@ class PublisherFiles:
     def get_file(self, remote_file):
         # Initialise the sFTP connection if not already done
         if not self._is_scp:
-            self.__init_sftp_connection__()
+            result = self.__init_sftp_connection__()
+            if result == -1:
+                app.logger.error(f"Error initialising sftp connection for publisher {self.id} {self.publisher_email}")
+                return {"status": "failure", "message": str(e)}
         remote_item = remote_file.removeprefix(self.remote_dir).lstrip("/")
         local_file = self.l_dir + remote_item
         l_filename = os.path.basename(local_file)
@@ -571,6 +599,7 @@ class PublisherFiles:
         total_number_of_notification = len(uids)
         notification_states = []
         app.logger.info(f"Processing {len(uids)} notifications")
+        overall_status = "success"
         for idx, uid in enumerate(uids):
             app.logger.info(f"Processing unrouted notification {idx} : {uid}")
             mun = models.UnroutedNotification()
@@ -586,15 +615,18 @@ class PublisherFiles:
             app.logger.debug(f"#{idx} :Starting routing for {obj.id}")
             res, routing_msg = routing.route(obj)
             message = f"#{idx} : Unrouted notification {obj.id} has been processed. Outcome - {res}"
+            app.logger.info(message)
             status = "success"
             doi = ''
-            message = None
+            msg = ""
+            num_matched_repositories = 0
             if routing_msg == "Done":
                 # This is now a routed notification. I need the repositories matched and the doi.
                 if res:
                     notification_obj = models.RoutedNotification.pull(uid)
                     if notification_obj:
-                        msg = f"Notification {notification_obj.id} matched to {len(notification_obj.repositories)} repositories"
+                        num_matched_repositories = len(notification_obj.repositories)
+                        msg = f"Notification {notification_obj.id} matched to {num_matched_repositories} repositories"
                         app.logger.info(msg)
                         dois = notification_obj.get_identifiers('doi')
                         if len(dois) > 0:
@@ -604,20 +636,23 @@ class PublisherFiles:
                     failed_obj = models.FailedNotification.pull(uid)
                     app.logger.debug(msg)
                     if failed_obj:
-                        msg = f"Notification {failed_obj.id} matched to {len(failed_obj.repositories)} repositories"
+                        num_matched_repositories = len(failed_obj.repositories)
+                        msg = f"Notification {failed_obj.id} matched to {num_matched_repositories} repositories"
                         app.logger.info(msg)
                         dois = failed_obj.get_identifiers('doi')
                         if len(dois) > 0:
                             doi = dois[0]
 
-                app.logger.info(message)
-                self.routing_history.add_notification_state("success", uid, doi=doi)
+                app.logger.info(msg)
+                self.routing_history.add_notification_state("success", uid, doi=doi, number_matched_repositories=num_matched_repositories)
+
             else: # Exception during routing
                 msg = "Received exception from routing"
                 app.logger.warn(msg)
-                self.routing_history.add_notification_state("failure", uid, doi=doi)
+                self.routing_history.add_notification_state("failure", uid, doi=doi, number_matched_repositories=0)
                 status = "failure"
-                message = msg
+                overall_status = "failure"
+            message = message + ". " + msg
 
             if self.delete_routed:
                 msg = f"Deleting unrouted notification {obj.id}"
@@ -626,6 +661,7 @@ class PublisherFiles:
             else:
                 msg = f"Not deleting unrouted notification {obj.id}"
                 app.logger.debug(msg)
+            message = message + ". " + msg
 
             # Update routing history
             app.logger.info("Updating routing history")
@@ -633,9 +669,8 @@ class PublisherFiles:
                     notification_id=uid, status=status, message=message)
             self.routing_history.save()
             # self.__log_routing_history__()
-            if not message:
-                message = f"Processed {total_number_of_notification} notifications."
-        return {'status': status, 'message': message}
+        message = f"Processed {total_number_of_notification} notifications."
+        return {'status': overall_status, 'message': message}
 
     ##### --- End checkunrouted. Clean up temporary files. ---
 

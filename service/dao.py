@@ -960,19 +960,11 @@ class RoutingHistoryDAO(dao.ESDAO):
     __type__ = "routing_history"
 
     @classmethod
-    def pull_records(cls, since, upto, page, page_size, publisher_id=None,
+    def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
                      publisher_email=None, doi=None, notification_id=None, status=None):
         query = {
             "query": {
                 "bool": {
-                    "filter": {
-                        "range": {
-                            "last_updated": {
-                                "gte": since,
-                                "lte": upto
-                            }
-                        }
-                    },
                     "must": []
                 }
             },
@@ -980,6 +972,24 @@ class RoutingHistoryDAO(dao.ESDAO):
             "from": (page - 1) * page_size,
             "size": page_size
         }
+        if since:
+            if not 'filter' in query['query']['bool']:
+                query['query']['bool']["filter"] = {}
+            if not 'range' in query['query']['bool']["filter"]:
+                query['query']['bool']["filter"]["range"] = {}
+            if not 'created_date' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["created_date"] = {}
+            query['query']['bool']["filter"]["range"]["created_date"]["gte"] = since
+
+        if upto:
+            if not 'filter' in query['query']['bool']:
+                query['query']['bool']["filter"] = {}
+            if not 'range' in query['query']['bool']["filter"]:
+                query['query']['bool']["filter"]["range"] = {}
+            if not 'created_date' in query['query']['bool']["filter"]["range"]:
+                query['query']['bool']["filter"]["range"]["created_date"] = {}
+            query['query']['bool']["filter"]["range"]["created_date"]["lte"] = upto
+
 
         if publisher_id:
             query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
@@ -990,10 +1000,12 @@ class RoutingHistoryDAO(dao.ESDAO):
         elif status == "success":
             query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
         if notification_id:
-            del query['query']['bool']['filter']
+            if 'filter' in query['query']['bool']:
+                del query['query']['bool']['filter']
             query['query']['bool']["must"].append({"match": {"notification_states.notification_id.exact": notification_id}})
         if doi:
-            del query['query']['bool']['filter']
+            if 'filter' in query['query']['bool']:
+                del query['query']['bool']['filter']
             query['query']['bool']["must"].append({"match": {"notification_states.doi.exact": doi}})
         ans = cls.query(q=query)
         return ans
@@ -1020,3 +1032,7 @@ class RoutingHistoryDAO(dao.ESDAO):
         if len(ans) == 1:
             return ans[0]
         return None
+
+    @classmethod
+    def get_all_publishers(cls):
+        return cls.get_all_facet_values("publisher_id.exact")

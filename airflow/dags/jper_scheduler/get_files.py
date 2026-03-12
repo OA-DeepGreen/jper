@@ -10,70 +10,90 @@ from airflow.utils.session import provide_session
 from airflow.configuration import conf
 # My code
 from jper_scheduler.publisher_transfer import PublisherFiles
+from jper_scheduler.utils import get_log_url, set_task_name
 
 donot_rerun_processftp_dirs = [
     "No handler for package format unknown"
 ]
-
-def get_log_url(context):
-    full_log_url = context['task_instance'].log_url
-    print(f"Full log url : {full_log_url}")
-    dag_id = f"dag_id={context['dag'].dag_id}"
-    ti = context['task_instance']
-    task_id = f"task_id={ti.task_id}"
-    execution_date = urlencode({"execution_date": ti.run_id.split('__')[1]})
-    map_index = None
-    if ti.map_index > -1:
-        map_index = f"map_index={ti.map_index}"
-    new_path = f"/airflow/log?{dag_id}&{task_id}&{execution_date}"
-    if map_index:
-        new_path = f"{new_path}&{map_index}"
-    app.logger.info(f"Log for this job : {new_path}")
-    return new_path
-
-def set_task_name(map_index, task_str):
-    task_name = f"{map_index} {task_str}"
-    sanitised_name = task_name
-    if len(task_name) > 250:
-        sanitised_name = f"{task_name[:245]} ..."
-    return sanitised_name
 
 @dag(dag_id="Process_Publisher_Deposits", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_ROUTING_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
      catchup=False,
      tags=["teamCottageLabs", "jper_scheduler"])
-def move_from_server():
-    @task(task_id="get_file_list", retries=3, max_active_tis_per_dag=4)
+def get_and_process_deposit_records():
+
+    @task(task_id="get_publisher_list", retries=3, max_active_tis_per_dag=4)
     @provide_session
-    def get_file_list(session=None, **context):
+    def get_publisher_list(session=None, **context):
+        # Get list of active publishers
         log_url = get_log_url(context)
-        app.logger.debug("Starting get list of files")
-        max_map_length = conf.getint("core", "max_map_length")
-        # Get File list
-        files_list = []
+        app.logger.debug("Getting list of active publishers")
         a = PublisherFiles()
         a.airflow_log_location = log_url
-        if len(a.publishers) < 1:
-            raise AirflowFailException(f"No publishers active found. Stopping DAG run")
-        for publisher in a.publishers:
-            b = PublisherFiles(publisher['id'], publisher=publisher)
-            b.airflow_log_location = log_url
-            b.list_remote_dir(b.remote_dir)
-            app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
-            for f in b.file_list_publisher:
-                # The maximum number of tasks we can create is limited by max_map_length
-                if len(files_list) >= max_map_length:
-                    break
-                routing_history_id = uuid.uuid4().hex
-                files_list.append((publisher['id'], f, routing_history_id))
-        app.logger.info(f"Total number of files to transfer : {len(files_list)}")
-        if len(files_list) == 0:
+        if len(a.publishers) == 0:
             app.logger.warn("Empty run")
             dag_run = session.merge(context['dag_run'])
             dag_run.note = "Empty run"
             session.commit()
-        return files_list  # This is visible in the xcom tab
+        publisher_list = []
+        for publisher in a.publishers:
+            publisher_list.append(publisher['id'])
+        return publisher_list # An XCom object
+
+    @task(task_id="get_list_of_files", retries=0, max_active_tis_per_dag=4)
+    def get_list_of_files(publisher=None):
+        # For each publisher, get list of files deposited in the sftp server
+        context = get_current_context()
+        log_url = get_log_url(context)
+        app.logger.debug(f"Starting get list of files for publisher {publisher}")
+        max_map_length = conf.getint("core", "max_map_length")
+        ti = context['ti']  # TaskInstance
+        context["map_index_template"] = set_task_name(ti.map_index, publisher)
+
+        files_list = []
+        if not publisher:
+            app.logger.warn(f"No publisher given to this task. Returning to airflow.")
+            return files_list
+        b = PublisherFiles(publisher_id=publisher, publisher=None)
+        b.airflow_log_location = log_url
+        result = b.list_remote_dir(b.remote_dir)
+        if len(result) > 0 and result[0] in [-403, -404]:
+            app.logger.debug(f"Problem with getting list of files for publisher {publisher}. Stopping.")
+            raise AirflowTaskTerminated(f"Error listing directories. See above messages for error source.")
+        app.logger.info(f"Found {len(b.file_list_publisher)} file(s)")
+        for f in b.file_list_publisher:
+            # The maximum number of tasks we can create is limited by max_map_length
+            if len(files_list) >= max_map_length:
+                break
+            routing_history_id = uuid.uuid4().hex
+            files_list.append((publisher, f, routing_history_id))
+        app.logger.info(f"Total number of files to transfer : {len(files_list)} for publisher {publisher}")
+        return files_list # An XCom object
+
+    @task(task_id="get_files_list", retries=3, max_active_tis_per_dag=4, trigger_rule="all_done")
+    @provide_session
+    def get_files_list(files, session=None):
+        # Combine the lists of files from the different publishers into one large list
+        # Note the trigger rule, to cover the eventuality that one or more publishers could have bad initialisation
+        # We are working with xcom objects. Hence need for a separate function to concatenate the lists
+        context = get_current_context()
+        log_url = get_log_url(context)
+        max_map_length = conf.getint("core", "max_map_length")
+        app.logger.debug(f"Putting together the list of input files (if any)")
+        sum_files = []
+        for file in files:
+            sum_files.extend(file)
+        if len(sum_files) == 0:
+            app.logger.warn("Empty run")
+            dag_run = session.merge(context['dag_run'])
+            dag_run.note = "Empty run"
+            session.commit()
+        if len(sum_files) >= max_map_length:
+            sum_files = sum_files[:max_map_length-1]
+        app.logger.info(f"Total number of files to transfer : {len(sum_files)}")
+        app.logger.info(f"Full list of files : {sum_files}")
+        return sum_files # An XCom object
 
     @task(task_id="get_single_file", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
@@ -123,7 +143,6 @@ def move_from_server():
         else:
             raise AirflowException(f"Failed to copy {sym_link_path}, publisher id {publisher_id} : {result['message']}")
 
-    # =
     @task(task_id="process_ftp", map_index_template="{{ map_index_template }}", retries=3, max_active_tis_per_dag=4)
     def process_ftp(pub_tuple):
         # Process the file - unzip and flatten it
@@ -184,6 +203,7 @@ def move_from_server():
     @task(task_id="check_unrouted", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
     def check_unrouted(pub_tuple):
+        # Check for matching repositories and set them as the destinations for the notifications
         context = get_current_context()
         log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
@@ -214,6 +234,7 @@ def move_from_server():
     @task(task_id="clean_temp_files", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
     def clean_temp_files(pub_tuple):
+        # Clean the temporary files from storage, but retain the important ones
         context = get_current_context()
         log_url = get_log_url(context)
         ti = context['ti']  # TaskInstance
@@ -236,6 +257,7 @@ def move_from_server():
 
     @task_group(group_id='ProcessFileFromPublisher')
     def process_one_file(pub_tuple, **context):
+        # Task group to run through the full chain of processing tasks for a given submitted file
         # Each of the following processes a single file, with the output of one feeding into to the next
         local_tuple = get_single_file(pub_tuple)
         local_tuple = copy_ftp(local_tuple)
@@ -244,8 +266,11 @@ def move_from_server():
         local_tuple = check_unrouted(local_tuple)
         clean_temp_files(local_tuple)
 
-    # The first call + chaining of the tasks
-    file_tuple = get_file_list()
-    process_one_file.expand(pub_tuple=file_tuple)
+    # The actual order of running the above tasks is here.
+    list_of_publishers = get_publisher_list() # List of publishers
+    files = get_list_of_files.expand(publisher=list_of_publishers) # Loop over the publishers
+    file_tuple = get_files_list(files) # List of files to process
+    process_one_file.expand(pub_tuple=file_tuple) # Actually process each file
 
-move_from_server()
+# Get the DAG up and running
+get_and_process_deposit_records()
