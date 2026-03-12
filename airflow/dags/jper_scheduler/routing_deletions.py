@@ -5,8 +5,7 @@ from octopus.core import app
 from octopus.modules.store import store
 from jper_scheduler.publisher_transfer import PublisherFiles
 
-# dryRun = True
-dryRun = False
+dryRun = app.config.get("AIRFLOW_DELETION_DRY_RUN", True)
 
 # Check if notification is okay to delete based on status values provided for on-demand deletion
 def is_notification_okay(note, status_values):
