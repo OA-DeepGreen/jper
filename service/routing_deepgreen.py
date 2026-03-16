@@ -180,13 +180,13 @@ def _match(notification_data, repository_config, provenance, acc_id):
         "grants": {
             "grants": _exact
         },
-        "strings": {
-            "urls": _domain_url,
-            "emails": _exact,
-            "affiliations": _exact_substring,
-            "author_ids": _author_string_match,
-            "grants": _exact
-        }
+        # "strings": {
+        #     "urls": _domain_url,
+        #     "emails": _exact,
+        #     "affiliations": _exact_substring,
+        #     "author_ids": _author_string_match,
+        #     "grants": _exact
+        # }
     }
 
     match_exclusion_algorithms = {

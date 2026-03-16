@@ -500,6 +500,12 @@ def details(repo_id):
     since = request.args.get('since')
     upto = request.args.get('upto')
 
+    if since == '' or since is None:
+        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
+        since = "01/06/2019"
+    if upto == '' or upto is None:
+        upto = datetime.today().strftime("%d/%m/%Y")
+
     try:
         since = validate_date(since, param='since', return_400_if_invalid=False)
     except ValueError as e:
@@ -510,12 +516,6 @@ def details(repo_id):
     except ValueError as e:
         upto = None
         flash(f"Error validating 'upto' date: {e}")
-
-    if since == '' or since is None:
-        # since = (datetime.now() - relativedelta(years=1)).strftime("%d/%m/%Y")
-        since = "01/06/2019"
-    if upto == '' or upto is None:
-        upto = datetime.today().strftime("%d/%m/%Y")
 
     if provider:
         notification_prefix = "matches"
