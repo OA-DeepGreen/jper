@@ -1,10 +1,12 @@
 import os, glob, json, uuid, time, datetime
 from pathlib import Path
 import esprit
+from pprint import pprint
 from octopus.core import app
 from octopus.lib import dates
+from octopus.modules.store import store
 
-from service import models
+from service import packages, models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
 
@@ -17,7 +19,9 @@ from jper_scheduler.utils import set_task_name, get_log_url
 
 # Create a connection - ES stuff
 host = app.config.get("ELASTIC_SEARCH_HOST", 'localhost') # includes port
-index = app.config.get("AIRFLOW_REPROCESS_ES_INDICES", 'jper-routed*')
+index = 'jper-routed*,jper-failed' # Comma-separated list of ES indices to query for notifications to reprocess
+# index = 'jper-routed*'
+# index = 'jper-failed'
 max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
@@ -58,7 +62,7 @@ def write_notifications(out_dir=None, notifications=None):
                 json.dump(notification, f, indent=2)
         write_count += 1
         if write_count == files_per_dir:
-            print(f"Written {write_count} notifications to directory: {tmp_dir}")
+            print(f"Written {write_count} notifications")
             out_subdir = out_subdir + 1
             write_count = 0
 
@@ -188,24 +192,51 @@ def add_update_routing_history(notification, repository_id, request_type, doi=""
                                            status=status, message=message, log_url=log_url)
         rh.save()
 
-def process_notification(n=None, bibids={}, log_url=None):
+def process_notification(note_json=None, bibids={}, log_url=None):
     # Process a single notification, extract the relevant metadata, and check if it matches TUBFR routing criteria
-    note = n['_source']
-    obj = models.RoutedNotification(note)
-    if not obj:
-        obj = models.FailedNotification(note)
+    note = note_json['_source']
+    app.logger.info(f"Processing notification {note['id']} for bibid : {bibids}")
+
+    obj = None
+    if note_json['_index'].startswith('jper-routed'):
+        app.logger.info(f"Processing routed notification id: {note['id']}")
+        obj = models.RoutedNotification(note)
+        repo_id = list(bibids.values())[0]
+        if repo_id in obj.repositories:
+            return 0 # No need to process if we already know this notification has been matched already to this repository
+
+    from_failed = False
+    if note_json['_index'].startswith('jper-failed'):
+        app.logger.info(f"Processing failed notification id: {note['id']}")
+        pf = note.get("content", {}).get("packaging_format", "")
+        if not pf:
+            app.logger.warn(f"No packaging format found")
+
+        metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+        if not metadata:
+            app.logger.warn(f"Metadata is empty")
+            return 0
+        note["metadata"] = json.loads(metadata.json())['metadata']
+
+        obj = models.RoutedNotification(note)
+        from_failed = True
+
     if not obj:
         print(f"Could not pull notification object for id: {note['id']}")
-        return
+        return 0
+
     notification_id = obj.id
     app.logger.info(f"Processing notification id: {notification_id}")
     metadata = note['metadata']
     if "identifier" not in metadata.keys():
         app.logger.warning(f"No identifier found in metadata for notification id: {notification_id}")
-        return
+        app.logger.info(f"Metadata keys are : {metadata.keys()}")
+        app.logger.debug(metadata)
+        return 0
     if "publication_date" not in metadata.keys():
         app.logger.warning(f"No publication_date or identifier found in metadata for notification id: {notification_id}")
-        return
+        app.logger.debug(metadata)
+        return 0
     issn_data = get_identifier(metadata["identifier"], "issn")
     publ_date = metadata.get("publication_date", None)
     dt = datetime.datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
@@ -214,7 +245,7 @@ def process_notification(n=None, bibids={}, log_url=None):
     doi = get_identifier(metadata["identifier"], "doi")
     if 'provider' not in note.keys() or 'id' not in note['provider'].keys():
         app.logger.warning(f"No provider id found in notification for id: {notification_id}")
-        return
+        return 0
     provider_id = note.get('provider', None).get('id', None)
     if doi is None:
         doi = "unknown"
@@ -224,7 +255,7 @@ def process_notification(n=None, bibids={}, log_url=None):
         doi = doi[0]
     if len(issn_data) == 0:
         app.logger.warning(f"No ISSN found in metadata for notification id: {notification_id}")
-        return
+        return 0
     gold_article_license = is_article_license_gold(metadata, provider_id)
     app.logger.info(f"Notification id: {notification_id} has DOI: {doi} and gold article license: {gold_article_license}")
     al_repos = None
@@ -258,6 +289,18 @@ def process_notification(n=None, bibids={}, log_url=None):
 
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
     if len(match_ids) > 0:
+        # Update notification
+        repos = obj.repositories.extend(match_ids)
+        obj.repositories = repos.unique()
+        obj.save()
+        app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
+        if from_failed:
+            # If this notification was from the failed index, we need to move it to the routed index
+            f = models.FailedNotification.pull(notification_id)
+            if f:
+                f.delete()
+                app.logger.info(f"Deleted failed notification id: {notification_id}")
+        # Update routing history
         request_type = "machine"
         request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
         add_update_routing_history(obj, match_ids[0], request_type, doi=doi, log_url=log_url)
@@ -315,6 +358,13 @@ def reprocess_repository():
             if local_count == notifications_to_process:
                 break
         print(f"Found {len(files_to_process)} notification files to process")
+
+        if len(files_to_process) == 0:
+            app.logger.debug("Empty run")
+            dag_run = session.merge(context['dag_run'])
+            dag_run.note = "Empty run"
+            session.commit()
+
         return files_to_process
 
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
@@ -332,10 +382,11 @@ def reprocess_repository():
         repository_name = repository_tuple.split("_")[0]
         repository_id = repository_tuple.split("_")[1]
         bibids = {repository_name: repository_id}
-        app.logger.debug(f"Processing notification {file_name}")
+        app.logger.debug(f"Processing notification {file_name} for repository {bibids}")
+        data = None
         with open(file_name, 'r') as file:
           data = json.load(file)
-        num_matched = process_notification(n=data, bibids=bibids, log_url=log_url)
+        num_matched = process_notification(note_json=data, bibids=bibids, log_url=log_url)
 
         # Move the processed file to a "processed" directory to avoid reprocessing in future runs
         out_file_name = note.replace("/TODO/", "/DONE/")
