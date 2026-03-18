@@ -213,10 +213,27 @@ def process_notification(note_json=None, bibids={}, log_url=None):
             app.logger.warn(f"No packaging format found")
 
         metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+        metadata_json = json.loads(metadata.json())['metadata']
         if not metadata:
             app.logger.warn(f"Metadata is empty")
             return 0
-        note["metadata"] = json.loads(metadata.json())['metadata']
+        else:
+            kkeys = metadata_json.keys()
+            for key in kkeys:
+                if "date" in key:
+                    value = metadata_json[key]
+                    if len(value) == 10:
+                        new_date_str = ""
+                        try:
+                            datetime_obj = datetime.datetime.strptime(value, "%Y-%d-%mT%H:%M:%SZ")
+                            new_date_str = datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        except ValueError:
+                            datetime_obj = datetime.datetime.strptime(value, "%Y-%d-%m")
+                            new_date_str = datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        metadata_json[key] = new_date_str
+                        print(f"Updating {key} to {new_date_str}")
+
+        note["metadata"] = metadata_json
 
         obj = models.RoutedNotification(note)
         from_failed = True
@@ -290,8 +307,9 @@ def process_notification(note_json=None, bibids={}, log_url=None):
     print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
     if len(match_ids) > 0:
         # Update notification
-        repos = obj.repositories.extend(match_ids)
-        obj.repositories = repos.unique()
+        repos = obj.repositories
+        repos.extend(match_ids)
+        obj.repositories = list(set(repos))
         obj.save()
         app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
         if from_failed:
