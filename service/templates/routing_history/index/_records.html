@@ -16,7 +16,7 @@
         <tr class="tablesorter">
           <td>
               <a href="/routing_history/view/{{ record['id'] }}">record</a><br/>
-              {% if record.get('publisher_email', '') and  record.get('publisher_id', '') %}
+              {% if record.get('publisher_email', '') and record.get('publisher_id', '') %}
                 <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_email'] | safe }}</a><br/>
               {% elif record.get('publisher_id', '') %}
                 <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_id'] | safe }}</a><br/>
@@ -28,7 +28,19 @@
                   {% for n_state in record['notification_states'] %}
                     {% if n_state.get('notification_id', '') %}
                       <dt>Notification:</dt>
-                      <dd><a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a></dd>
+                      <dd>
+                        <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a>
+                        {% if n_state['status'] == 'failure' %}
+                          - error
+                        {% endif %}
+                        {% if n_state['status'] == 'success' %}
+                          {% if n_state['number_matched_repositories'] > 0 %}
+                            - routed - matched {{ n_state['number_matched_repositories'] }}
+                          {% else %}
+                            - failed
+                          {% endif %}
+                        {% endif %}
+                      </dd>
                     {% endif %}
                     {% if n_state.get('doi', '') %}
                       <dt>DOI:</dt>
