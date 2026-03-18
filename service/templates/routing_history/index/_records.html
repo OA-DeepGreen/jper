@@ -16,7 +16,7 @@
         <tr class="tablesorter">
           <td>
               <a href="/routing_history/view/{{ record['id'] }}">record</a><br/>
-              {% if record.get('publisher_email', '') and  record.get('publisher_id', '') %}
+              {% if record.get('publisher_email', '') and record.get('publisher_id', '') %}
                 <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_email'] | safe }}</a><br/>
               {% elif record.get('publisher_id', '') %}
                 <a href="/account/{{ record['publisher_id'] }}">{{ record['publisher_id'] | safe }}</a><br/>

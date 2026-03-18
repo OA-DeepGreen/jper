@@ -19,7 +19,7 @@ def index():
     filled_params = {}
 
     # Get since
-    since = request.args.get('since').strip()
+    since = request.args.get('since', '').strip()
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     try:
@@ -29,7 +29,7 @@ def index():
         flash(f"Error validating 'since' date: {e}")
 
     # Get upto
-    upto = request.args.get('upto').strip()
+    upto = request.args.get('upto', '').strip()
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     try:

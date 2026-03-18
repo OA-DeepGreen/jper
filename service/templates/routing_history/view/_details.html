@@ -5,15 +5,21 @@
       <dd>{{ rec.created_date }}</dd>
       <dt>Last updated:</dt>
       <dd>{{ rec.last_updated }}</dd>
-      <dt>Publisher Id:</dt>
-      <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_id | safe }}</a></dd>
-    <dt>Publisher Email:</dt>
-      <dd><a href="/account/{{ rec.publisher_email }}">{{ rec.publisher_email | safe }}</a></dd>
+      <dt>Publisher:</dt>
+      {% if rec.publisher_email and rec.publisher_id %}
+        <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_email | safe }}</a></dd>
+      {% elif rec.get('publisher_id', '') %}
+        <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_id | safe }}</a></dd>
+      {% endif %}
       {% for n_state in rec.notification_states %}
         {% if n_state.get('notification_id', '') %}
           <dt>Notification:</dt>
           <dd>
-            <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a>
+            {% if n_state.get('doi', '') %}
+              <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['doi'] }}</a>
+            {% else %}
+              <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a>
+            {% endif %}
             {% if n_state['status'] == 'failure' %}
               | error
             {% elif n_state['number_matched_repositories'] > 0 %}
@@ -40,6 +46,10 @@
     <!-- file locations -->
     {% with rec=rec, id='file_locations', title='File locations' %}
       {% include "routing_history/view/_file_locations.html" %}
+    {% endwith %}
+    <!-- Notification details -->
+    {% with rec=rec, id='notifications', title='Notifications' %}
+      {% include "routing_history/view/_notification.html" %}
     {% endwith %}
     <!-- Workflow details -->
     {% with rec=rec, id='workflow', title='Workflow' %}

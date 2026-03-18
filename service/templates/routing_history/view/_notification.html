@@ -1,0 +1,29 @@
+<button class="accordion" id="accordion-notification">{{ title }}</button>
+<div class="panel">
+  <table id="{{ id }}">
+    <tr>
+      <th>Id</th>
+      <th>DOI</th>
+      <th>Status</th>
+    </tr>
+    {% for n_state in rec.notification_states %}
+      <tr>
+        <td>
+          <span title="{{ n_state['notification_id'] }}">
+            <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a>
+          </span>
+        </td>
+        <td><span>{{ n_state['doi'] }}</span></td>
+        <td>
+          {% if n_state['status'] == 'failure' %}
+            <span style="color:red">Error</span>
+          {% elif n_state['number_matched_repositories'] > 0 %}
+            <span style="color:green">{{"&check;" | safe }}  matched {{ n_state['number_matched_repositories'] }}</span>
+          {% else %}
+            <span style="color:grey">{{"&check;" | safe }} matched {{ n_state['number_matched_repositories'] }}</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
