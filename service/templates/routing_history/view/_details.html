@@ -16,7 +16,7 @@
             <a href="/api/v1/notification/{{ n_state['notification_id'] }}">{{ n_state['notification_id'] }}</a>
             {% if n_state['status'] == 'failure' %}
               | error
-            {% elsif n_state['number_matched_repositories'] > 0 %}
+            {% elif n_state['number_matched_repositories'] > 0 %}
               | routed - matched {{ n_state['number_matched_repositories'] }}
             {% else %}
               | failed
