@@ -5,15 +5,15 @@
         <li>
           <label>Show routing history</label>
         </li>
-        {% for key, filter in filters.items() %}
-          {% if filter['values'] %}
+        {% for key, val in filters.items() %}
+          {% if val['values'] %}
             <li class="form-fields__item--text">
               <label>
-                <span class="form-fields__label-text">{{ filter['label'] }}:</span>
+                <span class="form-fields__label-text">{{ val['label'] }}:</span>
                 <select name="{{ key }}">
-                  <option value="" {% if filter['selected'] == "" %}selected{% endif %}>Filter by {{ filter['label'] | lower }}</option>
-                  {%  for val in filter['values'] %}
-                    <option value="{{ val }}" {% if val == filter['selected'] %}selected{% endif %}>{{ val }}</option>
+                  <option value="" {% if val['selected'] == "" %}selected{% endif %}>Filter by {{ val['label'] | lower }}</option>
+                  {%  for v in val['values'] %}
+                    <option value="{{ v }}" {% if v == val['selected'] %}selected{% endif %}>{{ v }}</option>
                   {% endfor %}
                 </select>
               </label>
@@ -21,8 +21,8 @@
           {% else %}
             <li class="form-fields__item--text">
               <label>
-                <span class="form-fields__label-text">{{ filter['label'] }}:</span>
-                <input type="text" name="{{ key }}" value="{{filter['selected']}}"/>
+                <span class="form-fields__label-text">{{ val['label'] }}:</span>
+                <input type="text" name="{{ key }}" value="{{val['selected']}}"/>
               </label>
             </li>
           {% endif %}

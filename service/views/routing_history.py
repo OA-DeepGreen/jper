@@ -94,9 +94,9 @@ def index():
         },
     }
 
-    for key in filters:
-        if filters[key]['selected'] != '':
-            filled_params[key] = filters[key]['selected']
+    for key, val in filters.items():
+        if val['selected'] and val['selected'] != '':
+            filled_params[key] = val['selected']
 
     records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size,
                                           publisher_id=filters['publisher_id']['selected'],
