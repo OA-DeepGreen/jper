@@ -5,12 +5,12 @@
         <li>
           <label>Show routing history</label>
         </li>
-        {% for filter in filters %}
+        {% for key, filter in filters.items() %}
           {% if filter['values'] %}
             <li class="form-fields__item--text">
               <label>
                 <span class="form-fields__label-text">{{ filter['label'] }}:</span>
-                <select name="{{ filter }}">
+                <select name="{{ key }}">
                   <option value="" {% if filter['selected'] == "" %}selected{% endif %}>Filter by {{ filter['label'] | lower }}</option>
                   {%  for val in filter['values'] %}
                     <option value="{{ val }}" {% if val == filter['selected'] %}selected{% endif %}>{{ val }}</option>

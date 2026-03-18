@@ -963,7 +963,7 @@ class RoutingHistoryDAO(dao.ESDAO):
     def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
                      publisher_email=None, doi=None, notification_id=None, status=None, workflow_action=None):
 
-        if notification_id:
+        if notification_id != '':
             query = {
                 "query": {
                     "bool": {
@@ -971,7 +971,7 @@ class RoutingHistoryDAO(dao.ESDAO):
                     }
                 }
             }
-        elif doi:
+        elif doi != '':
             query = {
                 "query": {
                     "bool": {
@@ -991,41 +991,41 @@ class RoutingHistoryDAO(dao.ESDAO):
                 "size": page_size
             }
 
-            if since and upto:
+            if since != '' and upto != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since, "lte": upto} }})
-            elif since:
+            elif since != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since}}})
-            elif upto:
+            elif upto != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"lte": upto}}})
 
-            if publisher_id:
+            if publisher_id != '':
                 query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
 
-            if publisher_email:
+            if publisher_email != '':
                 query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
 
-            if workflow_action:
+            if workflow_action != '':
                 query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
 
-            if status == "failure":
-                query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
-            elif status == "success - routed":
+            if status.lower() == "error":
+                query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
+            elif status.lower() == "routed":
                 query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = {}
                 query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
-            elif status == "success - failed":
+            elif status.lower() == "failed":
                 query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = {}
-                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lte": 0}}})
-
+                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
+        print(query)
         ans = cls.query(q=query)
         return ans
 
@@ -1056,8 +1056,10 @@ class RoutingHistoryDAO(dao.ESDAO):
     def get_all_publisher_ids(cls):
         return cls.get_all_facet_values("publisher_id.exact")
 
+    @classmethod
     def get_all_publisher_emails(cls):
         return cls.get_all_facet_values("publisher_email.exact")
 
+    @classmethod
     def get_all_workflow_actions(cls):
         return cls.get_all_facet_values("workflow_states.action.exact")

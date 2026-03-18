@@ -19,7 +19,7 @@ def index():
     filled_params = {}
 
     # Get since
-    since = request.args.get('since')
+    since = request.args.get('since').strip()
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     try:
@@ -29,7 +29,7 @@ def index():
         flash(f"Error validating 'since' date: {e}")
 
     # Get upto
-    upto = request.args.get('upto')
+    upto = request.args.get('upto').strip()
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     try:
@@ -58,44 +58,44 @@ def index():
         },
         'status': {
             'label': 'Status',
-            'values': ["Failure", "Success - routed", "Success - failed"],
-            'selected': request.args.get('status', ''),
+            'values': ["Error", "Routed", "Failed"],
+            'selected': request.args.get('status', '').strip(),
             'term': 'workflow_states.status.exact'
         },
         'publisher_id': {
             'label': 'Publisher ID',
             'values': RoutingHistory.get_all_publisher_ids(),
-            'selected': request.args.get('publisher_id', ''),
+            'selected': request.args.get('publisher_id', '').strip(),
             'term': 'publisher_id.exact'
         },
         'publisher_email': {
             'label': 'Publisher email',
             'values': RoutingHistory.get_all_publisher_emails(),
-            'selected': request.args.get('publisher_emails', ''),
+            'selected': request.args.get('publisher_email', '').strip(),
             'term': 'publisher_email.exact',
         },
         'notification_id': {
             'label': 'Notification ID',
             'values': None,
-            'selected': request.args.get('notification_id', ''),
+            'selected': request.args.get('notification_id', '').strip(),
             'term': 'notification_states.notification_id.exact'
         },
         'doi': {
             'label': 'DOI',
             'values': None,
-            'selected': request.args.get('doi', ''),
+            'selected': request.args.get('doi', '').strip(),
             'term': 'notification_states.doi.exact'
         },
         'workflow_action': {
             'label': 'Workflow state',
             'values': RoutingHistory.get_all_workflow_actions(),
-            'selected': request.args.get('workflow_action', ''),
+            'selected': request.args.get('workflow_action', '').strip(),
             'term': 'workflow_states.action.exact'
         },
     }
 
     for key in filters:
-        if filters[key]['selected']:
+        if filters[key]['selected'] != '':
             filled_params[key] = filters[key]['selected']
 
     records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size,
