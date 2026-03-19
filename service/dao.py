@@ -961,52 +961,71 @@ class RoutingHistoryDAO(dao.ESDAO):
 
     @classmethod
     def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
-                     publisher_email=None, doi=None, notification_id=None, status=None):
-        query = {
-            "query": {
-                "bool": {
-                    "must": []
+                     publisher_email=None, doi=None, notification_id=None, status=None, workflow_action=None):
+
+        if notification_id != '':
+            query = {
+                "query": {
+                    "bool": {
+                        "must": [{"match": {"notification_states.notification_id.exact": notification_id}}]
+                    }
                 }
-            },
-            "sort": [{"last_updated": {"order": "desc"}}],
-            "from": (page - 1) * page_size,
-            "size": page_size
-        }
-        if since:
-            if not 'filter' in query['query']['bool']:
-                query['query']['bool']["filter"] = {}
-            if not 'range' in query['query']['bool']["filter"]:
-                query['query']['bool']["filter"]["range"] = {}
-            if not 'created_date' in query['query']['bool']["filter"]["range"]:
-                query['query']['bool']["filter"]["range"]["created_date"] = {}
-            query['query']['bool']["filter"]["range"]["created_date"]["gte"] = since
+            }
+        elif doi != '':
+            query = {
+                "query": {
+                    "bool": {
+                        "must": [{"match": {"notification_states.doi.exact": doi}}]
+                    }
+                }
+            }
+        else:
+            query = {
+                "query": {
+                    "bool": {
+                        "must": []
+                    }
+                },
+                "sort": [{"last_updated": {"order": "desc"}}],
+                "from": (page - 1) * page_size,
+                "size": page_size
+            }
 
-        if upto:
-            if not 'filter' in query['query']['bool']:
-                query['query']['bool']["filter"] = {}
-            if not 'range' in query['query']['bool']["filter"]:
-                query['query']['bool']["filter"]["range"] = {}
-            if not 'created_date' in query['query']['bool']["filter"]["range"]:
-                query['query']['bool']["filter"]["range"]["created_date"] = {}
-            query['query']['bool']["filter"]["range"]["created_date"]["lte"] = upto
+            if since != '' and upto != '':
+                if not 'filter' in query['query']['bool']:
+                    query['query']['bool']["filter"] = []
+                query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since, "lte": upto} }})
+            elif since != '':
+                if not 'filter' in query['query']['bool']:
+                    query['query']['bool']["filter"] = []
+                query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since}}})
+            elif upto != '':
+                if not 'filter' in query['query']['bool']:
+                    query['query']['bool']["filter"] = []
+                query['query']['bool']["filter"].append({'range': {'created_date': {"lte": upto}}})
 
+            if publisher_id != '':
+                query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
 
-        if publisher_id:
-            query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
-        if publisher_email:
-            query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
-        if status == "failure":
-            query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
-        elif status == "success":
-            query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
-        if notification_id:
-            if 'filter' in query['query']['bool']:
-                del query['query']['bool']['filter']
-            query['query']['bool']["must"].append({"match": {"notification_states.notification_id.exact": notification_id}})
-        if doi:
-            if 'filter' in query['query']['bool']:
-                del query['query']['bool']['filter']
-            query['query']['bool']["must"].append({"match": {"notification_states.doi.exact": doi}})
+            if publisher_email != '':
+                query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
+
+            if workflow_action != '':
+                query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
+
+            if status.lower() == "error":
+                query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
+            elif status.lower() == "routed":
+                query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+                if not 'filter' in query['query']['bool']:
+                    query['query']['bool']["filter"] = {}
+                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
+            elif status.lower() == "failed":
+                query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+                if not 'filter' in query['query']['bool']:
+                    query['query']['bool']["filter"] = {}
+                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
+        print(query)
         ans = cls.query(q=query)
         return ans
 
@@ -1034,5 +1053,13 @@ class RoutingHistoryDAO(dao.ESDAO):
         return None
 
     @classmethod
-    def get_all_publishers(cls):
+    def get_all_publisher_ids(cls):
         return cls.get_all_facet_values("publisher_id.exact")
+
+    @classmethod
+    def get_all_publisher_emails(cls):
+        return cls.get_all_facet_values("publisher_email.exact")
+
+    @classmethod
+    def get_all_workflow_actions(cls):
+        return cls.get_all_facet_values("workflow_states.action.exact")

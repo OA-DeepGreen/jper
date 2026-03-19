@@ -68,9 +68,7 @@ def index():
 
     # Call airflow dag here to reprocess with these params
     jper_url = app.config.get("BASE_URL", "http://localhost")
-    airflow_host = airflow_conf.get("webserver", "WEB_SERVER_HOST")
-    airflow_host = "localhost"
-    airflow_url = f"http://{airflow_host}/airflow"
+    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     reprocess_dag = "Reprocess_Repository"
     user = app.config.get("AIR_USER_USER", 'None')

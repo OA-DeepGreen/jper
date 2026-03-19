@@ -19,7 +19,7 @@ def index():
     filled_params = {}
 
     # Get since
-    since = request.args.get('since')
+    since = request.args.get('since', '').strip()
     if since == '' or since is None:
         since = (datetime.now() - relativedelta(months=1)).strftime("%d/%m/%Y")
     try:
@@ -27,10 +27,9 @@ def index():
     except ValueError as e:
         since = None
         flash(f"Error validating 'since' date: {e}")
-    filled_params['since'] = since
 
     # Get upto
-    upto = request.args.get('upto')
+    upto = request.args.get('upto', '').strip()
     if upto == '' or upto is None:
         upto = datetime.today().strftime("%d/%m/%Y")
     try:
@@ -38,53 +37,81 @@ def index():
     except ValueError as e:
         upto = None
         flash(f"Error validating 'upto' date: {e}")
-    filled_params['upto'] = upto
 
     # get page and page size
     page = validate_page()
     page_size = validate_page_size()
     filled_params['pageSize'] = page_size
 
-    publisher_id = ''
-    publisher_email = ''
-    doi = ''
-    notification_id = ''
-    search_val = request.args.get('search_val', None)
-    search_term = request.args.get('search_term', None)
-    if search_term == 'publisher_id':
-        publisher_id = search_val
-    elif search_term == 'publisher_email':
-        publisher_email = search_val
-    elif search_term == 'notification_id':
-        notification_id = search_val
-    elif search_term == 'doi':
-        doi = search_val
+    filters = {
+        'since': {
+            'label': 'From',
+            'values': None,
+            'selected': since,
+            'term': 'since'
+        },
+        'upto': {
+            'label': 'To',
+            'values': None,
+            'selected': upto,
+            'term': 'upto'
+        },
+        'status': {
+            'label': 'Status',
+            'values': ["Error", "Routed", "Failed"],
+            'selected': request.args.get('status', '').strip(),
+            'term': 'workflow_states.status.exact'
+        },
+        'publisher_id': {
+            'label': 'Publisher ID',
+            'values': RoutingHistory.get_all_publisher_ids(),
+            'selected': request.args.get('publisher_id', '').strip(),
+            'term': 'publisher_id.exact'
+        },
+        'publisher_email': {
+            'label': 'Publisher email',
+            'values': RoutingHistory.get_all_publisher_emails(),
+            'selected': request.args.get('publisher_email', '').strip(),
+            'term': 'publisher_email.exact',
+        },
+        'notification_id': {
+            'label': 'Notification ID',
+            'values': None,
+            'selected': request.args.get('notification_id', '').strip(),
+            'term': 'notification_states.notification_id.exact'
+        },
+        'doi': {
+            'label': 'DOI',
+            'values': None,
+            'selected': request.args.get('doi', '').strip(),
+            'term': 'notification_states.doi.exact'
+        },
+        'workflow_action': {
+            'label': 'Workflow state',
+            'values': RoutingHistory.get_all_workflow_actions(),
+            'selected': request.args.get('workflow_action', '').strip(),
+            'term': 'workflow_states.action.exact'
+        },
+    }
 
-    if search_term and search_val:
-        filled_params['search_term'] = search_term
-        filled_params['search_val'] = search_val
+    for key, val in filters.items():
+        if val['selected'] and val['selected'] != '':
+            filled_params[key] = val['selected']
 
-    status = request.args.get('status', '')
-    if status:
-        filled_params['status'] = status
-
-    records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,
-                                          publisher_email=publisher_email, doi=doi,
-                                          notification_id=notification_id, status=status)
+    records = RoutingHistory.pull_records(since=since, upto=upto, page=page, page_size=page_size,
+                                          publisher_id=filters['publisher_id']['selected'],
+                                          publisher_email=filters['publisher_email']['selected'],
+                                          doi=filters['doi']['selected'],
+                                          notification_id=filters['notification_id']['selected'],
+                                          status=filters['status']['selected'],
+                                          workflow_action=filters['workflow_action']['selected'])
     total = records.get('hits', {}).get('total', {}).get('value', 0)
     num_pages = int(math.ceil(total / page_size))
     link = f"/routing_history"
     encoded_params = urllib.parse.urlencode(filled_params)
     link = f'{link}?{encoded_params}'
-
-    if publisher_id:
-        link = link + f"&publisher_id={publisher_id}"
-    if not search_val:
-        search_val = ""
-    return render_template('routing_history/index.html', records=records, publisher_id=publisher_id,
-                           page_size=page_size, link=link, page=page, num_pages=num_pages, total=total,
-                           since=since, upto=upto, status=status, search_term=search_term,
-                           search_val=search_val)
+    return render_template('routing_history/index.html', records=records, link=link, filters=filters,
+                           page_size=page_size,  page=page, num_pages=num_pages, total=total)
 
 
 @blueprint.route('/view/<record_id>')
