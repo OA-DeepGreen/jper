@@ -16,7 +16,7 @@ from jper_scheduler.utils import set_task_name, get_log_url
 days_to_keep = app.config.get("AIRMAINT_DATA_KEEP", 180)
 
 @dag(dag_id="Delete_Old_Data", max_active_runs=1,
-     schedule=None, schedule_interval=app.config.get("AIRMAINT_OLD_CLEAN", 'None'),
+     schedule=None, schedule_interval=app.config.get("AIRMAINT_DELETE_OLD_SCHED", 'None'),
      start_date=datetime(2025, 10, 22),
      description=f"Cleanup all data stored older than {days_to_keep} days",
      catchup=False,

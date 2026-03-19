@@ -18,7 +18,7 @@ from jper_scheduler.utils import set_task_name, get_log_url
 from service import models
 
 @dag(dag_id="Delete_Data_OnDemand", max_active_runs=1,
-     schedule=None, schedule_interval=app.config.get("AIRMAINT_OLD_CLEAN", 'None'),
+     schedule=None, schedule_interval=app.config.get("AIRMAINT_DELETE_DEMAND_SCHED", 'None'),
      start_date=datetime(2025, 10, 22),
      description="Delete data according to on-demand request",
      catchup=False,
