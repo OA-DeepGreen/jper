@@ -116,7 +116,8 @@ def get_and_process_deposit_records():
             app.logger.info(f"Sftp file transfer complete for file name: {file_name}")
             return publisher_id, result['linkPath'], routing_id
         else:
-            raise AirflowException(f"Failed to get {file_name} : {result['message']}")
+            app.logger.error(f"Failure in getting and moving file {file_name}. Will stop  this task here.")
+            raise AirflowFailException(f"Failed to get {file_name} : {result['message']}")
 
     @task(task_id="copy_ftp", map_index_template="{{ map_index_template }}",
           retries=3, max_active_tis_per_dag=4)
