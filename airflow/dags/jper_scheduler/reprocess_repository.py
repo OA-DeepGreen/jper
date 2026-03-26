@@ -10,7 +10,7 @@ from service import packages, models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
 
-from airflow.exceptions import AirflowSkipException
+from airflow.exceptions import AirflowSkipException, AirflowFailException
 from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
 from airflow.utils.session import provide_session
@@ -212,7 +212,15 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         if not pf:
             app.logger.warn(f"No packaging format found")
 
-        metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+        try:
+            metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+        except AttributeError as e:
+            app.logger.error(f"Error in a saved date? Cannot process further : {str(e)}")
+            return -1
+        except packages.PackageException as e:
+            app.logger.error(f"Error accessing data from store? Cannot process further : {str(e)}")
+            return -1
+
         metadata_json = json.loads(metadata.json())['metadata']
         if not metadata:
             app.logger.warn(f"Metadata is empty")
@@ -232,6 +240,11 @@ def process_notification(note_json=None, bibids={}, log_url=None):
                             new_date_str = datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
                         metadata_json[key] = new_date_str
                         print(f"Updating {key} to {new_date_str}")
+                    if len(value) == 11:
+                        if key == "date_accepted":
+                            # A weird / corrupted format with a 3-digit (not letter) month? Set it to date_submitted
+                            metadata_json[key] = metadata_json["date_submitted"]
+                            print(f"Updating {key} to {metadata_json[key]}")
 
         note["metadata"] = metadata_json
 
@@ -324,6 +337,13 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         add_update_routing_history(obj, match_ids[0], request_type, doi=doi, log_url=log_url)
     return len(match_ids)
 
+def move_notification_to(file_name, dest):
+    # Move the processed file to a "processed" directory to avoid reprocessing in future runs
+    out_file_name = file_name.replace("/TODO/", f"/{dest}/")
+    out_dir = os.path.dirname(out_file_name)
+    os.makedirs(out_dir, exist_ok=True)
+    os.rename(file_name, out_file_name)
+
 @dag(dag_id="Reprocess_Repository", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
@@ -393,7 +413,7 @@ def reprocess_repository():
         context["map_index_template"] = set_task_name(ti.map_index, note)
         log_url = get_log_url(context)
 
-        # note = /<outputPath>/name_id/TODO/xxxx/note.json
+        # note = /<outputPath>/name_id/TODO/xxxx/<note_id>.json
         file_name = note
         file_path = Path(file_name)
         repository_tuple = file_path.parts[-4]
@@ -406,11 +426,12 @@ def reprocess_repository():
           data = json.load(file)
         num_matched = process_notification(note_json=data, bibids=bibids, log_url=log_url)
 
-        # Move the processed file to a "processed" directory to avoid reprocessing in future runs
-        out_file_name = note.replace("/TODO/", "/DONE/")
-        out_dir = os.path.dirname(out_file_name)
-        os.makedirs(out_dir, exist_ok=True)
-        os.rename(file_name, out_file_name)
+        if num_matched == -1:
+            move_notification_to(file_name, "FAILED")
+            raise AirflowFailException(f"Failure during processing. Will not rerun this task.")
+
+        # Move the processed file to "DONE"
+        move_notification_to(file_name, "DONE")
 
         if num_matched == 0:
             raise AirflowSkipException(f"No repositories matched for notification {file_name}. Check log for details.")
