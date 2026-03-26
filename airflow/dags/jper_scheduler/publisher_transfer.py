@@ -210,11 +210,11 @@ class PublisherFiles:
             if result == -1:
                 app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
                                f'Error creating sftp connection for publisher {self.id}')
-                return
+                return -1
         except Exception as e:
             app.logger.warning(f'Could not create destination directory in ftp server {new_dir}. '
                                f'Error: {str(e)}')
-            return
+            return -1
 
         # Move the file to the destination
         if len(file_subdir.strip()) > 0:
@@ -227,22 +227,22 @@ class PublisherFiles:
                 result = self.__init_sftp_connection__()
                 if result == -1:
                     app.logger.error(f"Failed to move {file} to {new_file}. Error creating sftp connection.")
-                    return
+                    return -1
             self.scp.rename(remote_path + '/' + file, new_file)
             app.logger.info(f"Successfully moved {file} to {new_file}.")
         except Exception as e:
             app.logger.error(f"Failed to move {file} to {new_file}. Error : {str(e)}")
-            return
+            return -1
 
-        # Clean up the server of empty directories (if any). A bit of unnecessary overhead, so avoid for subdirectories
-        if cleanUp:
+        # Clean up the server of empty directories (if any). A bit of overhead, so avoid for subdirectories
+        if cleanUp: # Failure here is not an error
             try:
                 self.scp.rmdir(remote_path)
                 self.scp.mkdir(remote_path)
                 app.logger.debug(f"Cleaned up parent directory {remote_path}")
             except Exception as e:
                 app.logger.warning(f"Could not cleanup directory {remote_path}. Likely not empty. Error : {str(e)}")
-
+        return 0
     ##### End internal functions. Begin main (external) functions #####
 
     ##### --- Begin moveftp ---
@@ -358,33 +358,37 @@ class PublisherFiles:
 
         # Move the file in the server
         if step_status:
-            try:
-                self._move_files_in_server(remote_item, self.remote_dir, self.remote_ok, clean_up)  # Move and clean up
+            mstat = self._move_files_in_server(remote_item, self.remote_dir, self.remote_ok, clean_up)  # Move and clean up
+            if mstat == 0:
                 final_location = self.remote_ok
                 msg3 = f"Remote file has been moved to {self.remote_ok}"
                 app.logger.info(msg3)
-            except Exception as e:
-                # ToDo: Delete the file in local_file_path and sym_link?
+                temp_stat = 'success'
+            else:
                 step_status = False
-                msg3 = f"Error moving files in remote from {remote_file} to #{self.remote_ok}. Error: {str(e)}"
+                msg3 = f"Error moving files in remote from {remote_file} to #{self.remote_ok}. File system issue?"
                 app.logger.error(msg3)
-                status = {"status": "failure", "message": message + "\n" + msg3}
+                temp_stat = 'failure'
+
             message = message + "\n" + msg3
             # Finally, set the success status or cleanup files
-            status = {"status": "success", "linkPath": sym_link_path,
+            status = {"status": temp_stat, "linkPath": sym_link_path,
                       "message": message}
         else:
-            try:
-                self._move_files_in_server(remote_item, self.remote_dir, self.remote_fail, False)
+            mstat = self._move_files_in_server(remote_item, self.remote_dir, self.remote_fail, False)
+            if mstat == 0:
                 final_location = self.remote_fail
                 msg4 = f"Remote file has been moved to {self.remote_fail}"
                 app.logger.info(msg4)
-            except Exception as e:
+                temp_stat = 'success'
+            else:
                 # At this point no other cleanup needed
-                msg4 = f"Error moving files in remote from {remote_file} to #{self.remote_fail}. Error: {str(e)}"
+                msg4 = f"Error moving files in remote from {remote_file} to #{self.remote_fail}. File system issue?"
                 app.logger.error(msg4)
+                temp_stat = 'failure'
             message = message + "\n" + msg4
-            status = {"status": "failure", "message": message + "\n" + msg4}
+            status = {"status": temp_stat, "linkPath": sym_link_path,
+                      "message": message + "\n" + msg4}
 
         file_plus_subdir = remote_item.removeprefix(self.remote_dir).lstrip("/")
         final_location = final_location + "/" + file_plus_subdir
