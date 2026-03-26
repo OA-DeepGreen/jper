@@ -17,10 +17,10 @@
         <td>
           {% if n_state['status'] == 'failure' %}
             <span style="color:red">Error</span>
-          {% elif n_state['number_matched_repositories'] > 0 %}
+          {% elif n_state.get(['number_matched_repositories'],0) > 0 %}
             <span style="color:green">{{"&check;" | safe }}  matched {{ n_state['number_matched_repositories'] }}</span>
           {% else %}
-            <span style="color:grey">{{"&check;" | safe }} matched {{ n_state['number_matched_repositories'] }}</span>
+            <span style="color:grey">{{"&check;" | safe }} matched 0</span>
           {% endif %}
         </td>
       </tr>
