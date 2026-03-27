@@ -1,0 +1,29 @@
+<div class="row line-space">
+  <h3>Filters</h3>
+  <dl class="dl-details">
+    {% if since %}
+      <dt>Since:</dt>
+      <dd>{{ since }}</dd>
+    {% endif %}
+    {% if upto %}
+      <dt>Upto:</dt>
+      <dd>{{ upto }}</dd>
+    {% endif %}
+    {% if status %}
+      <dt>Status:</dt>
+      <dd>{{ status }}</dd>
+    {% endif %}
+    {% if search_term and search_val %}
+      {% if search_term == 'publisher_id' %}
+        <dt>Publisher ID:</dt>
+      {% elif search_term == 'publisher_email' %}
+        <dt>Publisher email:</dt>
+      {% elif search_term == 'notification_id' %}
+        <dt>Notification ID:</dt>
+      {% elif search_term == 'doi' %}
+        <dt>DOI:</dt>
+      {% endif %}
+      <dd>{{ search_val }}</dd>
+    {% endif %}
+  </dl>
+</div>

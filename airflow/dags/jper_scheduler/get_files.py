@@ -117,12 +117,11 @@ def move_from_server():
         a = PublisherFiles(publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
         ff = pend_dir.removeprefix(a.l_dir)
-        # context["map_index_template"] = f"{ti.map_index} {ff}"
         result = a.processftp(pend_dir)
-        context["map_index_template"] = f"{ti.map_index} {result['pub']}"
+        context["map_index_template"] = f"{ti.map_index} {result['publication']}"
         if result["status"] == "success":
             app.logger.info(f"Successfully processed {pend_dir}")
-            return publisher_id, result['proc_dir'], routing_id, result['pub']
+            return publisher_id, result['proc_dir'], routing_id, result['publication']
         elif result["status"] == "Processed":
             app.logger.warn(result["message"])
             raise AirflowTaskTerminated(f"Processed {pend_dir}. {result['message']}")

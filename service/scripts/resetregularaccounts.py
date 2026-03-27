@@ -231,7 +231,7 @@ def update_account(fullname, ezbid, sigel='', purge=False, passive=False):
 
     #
     if acc is None:
-        api_key = str(uuid.uuid4())
+        api_key = uuid.uuid4().hex
         acc = Account()
         acc.data['api_key'] = api_key
         acc.data['packaging'] = [ 'http://purl.org/net/sword/package/SimpleZip' ]

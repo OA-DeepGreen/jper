@@ -88,9 +88,9 @@
 #action.destructive_requires_name: true
 
 cluster.name: jper
-# path.data: /data/IndexES
+path.data: /usr/share/elasticsearch/data/IndexES
 # path.logs: /var/log/elasticsearch
-# path.repo: ["/data/BackupES"]
+path.repo: ["/usr/share/elasticsearch/data/BackupES"]
 bootstrap.memory_lock: true
 # network.host: [ 130.73.102.229, local ]
 # network.host: [ 127.0.0.1, localhost]

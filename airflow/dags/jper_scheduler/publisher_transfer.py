@@ -19,10 +19,10 @@ class PublisherFiles:
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         if routing_id:
-            self.__init_routing_id__(routing_id)
+            self.__init_routing_id__(routing_id, publisher=publisher)
         self._is_scp = False
 
-    def __init_routing_id__(self, routing_id):
+    def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
         app.logger.debug(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
@@ -33,6 +33,7 @@ class PublisherFiles:
         else:
             self.routing_history.id = routing_id
             self.routing_history.publisher_id = self.id
+            self.routing_history.publisher_email = self.publisher_email
             # self.routing_history.created_date = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         # self.routing_history.last_updated = datetime.now().strftime('%Y-%m-%dT%H-%M-%SZ')
         self.routing_history.save()
@@ -110,6 +111,8 @@ class PublisherFiles:
         self.id = publisher_id
         if not publisher:
             publisher = models.Account().pull(self.id, wrap=False)
+        app.logger.info(f"Publisher email : {publisher['email']}")
+        self.publisher_email = publisher['email']
         server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():
             self.sftp_server = server
@@ -427,14 +430,14 @@ class PublisherFiles:
         if self.acc is None:
             msg = f"Could not find publisher account {self.username}. Not processing file {thisdir}"
             app.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": ""}
 
         # there is a uuid dir for each item moved in a given operation from the user jail
         dirList = os.listdir(thisdir)
         if len(dirList) > 1:
             msg = f"Found {len(dirList)} directories, expected one. Not processing."
             os.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": ""}
 
         pub = dirList[0]
         thisfile = os.path.join(thisdir, pub)
@@ -442,7 +445,7 @@ class PublisherFiles:
         if not os.path.isfile(thisfile):
             msg = f"{thisfile} is not a file. Nothing to process further."
             app.logger.warning(msg)
-            return {"status": "Processed", "message": msg}
+            return {"status": "Processed", "message": msg, "publication": pub}
         #
         nf = uuid.uuid4().hex
         newloc = os.path.join(thisdir, nf, '')
@@ -452,7 +455,7 @@ class PublisherFiles:
         except Exception as e:
             msg = f"Could not move {thisfile} to {newloc}. Error: {str(e)}"
             app.logger.error(msg)
-            return {"status": "failure", "message": msg}
+            return {"status": "failure", "message": msg, "publication": pub}
         msg = f"Moved {thisfile} to {newloc}"
         app.logger.debug(msg)
 
@@ -477,7 +480,7 @@ class PublisherFiles:
             pdir = thisdir + '/' + nf + '/' + nf
         # Could have multiple directories. Process them individually in the next step
         dirList = os.listdir(pdir)
-        status = {'status': 'success', 'proc_dir': pdir}
+        status = {'status': 'success', 'proc_dir': pdir, "publication": pub}
 
         # Update routing history
         app.logger.info("Updating routing history")
@@ -554,7 +557,7 @@ class PublisherFiles:
             "message": "Processing complete",
             "status": final_status,
             "erlog": erlog
-     }
+        }
         return status
 
     ##### --- End processftp. Begin checkunrouted. ---
@@ -581,6 +584,9 @@ class PublisherFiles:
 
             # This is now a routed notification. I need the repositories matched.
             notification_obj = models.RoutedNotification.pull(uid)
+            for i in notification_obj.identifiers:
+                if i["type"] == "doi":
+                    self.routing_history.doi = i["id"]
 
             if res:
                 if len(notification_obj.repositories) > 0:

@@ -110,7 +110,7 @@ hostname = os.environ['HOSTNAME']
 try:
     SEARCH = '%s/%%s/_search?q="%%s"' % ES_BASES[hostname]
 except:
-    print "unknown Elsatic Search Server for host '%s'" % hostname
+    print("unknown Elsatic Search Server for host '%s'" % hostname)
     sys.exit(1)    
 # print 'Elastic Search Host: %s' % SEARCH
 

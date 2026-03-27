@@ -1008,7 +1008,8 @@ class RoutingHistoryDAO(dao.ESDAO):
     __type__ = "routing_history"
 
     @classmethod
-    def pull_records(cls, since, upto, page, page_size, publisher_id=None):
+    def pull_records(cls, since, upto, page, page_size, publisher_id=None,
+                     publisher_email=None, doi=None, notification_id=None, status=None):
         query = {
             "query": {
                 "bool": {
@@ -1019,7 +1020,8 @@ class RoutingHistoryDAO(dao.ESDAO):
                                 "lte": upto
                             }
                         }
-                    }
+                    },
+                    "must": []
                 }
             },
             "sort": [{"last_updated": {"order": "desc"}}],
@@ -1027,8 +1029,20 @@ class RoutingHistoryDAO(dao.ESDAO):
             "size": page_size
         }
 
-        if publisher_id is not None:
-            query['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
+        if publisher_id:
+            query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
+        if publisher_email:
+            query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
+        if status == "failure":
+            query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": status}})
+        elif status == "success":
+            query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+        if notification_id:
+            del query['query']['bool']['filter']
+            query['query']['bool']["must"].append({"match": {"workflow_states.notification_id.exact": notification_id}})
+        if doi:
+            del query['query']['bool']['filter']
+            query['query']['bool']["must"].append({"match": {"original_file_location": doi}})
         ans = cls.query(q=query)
         return ans
 
