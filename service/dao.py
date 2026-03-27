@@ -963,7 +963,7 @@ class RoutingHistoryDAO(dao.ESDAO):
     def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
                      publisher_email=None, doi=None, notification_id=None, status=None, workflow_action=None):
 
-        if notification_id != '':
+        if notification_id and notification_id != '':
             query = {
                 "query": {
                     "bool": {
@@ -971,7 +971,7 @@ class RoutingHistoryDAO(dao.ESDAO):
                     }
                 }
             }
-        elif doi != '':
+        elif doi and doi != '':
             query = {
                 "query": {
                     "bool": {
@@ -991,40 +991,41 @@ class RoutingHistoryDAO(dao.ESDAO):
                 "size": page_size
             }
 
-            if since != '' and upto != '':
+            if since and since != '' and upto and upto != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since, "lte": upto} }})
-            elif since != '':
+            elif since and since != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since}}})
-            elif upto != '':
+            elif upto and upto != '':
                 if not 'filter' in query['query']['bool']:
                     query['query']['bool']["filter"] = []
                 query['query']['bool']["filter"].append({'range': {'created_date': {"lte": upto}}})
 
-            if publisher_id != '':
+            if publisher_id and publisher_id != '':
                 query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
 
-            if publisher_email != '':
+            if publisher_email and publisher_email != '':
                 query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
 
-            if workflow_action != '':
+            if workflow_action and workflow_action != '':
                 query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
 
-            if status.lower() == "error":
-                query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
-            elif status.lower() == "routed":
-                query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
-                if not 'filter' in query['query']['bool']:
-                    query['query']['bool']["filter"] = {}
-                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
-            elif status.lower() == "failed":
-                query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
-                if not 'filter' in query['query']['bool']:
-                    query['query']['bool']["filter"] = {}
-                query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
+            if status and status:
+                if status.lower() == "error":
+                    query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
+                elif status.lower() == "routed":
+                    query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+                    if not 'filter' in query['query']['bool']:
+                        query['query']['bool']["filter"] = {}
+                    query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
+                elif status.lower() == "failed":
+                    query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
+                    if not 'filter' in query['query']['bool']:
+                        query['query']['bool']["filter"] = {}
+                    query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
         print(query)
         ans = cls.query(q=query)
         return ans
