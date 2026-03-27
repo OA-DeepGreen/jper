@@ -488,6 +488,7 @@ class PublisherFiles:
                 notification_id="", status=status["status"], message=f"Directories found : {dirList}")
         self.routing_history.save()
         # self.__log_routing_history__()
+        status['publication'] = pub
         return status
 
     def processftp_dirs(self, pdir):
