@@ -49,18 +49,17 @@ def delete_data_ondemand():
         if b == None or len(b) == 0:
             app.logger.error("Open search returned null record- exiting")
             return []
-        num_records = b['hits']['total']['value']
+        num_records = b.get('hits', {}).get('total', {}).get('value', 0)
         if num_records == 0:
             app.logger.info("No records returned from open search matching query - exiting")
             return []
 
         page = 1
         page_size = 10000
-        total = b.get('hits', {}).get('total', {}).get('value', 0)
-        num_pages = int(math.ceil(total / page_size))
+        num_pages = int(math.ceil(num_records / page_size))
         info_to_run = []
         for page in range(1, 1+num_pages):
-            records = RoutingHistory.pull_records(since=brom, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id,)
+            records = RoutingHistory.pull_records(since=brom, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id)
             if records == None or len(records) == 0:
                 app.logger.error(f"Open search returned null record for page {page} - finishing")
                 continue
