@@ -10,6 +10,7 @@ from typing import Iterable, Type
 import collections
 from esprit import raw
 from esprit.dao import DomainObject
+
 from octopus.modules.es import dao
 
 
@@ -148,6 +149,20 @@ class AccountDAO(dao.ESDAO):
 
     __type__ = "account"
     """ The index type to use to store these objects """
+
+    @classmethod
+    def with_sword_activated(cls):
+        """
+        List all accounts in JPER that have sword deposit activated
+
+        :return: list of sword enabled accounts
+        """
+        q = SwordAccountQuery()
+        all = []
+        for acc in cls.scroll(q=q.query()):
+            # we need to do this because of the scroll keep-alive
+            all.append(acc)
+        return all
 
 
 class LicRelatedFileDAO(dao.ESDAO):
@@ -516,6 +531,20 @@ class DepositRecordDAO(dao.ESDAO):
         obs = cls.query(q=q.query())
         return obs
 
+    @classmethod
+    def pull_count_by_ids(cls, notification_id, repository_id):
+        """
+        Get count of deposit records associated with the notification_id and the repository_id
+
+        :param notification_id:
+        :param repository_id:
+        :return:
+        """
+        q = DepositRecordQuery(notification_id, repository_id)
+        res = cls.query(q.query())
+        total = res.get('hits', {}).get('total', {}).get('value', 0)
+        return total
+
 
 class DepositRecordQuery(object):
     """
@@ -597,17 +626,34 @@ class RequestNotification(dao.ESDAO):
         if len(obs) > 0:
             return obs
 
+    @classmethod
+    def pull_by_repository_status(cls, repo_id, status, size=100, from_count=0):
+        """
+        Get all request notifications matching repository and status
+
+        :param repo_id:
+        :param status:
+        :param size:
+        :param from_count:
+        :return:
+        """
+        q = RequestNotificationQuery(None, repo_id, status, size, from_count)
+        obs = cls.query(q=q.query())
+        if len(obs) > 0:
+            return obs
+
 
 class RequestNotificationQuery(object):
     """
     Query generator for retrieving deposit records by notification id and repository id
     """
 
-    def __init__(self, notification_id, repository_id, status=None, size=None):
+    def __init__(self, notification_id, repository_id, status=None, size=None, from_count=None):
         self.notification_id = notification_id
         self.repository_id = repository_id
         self.status = status
         self.size = size
+        self.from_count = from_count
 
     def query(self):
         """
@@ -631,6 +677,8 @@ class RequestNotificationQuery(object):
             q["query"]["bool"]["must"].append({"term": {"status.exact": self.status}})
         if self.size:
             q['size'] = self.size
+        if self.from_count:
+            q['from'] = self.from_count
         return q
 
 
@@ -960,73 +1008,27 @@ class RoutingHistoryDAO(dao.ESDAO):
     __type__ = "routing_history"
 
     @classmethod
-    def pull_records(cls, since=None, upto=None, page=1, page_size=1000, publisher_id=None,
-                     publisher_email=None, doi=None, notification_id=None, status=None, workflow_action=None):
-
-        if notification_id and notification_id != '':
-            query = {
-                "query": {
-                    "bool": {
-                        "must": [{"match": {"notification_states.notification_id.exact": notification_id}}]
+    def pull_records(cls, since, upto, page, page_size, publisher_id=None):
+        query = {
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "last_updated": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
                     }
                 }
-            }
-        elif doi and doi != '':
-            query = {
-                "query": {
-                    "bool": {
-                        "must": [{"match": {"notification_states.doi.exact": doi}}]
-                    }
-                }
-            }
-        else:
-            query = {
-                "query": {
-                    "bool": {
-                        "must": []
-                    }
-                },
-                "sort": [{"last_updated": {"order": "desc"}}],
-                "from": (page - 1) * page_size,
-                "size": page_size
-            }
+            },
+            "sort": [{"last_updated": {"order": "desc"}}],
+            "from": (page - 1) * page_size,
+            "size": page_size
+        }
 
-            if since and since != '' and upto and upto != '':
-                if not 'filter' in query['query']['bool']:
-                    query['query']['bool']["filter"] = []
-                query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since, "lte": upto} }})
-            elif since and since != '':
-                if not 'filter' in query['query']['bool']:
-                    query['query']['bool']["filter"] = []
-                query['query']['bool']["filter"].append({'range': {'created_date': {"gte": since}}})
-            elif upto and upto != '':
-                if not 'filter' in query['query']['bool']:
-                    query['query']['bool']["filter"] = []
-                query['query']['bool']["filter"].append({'range': {'created_date': {"lte": upto}}})
-
-            if publisher_id and publisher_id != '':
-                query['query']['bool']["must"].append({"match": {"publisher_id.exact": publisher_id}})
-
-            if publisher_email and publisher_email != '':
-                query['query']['bool']["must"].append({"match": {"publisher_email.exact": publisher_email}})
-
-            if workflow_action and workflow_action != '':
-                query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
-
-            if status and status:
-                if status.lower() == "error":
-                    query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
-                elif status.lower() == "routed":
-                    query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
-                    if not 'filter' in query['query']['bool']:
-                        query['query']['bool']["filter"] = {}
-                    query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
-                elif status.lower() == "failed":
-                    query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
-                    if not 'filter' in query['query']['bool']:
-                        query['query']['bool']["filter"] = {}
-                    query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
-        print(query)
+        if publisher_id is not None:
+            query['query']['bool']["must"] = {"match": {"publisher_id.exact": publisher_id}}
         ans = cls.query(q=query)
         return ans
 
