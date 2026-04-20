@@ -1013,7 +1013,7 @@ class RoutingHistoryDAO(dao.ESDAO):
             if workflow_action and workflow_action != '':
                 query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
 
-            if status and status:
+            if status:
                 if status.lower() == "error":
                     query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
                 elif status.lower() == "routed":
@@ -1021,7 +1021,7 @@ class RoutingHistoryDAO(dao.ESDAO):
                     if not 'filter' in query['query']['bool']:
                         query['query']['bool']["filter"] = {}
                     query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
-                elif status.lower() == "failed":
+                elif status.lower().startswith("fail"):
                     query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
                     if not 'filter' in query['query']['bool']:
                         query['query']['bool']["filter"] = {}
