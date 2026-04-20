@@ -9,6 +9,7 @@ from octopus.modules.store import store
 from service import packages, models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
+from service.lib.repackage_notifications import repackage_notification
 
 from airflow.exceptions import AirflowSkipException, AirflowFailException
 from airflow.decorators import dag, task
@@ -198,10 +199,10 @@ def process_notification(note_json=None, bibids={}, log_url=None):
     app.logger.info(f"Processing notification {note['id']} for bibid : {bibids}")
 
     obj = None
+    repo_id = list(bibids.values())[0]
     if note_json['_index'].startswith('jper-routed'):
         app.logger.info(f"Processing routed notification id: {note['id']}")
         obj = models.RoutedNotification(note)
-        repo_id = list(bibids.values())[0]
         if repo_id in obj.repositories:
             return 0 # No need to process if we already know this notification has been matched already to this repository
 
@@ -324,6 +325,8 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         repos.extend(match_ids)
         obj.repositories = list(set(repos))
         obj.save()
+        repackage_notification(notification_id, repo_ids=[repo_id], packaging_formats=[], add_new_links=True)
+
         app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
         if from_failed:
             # If this notification was from the failed index, we need to move it to the routed index
