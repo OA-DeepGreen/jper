@@ -1,0 +1,24 @@
+<div class="box box--padding-large box--brd-mgreyblue">
+    <h2>Notifications for regenerating METS-MODS</h2>
+    <form id="upload-xml-form" method="POST" action="/regenerate_metsmods/transform" enctype="multipart/form-data">
+
+        <div>
+            <div>
+                <label for="file">Upload notification list file: </label>
+                <input type="file" name="file" id="upload-btn" class="input--large"/><br/><br/>
+            </div>
+            <div>
+                <label for="format">Format:</label>
+                <select name="format" id="format">
+                    <option disabled selected>Select format</option>
+                    {% for format in allowed_transformation_formats %}
+                        <option value="{{ format }}">{{ format }}</option>
+                    {% endfor %}
+                </select><br/><br/>
+            </div>
+            <div>
+                <input type="submit" value="Submit"/><br/><br/>
+            </div>
+        </div>
+    </form>
+</div>

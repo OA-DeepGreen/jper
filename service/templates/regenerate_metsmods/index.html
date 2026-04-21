@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Regenerate METS-MODS</h1>
+
+{% include 'regenerate_metsmods/transform/upload_xml.html' %}
+
+{% include 'regenerate_metsmods/transform/result.html' %}
+
+<script>hljs.highlightAll();</script>
+
+{% endblock %}

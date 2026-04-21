@@ -110,6 +110,9 @@ app.register_blueprint(delete_notifications.blueprint, url_prefix="/delete_notif
 from service.views import reprocess_repository
 app.register_blueprint(reprocess_repository.blueprint, url_prefix="/reprocess_repository")
 
+from service.views import regenerate_metsmods
+app.register_blueprint(regenerate_metsmods.blueprint, url_prefix="/regenerate_metsmods")
+
 # this allows us to override the standard static file handling with our own dynamic version
 @app.route("/static/<path:filename>")
 def static(filename):
