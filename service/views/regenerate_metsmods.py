@@ -81,13 +81,13 @@ def index():
     return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
 
 def _available_transformations():
+    # Picked up from https://github.com/OA-DeepGreen/jper/blob/develop/local.template.cfg#L124C1-L132C2
     return {
-        'rsc to opus4': models.XSLT.rsc2opus4,
-        'rsc to escidoc': models.XSLT.rsc2escidoc,
-        'rsc to mets dspace': models.XSLT.rsc2metsdspace,
-        'rsc to mets mods': models.XSLT.rsc2metsmods,
-        'jats to opus4': models.XSLT.jats2opus4,
-        'jats to escidoc': models.XSLT.jats2escidoc,
-        'jats to mets dspace': models.XSLT.jats2metsdspace,
-        'jats to mets mods': models.XSLT.jats2metsmods
+        "FilesAndJATS"  : "service.packages.FilesAndJATS",
+        "FilesAndRSC"   : "service.packages.FilesAndRSC",
+        "SimpleZip" : "service.packages.SimpleZip",
+        "OPUS4Zip"  : "service.packages.OPUS4Zip",
+        "ESciDoc"   : "service.packages.ESciDoc",
+        "METSDSpaceSIP" : "service.packages.METSDSpaceSIP",
+        "METSMODS"  : "service.packages.METSMODS"
     }
