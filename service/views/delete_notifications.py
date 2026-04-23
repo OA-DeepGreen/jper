@@ -30,7 +30,7 @@ def index():
         upto = validate_date(default_upto, param='upto')
         publisher_ids = {
             'label': 'Publisher ID',
-            'values': models.RoutingHistory.get_all_publishers(),
+            'values': models.RoutingHistory.get_all_publisher_ids(),
             'selected': request.args.get('publisher_id', ''),
             'term': 'publisher_id.exact'
         }
@@ -79,9 +79,7 @@ def index():
 
     # Call airflow dag here to delete with these params
     jper_url = app.config.get("BASE_URL", "http://localhost")
-    airflow_host = airflow_conf.get("webserver", "WEB_SERVER_HOST")
-    airflow_host = "localhost"
-    airflow_url = f"http://{airflow_host}/airflow"
+    airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     deletion_dag = "Delete_Data_OnDemand"
     user = app.config.get("AIR_USER_USER", 'None')
@@ -110,7 +108,7 @@ def index():
         flash(f"Successfully triggered Airflow DAG to delete notifications between {brom} and {upto}.")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
-        return render_template('delete_notifications/index.html', publisher_id=publisher_id,
+        return render_template('delete_notifications/deletion_sent.html', publisher_id=publisher_id,
                            brom=brom, upto=upto, status_values=status_values)
     print(f"Airflow deletion request: {r.request.body}")
     print(f"Airflow deletion url: {r.url}")
