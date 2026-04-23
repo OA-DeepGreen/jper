@@ -17,7 +17,7 @@ def index():
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
 
     uploaded_file = request.files.get('file', None)
-    format = _available_transformations.get(request.form.get('format'), None)
+    format = _available_transformations().get(request.form.get('format'), None)
 
     print(f"Received form data: format={format}, uploaded_file={uploaded_file}")
     if not format or not uploaded_file:
@@ -63,7 +63,7 @@ def index():
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
     if r.status_code >= 200 and r.status_code < 300:
         flash(f"Successfully triggered Airflow DAG to regenerate METS/MODS with given notification file {uploaded_file.filename}.<br>" \
-              f"You can monitor the progress of the DAG in Airflow UI at {airflow_display_url}")
+              f"You can monitor the progress of the DAG <a href='{airflow_display_url}' target='_blank'>here</a> in Airflow UI")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
