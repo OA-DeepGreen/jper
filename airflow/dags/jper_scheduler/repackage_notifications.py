@@ -10,7 +10,10 @@ from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
 from airflow.configuration import conf
 
-@dag(dag_id="Regenerate_MetsMods", max_active_runs=1,
+# This DAG is for on-demand regeneration of a set of notifications with a given format.
+# This DAG goes along with the view in service/views/regenerate_metsmods.py.
+
+@dag(dag_id="Repackage_Notification", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REGENERATE_METSMODS_SCHED", 'None'),
      start_date=datetime(2025, 10, 22), description="Regenerate METS/MODS on demand for given notifications",
      catchup=False, tags=["teamCottageLabs", "regenerate_ondemand"])

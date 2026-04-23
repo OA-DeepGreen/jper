@@ -7,6 +7,11 @@ from service import models
 import requests, base64, json
 
 blueprint = Blueprint('regenerate_metsmods', __name__)
+# This goes with the Airflow DAG in airflow/dags/jper_scheduler/repackage_notifications.py to trigger on-demand METS/MODS regeneration for a
+# list of notifications with a given format. The DAG will call the repackage_notification method in service/lib/repackage_notifications.py to
+# do the actual regeneration work.
+# This is triggered by uploading a file with a list of notification ids and selecting the format to regenerate to, through the form in
+# service/templates/regenerate_metsmods/index.html
 
 @blueprint.route('/', methods=["GET", "POST"])
 def index():
@@ -34,7 +39,7 @@ def index():
 
     airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
-    regenerate_dag = "Regenerate_MetsMods"
+    regenerate_dag = "Repackage_Notification"
     user = app.config.get("AIR_USER_USER", 'None')
     password = app.config.get("AIR_USER_PASSWORD", 'None')
     if user and password:
