@@ -14,24 +14,24 @@ def repackage_notification(notification_id, repo_id=None, packaging_format=None,
     links = []
     new_links = []
     if not routed:
-        app.logger.error(f"Repackaging - no routed notification with id #{notification_id} found. Aborting")
-        # TODO raise exception
-        return links, new_links
+        app.logger.error(f"Repackaging - No routed notification with id #{notification_id} found. Aborting")
+        raise LookupError(f"Repackaging - No routed notification found for id {notification_id}")
 
     pm = packages.PackageFactory.converter(routed.packaging_format)
     conversions = []
     # If there is no repository id or packaging format given, throw an error
     if not repo_id and not packaging_format:
-        app.logger.error(f"need wither repository ID or the packaging format")
-        # TODO raise exception
+        app.logger.error(f"Repackaging - Need either repository ID or the packaging format")
+        raise ValueError("Repackaging - Either repo_id or packaging_format is required")
+
     # Get the packing format to convert to, for the repository
     # Note: not checking the repo_id passed to the method is matched to the notification
     if repo_id:
         acc = models.Account.pull(repo_id)
         if acc is None:
             # realistically this shouldn't happen, but if it does just carry on
-            app.logger.error(f"Repackaging - no account with id #{repo_id}")
-            # TODO raise exception
+            app.logger.error(f"Repackaging - No account with id #{repo_id}")
+            raise LookupError(f"Repackaging - No account found for id {repo_id}")
         for packaging_format in acc.packaging:
             # if it's already in the conversion list, check next pack!
             if packaging_format in conversions:
@@ -41,7 +41,7 @@ def repackage_notification(notification_id, repo_id=None, packaging_format=None,
                 conversions.append(packaging_format)
             else:
                 app.logger.error(f"Repackaging - Cannot convert #{routed.packaging_format} to #{packaging_format}")
-                # TODO raise exception
+                raise ValueError(f"Repackaging - Cannot convert {routed.packaging_format} to {packaging_format}")
     elif packaging_format:
         # If packing format has been given, check if it can be converted to and add it to the list
         # Not checking the packaging format belongs to the list matched repositories
@@ -49,7 +49,7 @@ def repackage_notification(notification_id, repo_id=None, packaging_format=None,
             conversions.append(packaging_format)
         else:
             app.logger.error(f"Repackaging - Cannot convert #{routed.packaging_format} to #{packaging_format}")
-            # TODO raise exception
+            raise ValueError(f"Repackaging - Cannot convert {routed.packaging_format} to {packaging_format}")
     # Make the list of formats to convert to unique.
     # Ideally this should be a single format
     #     If there is an error with any one conversion format, an exception will be thrown
