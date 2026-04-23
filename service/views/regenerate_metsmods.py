@@ -63,7 +63,7 @@ def index():
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
     if r.status_code >= 200 and r.status_code < 300:
         flash(f"Successfully triggered Airflow DAG to regenerate METS/MODS with given notification file {uploaded_file.filename}.<br>" \
-              f"You can monitor the progress of the DAG <a href='{airflow_display_url}' target='_blank'>here</a> in Airflow UI")
+              f"You can monitor the progress of the DAG <a href='{airflow_display_url}' target='_blank'>here in the Airflow UI</a>")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
