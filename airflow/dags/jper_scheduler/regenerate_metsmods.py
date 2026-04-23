@@ -48,7 +48,11 @@ def regenerate_metsmods():
         app.logger.info(f"Doing METS/MODS regeneration for ALL repos notification {notification_id} with format {format}")
         ti = context['ti']
         context["map_index_template"] = set_task_name(ti.map_index, f"{format} {notification_id}")
-        repackage_notification(notification_id, repo_ids=[], packaging_formats=[format], add_new_links=True)
+        try:
+            repackage_notification(notification_id, repo_id=None, packaging_format=format, add_new_links=True)
+        except Exception as e:
+            app.logger.error(f"Error occurred while regenerating METS/MODS for notification {notification_id}: {e}")
+            raise AirflowFailException(f"Error occurred while regenerating METS/MODS for notification {notification_id}: {e}")
         return
 
     notification_list = list_of_notifications_ondemand()
