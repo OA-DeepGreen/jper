@@ -16,17 +16,8 @@ def index():
     if request.method == 'GET':
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
 
-    format = None
-    uploaded_file = None
-    # format = request.form.getlist('format')[0]
-    # uploaded_file = request.form.getlist('file')[0]
-    print(dir(request))
-    print('files: ', request.files)
-    print('args: ', request.args)
-    print('data: ', request.data)
-    print('form: ', request.form)
-    uploaded_file = request.files.get('file')
-    format = request.form.get('format')
+    uploaded_file = request.files.get('file', None)
+    format = _available_transformations.get(request.form.get('format'), None)
 
     print(f"Received form data: format={format}, uploaded_file={uploaded_file}")
     if not format or not uploaded_file:
@@ -40,6 +31,7 @@ def index():
 
     # Call airflow dag here to reprocess with these params
     jper_url = app.config.get("BASE_URL", "http://localhost")
+
     airflow_url = app.config.get("JPER_AIRFLOW_CONNECT_URL", "http://localhost:8080/airflow")
     airflow_rest_url = f"{airflow_url}/api/v1/dags/"
     regenerate_dag = "Regenerate_MetsMods"
@@ -51,6 +43,9 @@ def index():
         flash("Airflow REST API user or password not set - cannot call reprocessing DAG. Please" \
         " request system administrator to check configuration.")
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
+    if jper_url.endswith('/'):
+        jper_url = jper_url[:-1]
+    airflow_display_url = f"{jper_url}/airflow/dags/{regenerate_dag}/graph"
 
     headers = {
         "Content-Type": "application/json",
@@ -67,27 +62,25 @@ def index():
     print(f"Calling Airflow REST API with url {api_url} and data {data}")
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
     if r.status_code >= 200 and r.status_code < 300:
-        flash(f"Successfully triggered Airflow DAG to regenerate METS/MODS with given notification file {uploaded_file.filename}.")
+        flash(f"Successfully triggered Airflow DAG to regenerate METS/MODS with given notification file {uploaded_file.filename}.<br>" \
+              f"You can monitor the progress of the DAG in Airflow UI at {airflow_display_url}")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
     print(f"Called Airflow REST API with url {api_url} and data {data}. Response status code: {r.status_code}, response text: {r.text}")
     print(f"Airflow reprocessing request: {r.request.body}")
     print(f"Airflow reprocessing url: {r.url}")
-    # if jper_url.endswith('/'):
-    #     jper_url = jper_url[:-1]
-    # # airflow_display_url = f"{jper_url}/airflow/dags/{regenerate_dag}/graph"
 
     return render_template('regenerate_metsmods/index.html', allowed_transformation_formats=_available_transformations().keys(), answer={})
 
 def _available_transformations():
     # Picked up from https://github.com/OA-DeepGreen/jper/blob/develop/local.template.cfg#L124C1-L132C2
     return {
-        "FilesAndJATS"  : "service.packages.FilesAndJATS",
-        "FilesAndRSC"   : "service.packages.FilesAndRSC",
-        "SimpleZip" : "service.packages.SimpleZip",
-        "OPUS4Zip"  : "service.packages.OPUS4Zip",
-        "ESciDoc"   : "service.packages.ESciDoc",
-        "METSDSpaceSIP" : "service.packages.METSDSpaceSIP",
-        "METSMODS"  : "service.packages.METSMODS"
+        "FilesAndJATS" : "https://datahub.deepgreen.org/FilesAndJATS",
+        "FilesAndRSC"  : "https://datahub.deepgreen.org/FilesAndRSC",
+        "SimpleZip"    : "http://purl.org/net/sword/package/SimpleZip",
+        "OPUS4Zip"     : "http://purl.org/net/sword/package/OPUS4Zip",
+        "ESciDoc"      : "http://purl.org/net/sword/package/ESciDoc",
+        "METSDSpaceSIP": "http://purl.org/net/sword/package/METSDSpaceSIP",
+        "METSMODS"     : "http://purl.org/net/sword/package/METSMODS"
     }
