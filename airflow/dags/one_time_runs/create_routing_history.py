@@ -158,12 +158,12 @@ def add_new_routing_history(notification, doi="", log_url=None):
     rh.final_file_locations = []
     rh.notification_states = [{
         "status": "success",
-        "notification_id": notification_id,
+        "notification_id": notification.id,
         "doi": doi,
-        "number_matched_repositories": 1
+        "number_matched_repositories": 0
     }]
-    rh.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                        status=status, message=message, log_url=log_url)
+    rh.add_workflow_state(action="New RH for existing Notification", file_location="None", notification_id=notification.id,
+                                        status='started', message='New Routing History', log_url=log_url)
     rh.save()
     return rh
 
@@ -172,6 +172,25 @@ def unrouted_has_info(message):
     if "matched to" in message.lower():
         return True
     return False
+
+# Get info about the notification (number of matched repositories or reason for failure) and append to the message
+# Needed for notifications which were processed before we added the info to the message in the routing history states.
+# We want to update those old messages with the info by pulling the notification objects.
+def get_notification_info(notificaiton_id, message):
+    msg = ''
+    obj = models.RoutedNotification.pull(notificaiton_id)
+    if not obj:
+        obj = models.FailedNotification.pull(notificaiton_id)
+    if obj:
+        if obj.reason:
+            msg = f"{message}. {obj.reason}"
+        elif obj.repositories:
+            msg = f"{message}. Matched to {len(obj.repositories)} repositories"
+        else:
+            msg = f"{message}. Matched to 0 repositories."
+    else:
+        print(f"Could not find notification object for id: {notificaiton_id}")
+    return msg
 
 def update_routing_history(notification, doi="", routing_history=None, log_url=None):
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
