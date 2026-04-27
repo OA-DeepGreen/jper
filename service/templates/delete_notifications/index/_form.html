@@ -8,23 +8,26 @@
                 <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">From:</span>
-                        <input type="text" name="brom" value="{{brom}}"/>
+                        <input type="text" name="since" value="{since}}"/>
                     </label>
+                </li>
+                <li>
                     <label>
                         <span class="form-fields__label-text">To:</span>
                         <input type="text" name="upto" value="{{upto}}"/>
+                    </label>
                 </li>
-                    <li class="form-fields__item--text">
-                        <label>
-                            <span class="form-fields__label-text" style="width: 35%">{{ publisher_ids['label'] }}</span>
-                            <select name="publisher_id">
-                                <option value="" {% if publisher_ids['selected'] == "" %}selected{% endif %}>Filter by {{ publisher_ids['label'] }}</option>
-                                {% for val in publisher_ids['values'] %}
-                                    <option value="{{ val }}" {% if publisher_ids['selected'] == val %}selected{% endif %}>{{ val }}</option>
-                                {% endfor %}
-                            </select>
-                        </label>
-                    </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text" style="width: 35%">Publisher ID</span>
+                        <select name="publisher_id">
+                            <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
+                            {% for val in publisher_ids %}
+                                <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </li>
                <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">Status: <br/><br/></span>
