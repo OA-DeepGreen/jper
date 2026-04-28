@@ -22,7 +22,7 @@
             {% endif %}
             {% if n_state['status'] == 'failure' %}
               | error
-            {% elif n_state.get(['number_matched_repositories'],0) > 0 %}
+            {% elif n_state.get('number_matched_repositories',0) > 0 %}
               | routed - matched {{ n_state['number_matched_repositories'] }}
             {% else %}
               | failed
