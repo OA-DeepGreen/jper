@@ -135,62 +135,27 @@ def add_new_routing_history(notification, doi="", log_url=None):
     rh.id = routing_history_id
     acc = None
     try:
-        acc = models.Account().pull(notification.provider.id)
+        acc = models.Account().pull(notification.provider_id)
     except Exception as e:
         app.logger.debug(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
 
-    if acc:
-        rh.publisher_id = acc.id if acc else None
-        rh.publisher_email = acc.email if acc else None
-        try:
-            rh.sftp_server_url = acc.sftp_server_url
-        except AttributeError as e:
-            rh.sftp_server_url = ""
-        try:
-            rh.sftp_server_port = acc.sftp_server_port
-        except AttributeError as e:
-            rh.sftp_server_port = ""
-        try:
-            rh.sftp_username = acc.sftp_username
-        except AttributeError as e:
-            rh.sftp_username = ""
+    rh.publisher_id = acc.id if acc else None
+    rh.publisher_email = acc.email if acc else None
+    rh.sftp_server_url = acc.sftp_server_url if acc and hasattr(acc, 'sftp_server_url') else ""
+    rh.sftp_server_port = acc.sftp_server_port if acc and hasattr(acc, 'sftp_server_port') else ""
+    rh.sftp_username = acc.sftp_server_username if acc and hasattr(acc, 'sftp_server_username') else ""
     rh.original_file_location = "None"
     rh.final_file_locations = []
     rh.notification_states = [{
         "status": "success",
         "notification_id": notification.id,
         "doi": doi,
-        "number_matched_repositories": 0
+        "number_matched_repositories": len(notification.repositories) if notification.repositories else 0
     }]
     rh.add_workflow_state(action="New RH for existing Notification", file_location="None", notification_id=notification.id,
-                                        status='started', message='New Routing History', log_url=log_url)
+                                        status='success', message='New Routing History', log_url=log_url)
     rh.save()
     return rh
-
-# Check if the given checkunrouted message has info about matched repositories
-def unrouted_has_info(message):
-    if "matched to" in message.lower():
-        return True
-    return False
-
-# Get info about the notification (number of matched repositories or reason for failure) and append to the message
-# Needed for notifications which were processed before we added the info to the message in the routing history states.
-# We want to update those old messages with the info by pulling the notification objects.
-def get_notification_info(notificaiton_id, message):
-    msg = ''
-    obj = models.RoutedNotification.pull(notificaiton_id)
-    if not obj:
-        obj = models.FailedNotification.pull(notificaiton_id)
-    if obj:
-        if obj.reason:
-            msg = f"{message}. {obj.reason}"
-        elif obj.repositories:
-            msg = f"{message}. Matched to {len(obj.repositories)} repositories"
-        else:
-            msg = f"{message}. Matched to 0 repositories."
-    else:
-        print(f"Could not find notification object for id: {notificaiton_id}")
-    return msg
 
 def update_routing_history(notification, doi="", routing_history=None, log_url=None):
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
@@ -198,50 +163,44 @@ def update_routing_history(notification, doi="", routing_history=None, log_url=N
     if not routing_history:
         app.logger.info(f"No existing routing history found for notification id: {notification_id}, creating a new one.")
         routing_history = add_new_routing_history(notification, doi=doi, log_url=log_url)
-    rh_id = routing_history.id
-    app.logger.info(f"Updating routing history {rh_id} for notification id: {notification_id}")
-    action = f"Update"
-    file_location = "None"
-    status = "success"
-    message = f"Routing history {rh_id} updated"
 
-    routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                        status=status, message=message, log_url=log_url)
+    # From here on we have a routing history object.
+    if len(routing_history.final_file_locations) == 0:
+        store_files = store.StoreFactory.get().list_file_paths(notification_id)
+        for index, s_file in enumerate(store_files):
+            routing_history.add_final_file_location("store", s_file)
+            routing_history.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification.id,
+                                status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
+        modified = True
 
-    modified = False
-    new_states = routing_history.workflow_states
-    new_notes = routing_history.notification_states
+    if routing_history.publisher_id is None:
+        acc = None
+        try:
+            acc = models.Account().pull(notification.provider_id)
+        except Exception as e:
+            app.logger.debug(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
+        if acc:
+            routing_history.publisher_id = acc.id
+            routing_history.publisher_email = acc.email
+            routing_history.sftp_server_url = acc.sftp_server_url if acc and hasattr(acc, 'sftp_server_url') else ""
+            routing_history.sftp_server_port = acc.sftp_server_port if acc and hasattr(acc, 'sftp_server_port') else ""
+            routing_history.sftp_username = acc.sftp_server_username if acc and hasattr(acc, 'sftp_server_username') else ""
+        else:
+            routing_history.publisher_id = None
+            routing_history.publisher_email = None
+            routing_history.sftp_server_url = ""
+            routing_history.sftp_server_port = ""
+            routing_history.sftp_username = ""
 
-    for wfs in new_states:
-        if wfs['action'] == "checkunrouted":
-            # If multiple notifications for this routing_history, only update the one that matches the current notification id
-            if notification_id == wfs['notification_id']:
-                message = ""
-                if 'message' in wfs.keys():
-                    message = wfs['message']
-                if not unrouted_has_info(message):
-                    message = get_notification_info(notification_id, message)
-                    wfs['message'] = message
-                    modified = True
-                else:
-                    print("Unrouted message already has info, not modifying")
-
-                for note in new_notes:
-                    if note['notification_id'] == notification_id:
-                        if "number_matched_repositories" not in note.keys():
-                            tokens = re.split(r"matched to", message, flags=re.IGNORECASE)
-                            num_repos = 0
-                            if len(tokens) == 2:
-                                num_repos = tokens[1].strip().split()[0].strip()
-                            note['number_matched_repositories'] = int(num_repos)
-                            modified = True
-                        if 'status' not in note.keys():
-                            note['status'] = wfs['status']
-                            modified = True
-    if modified:
-        routing_history.workflow_states = new_states
-        routing_history.notification_states = new_notes
-        print(f"Modified routing history for id: {routing_history.id}")
+    for notification_state in routing_history.notification_states:
+        if notification_state['notification_id'] == notification_id:
+            # Update existing notification state
+            modified = True
+            if notification_state.get('number_matched_repositories', 0) == 0:
+                if notification.repositories and len(notification.repositories) > 0: # Update if we have new info to add
+                   routing_history.add_notification_state(status='success', notification_id=notification.id, doi=doi,
+                                number_matched_repositories=len(notification.repositories))
+            break
 
     routing_history.save()
 
@@ -262,8 +221,10 @@ def process_notification(notification_id=None, note_json=None, routing_history=N
         if not pf:
             app.logger.warn(f"No packaging format found")
 
+        ## A block of code to get and clean up the metadata of the notification so that it is in a clean state for importing into a model object
         try:
             metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+            app.logger.debug(f"Successfully extracted metadata for notification id: {note['id']}")
         except AttributeError as e:
             app.logger.error(f"Error in a saved date? Cannot process further : {str(e)}")
             return 'failure'
@@ -327,12 +288,6 @@ def process_notification(notification_id=None, note_json=None, routing_history=N
     obj.repositories = list(set(repos))
     obj.save()
     app.logger.info(f"Saved routed notification id: {notification_id}")
-    if from_failed:
-        # If this notification was from the failed index, we need to move it to the routed index
-        f = models.FailedNotification.pull(notification_id)
-        if f:
-            f.delete()
-            app.logger.info(f"Deleted failed notification id: {notification_id}")
     # Update routing history
     update_routing_history(obj, doi=doi, routing_history=routing_history, log_url=log_url)
     return 'success'
@@ -412,7 +367,7 @@ def reprocess_all_notifications():
         notification_id = file_path.stem
         rh = models.RoutingHistory.pull_records(notification_id=notification_id)['hits']['hits']
         if len(rh) > 0:
-            app.logger.info(f"Existing routing history found for notification id: {notification_id}, will update it.")
+            app.logger.info(f"Existing routing history {rh[0]['_id']} found for notification id: {notification_id}, will update it.")
             routing_history = models.RoutingHistory(rh[0]['_source'])
         else:
             app.logger.info(f"No existing routing history found for notification id: {notification_id}, will create a new one.")
