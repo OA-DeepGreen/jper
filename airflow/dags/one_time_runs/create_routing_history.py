@@ -232,10 +232,11 @@ def process_notification(notification_id=None, note_json=None, routing_history=N
             app.logger.error(f"Error accessing data from store? Cannot process further : {str(e)}")
             return 'failure'
 
-        metadata_json = json.loads(metadata.json())['metadata']
+        print(f"Extracted metadata for notification id: {note['id']} : {metadata}")
         if not metadata:
             app.logger.warn(f"Metadata is empty")
         else:
+            metadata_json = json.loads(metadata.json())['metadata']
             kkeys = metadata_json.keys()
             for key in kkeys:
                 if "date" in key:
@@ -255,8 +256,7 @@ def process_notification(notification_id=None, note_json=None, routing_history=N
                             # A weird / corrupted format with a 3-digit (not letter) month? Set it to date_submitted
                             metadata_json[key] = metadata_json["date_submitted"]
                             print(f"Updating {key} to {metadata_json[key]}")
-
-        note["metadata"] = metadata_json
+            note["metadata"] = metadata_json
 
         obj = models.RoutedNotification(note)
         from_failed = True
