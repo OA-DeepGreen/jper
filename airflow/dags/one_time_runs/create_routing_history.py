@@ -131,6 +131,7 @@ def get_identifier(identifier, type):
 
 def add_new_routing_history(notification, doi="", log_url=None):
     routing_history_id = uuid.uuid4().hex
+    app.logger.info(f"Creating new routing history with id {routing_history_id} for notification id: {notification.id}")
     rh = models.RoutingHistory()
     rh.id = routing_history_id
     acc = None
@@ -166,12 +167,18 @@ def update_routing_history(notification, doi="", routing_history=None, log_url=N
 
     # From here on we have a routing history object.
     if len(routing_history.final_file_locations) == 0:
-        store_files = store.StoreFactory.get().list_file_paths(notification_id)
-        for index, s_file in enumerate(store_files):
-            routing_history.add_final_file_location("store", s_file)
-            routing_history.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification.id,
-                                status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
-        modified = True
+        # Try to get a file location from the store if we don't have one already. It is the only possibility for a new routing history created from an old notification.
+        if store.StoreFactory.get().exists(notification_id):
+            app.logger.info(f"Found record in store. Adding file locations to routing history for notification id: {notification_id}")
+            store_files = store.StoreFactory.get().list_file_paths(notification_id)
+            for index, s_file in enumerate(store_files):
+                routing_history.add_final_file_location("store", s_file)
+                routing_history.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification.id,
+                                    status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
+        else:
+            app.logger.info(f"No record found in store for notification id: {notification_id}. Setting file location to None.")
+            routing_history.add_workflow_state(action=f"No Store file", file_location="None", notification_id=notification.id,
+                                    status='success', message='Reprocessed old notification, no file location found in store', log_url=log_url)
 
     if routing_history.publisher_id is None:
         acc = None
@@ -195,7 +202,6 @@ def update_routing_history(notification, doi="", routing_history=None, log_url=N
     for notification_state in routing_history.notification_states:
         if notification_state['notification_id'] == notification_id:
             # Update existing notification state
-            modified = True
             if notification_state.get('number_matched_repositories', 0) == 0:
                 if notification.repositories and len(notification.repositories) > 0: # Update if we have new info to add
                    routing_history.add_notification_state(status='success', notification_id=notification.id, doi=doi,
@@ -271,17 +277,9 @@ def process_notification(notification_id=None, note_json=None, routing_history=N
         app.logger.warning(f"No identifier found in metadata for notification id: {notification_id}")
         app.logger.info(f"Metadata keys are : {metadata.keys()}")
         app.logger.debug(metadata)
-    if "publication_date" not in metadata.keys():
-        app.logger.warning(f"No publication_date or identifier found in metadata for notification id: {notification_id}")
-        app.logger.debug(metadata)
-    issn_data = get_identifier(metadata["identifier"], "issn")
-    publ_date = metadata.get("publication_date", None)
-    dt = datetime.datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
-    publ_year = str(dt.year)
-    doi = get_identifier(metadata["identifier"], "doi")
-    if 'provider' not in note.keys() or 'id' not in note['provider'].keys():
-        app.logger.warning(f"No provider id found in notification for id: {notification_id}")
-    provider_id = note.get('provider', None).get('id', None)
+        doi = None
+    else:
+        doi = get_identifier(metadata["identifier"], "doi")
 
     # Update notification
     repos = obj.repositories
