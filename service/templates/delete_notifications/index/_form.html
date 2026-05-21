@@ -3,12 +3,25 @@
         <div class="col span-9">
             <ul class="form-fields">
                 <li>
-                    <label>Delete old notifications</label>
+                    <label>Delete a single notification</label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Notification ID:</span>
+                        <input type="text" name="notification_id" value="{{notification_id}}"/>
+                    </label>
+                </li>
+                <li>
+                    <label> If a notification ID is supplied above, the options below are ignored.  </label>
+                </li>
+                <hr>
+                <li>
+                    <label>OR Delete a group of old notifications</label>
                 </li>
                 <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">From:</span>
-                        <input type="text" name="since" value="{since}}"/>
+                        <input type="text" name="since" value="{{since}}"/>
                     </label>
                 </li>
                 <li>
