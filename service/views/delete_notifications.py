@@ -128,7 +128,7 @@ def call_airflow_dag_to_delete_notifications(x):
     else:
         data = {
             "conf": {"upto": x['upto'], "from": x['from'], "status_values": x['status_values'], "publisher_id": x['publisher_id']},
-            "note": f"User request to delete notifications between {x['from']} and {x['upto']}"
+            "note": f"User request to delete notifications between {x['from']} and {x['upto']} for publisher_id {x['publisher_id']} with status values {x['status_values']}"
         }
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
