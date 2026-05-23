@@ -1,7 +1,9 @@
+import uuid
 import os, shutil, zipfile, tarfile
+import esprit
 from urllib.parse import urlparse
 from octopus.core import app
-
+from service import models
 
 # Utility function for processftp
 # Function for the checkftp to unzip and move stuff up then zip again in incoming packages
@@ -156,3 +158,107 @@ def get_log_url(context):
     new_path = f"{parsed_url.path}?{parsed_url.query}"
     app.logger.info(f"Log for this job : {new_path}")
     return new_path
+
+def get_notifications_for(conn=None, notification_id=None, publisher_id=None, upto=None, since=None, scroll_id=None, page=1, page_size=10000):
+    if notification_id:
+        # Fetch notifications from Elasticsearch for the given notification ID
+        qr = {
+            "size": page_size,
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"id.exact": notification_id}}
+                    ]
+                }
+            }
+        }
+        response = esprit.raw.initialise_scroll(conn, query=qr, keepalive='2m')
+    else:
+        # Fetch notifications from Elasticsearch for the given date range and pagination parameters
+        qr = {
+            "size": page_size,
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "created_date": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
+                    }
+                    
+                }
+            },
+            "sort": [{"created_date": {"order": "desc"}}]
+        }
+        if publisher_id:
+            qr["query"]["bool"] = {
+                "must": {
+                    "provider.id.exact": publisher_id
+                }
+            }
+
+        if page == 1: # Initial query to fetch the first page and get the scroll_id for pagination
+            response = esprit.raw.initialise_scroll(conn, query=qr, keepalive='2m')
+        else:
+            response = esprit.raw.scroll_next(conn, scroll_id=scroll_id, keepalive='2m')
+    data = response.json()
+    return data
+
+def create_routing_history_record(note_index, notification_id):
+    app.logger.info(f"Creating routing history record for notification ID {notification_id} and publisher ID {obj.provider_id}")
+
+    obj = None
+    matches = 0
+    note_state = "success"
+    if note_index.startswith('jper-routed'):
+        app.logger.info(f"Processing routed notification id: {notification_id}")
+        obj = models.RoutedNotification.pull(notification_id)
+        if obj and obj.repositories:
+            matches = len(obj.repositories)
+    elif note_index.startswith('jper-failed'):
+        app.logger.info(f"Processing failed notification id: {notification_id}")
+        obj = models.FailedNotification.pull(notification_id)
+        note_state = "failure"
+
+    metadata = obj.metadata if obj and hasattr(obj, 'metadata') else {}
+    doi = metadata.get('doi', 'None')
+    app.logger.info(f"Notification ID {notification_id} has DOI {doi} and matches {matches} repositories")
+
+    rh = models.RoutingHistory()
+    rh.id = uuid.uuid4().hex
+    try:
+        acc = models.Account().pull(obj.provider.id)
+    except AttributeError as e:
+        acc = models.Account().pull(obj.provider_id)
+    except Exception as e:
+        app.logger.debug(f"Error pulling account for provider id {obj.provider_id} : {str(e)}")
+        acc = None
+    if acc:
+        rh.publisher_id = acc.id if acc else None
+        rh.publisher_email = acc.email if acc else None
+        try:
+            rh.sftp_server_url = acc.sftp_server_url
+        except AttributeError as e:
+            rh.sftp_server_url = ""
+        try:
+            rh.sftp_server_port = acc.sftp_server_port
+        except AttributeError as e:
+            rh.sftp_server_port = ""
+        try:
+            rh.sftp_username = acc.sftp_username
+        except AttributeError as e:
+            rh.sftp_username = ""
+    rh.original_file_location = "None"
+    rh.final_file_locations = []
+    rh.notification_states = [{
+        "status": note_state,
+        "notification_id": notification_id,
+        "doi": doi,
+        "number_matched_repositories": matches
+    }]
+    rh.add_workflow_state(action='New RH for old notification', file_location="", notification_id=notification_id,
+                                        status="success", message="New routing history for old notification", log_url="")
+    rh.save()
+    return rh
