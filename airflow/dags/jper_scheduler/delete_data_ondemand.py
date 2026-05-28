@@ -48,8 +48,13 @@ def delete_data_ondemand():
         info_to_run = []
         status_values = []
         notification_id = context['params'].get('notification_id', None)
+        rerouting = context['params'].get('rerouting', None)
+        deletion_reason = context['params'].get('deletion_reason', None)
         if notification_id:
-            info_to_run.append((notification_id, status_values))
+            app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
+            app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
+            app.logger.info(f"Deletion reason provided: {deletion_reason}")
+            info_to_run.append((notification_id, status_values, rerouting, deletion_reason))
             return info_to_run
         
         publisher_id = context['params'].get('publisher_id', None)
@@ -83,7 +88,7 @@ def delete_data_ondemand():
                 continue
             for hit in records['hits']['hits']:
                 notification_id = hit['_source']['id']
-                info_to_run.append((notification_id, status_values))
+                info_to_run.append((notification_id, status_values, rerouting, deletion_reason))
         return info_to_run[:3]
 
     @task(task_id="delete_old_routing_id", retries=0, max_active_tis_per_dag=1)
@@ -94,6 +99,8 @@ def delete_data_ondemand():
         notification_id = routing_tuple[0]
         b = RoutingHistory()
         status_values = routing_tuple[1]
+        rerouting = routing_tuple[2]
+        deletion_reason = routing_tuple[3]
         app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
         c = b.pull_records(notification_id=notification_id)
         num_records = c.get('hits', {}).get('total', {}).get('value', 0)
@@ -118,7 +125,7 @@ def delete_data_ondemand():
         context["map_index_template"] = set_task_name(ti.map_index, routing_id)
         a = RoutingDeletion(publisher_id=publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        status = a.clean_all(status_values=status_values)
+        status = a.clean_all(status_values=status_values, rerouting=rerouting, deletion_reason=deletion_reason)
         app.logger.info(f"Routing history deletion status: {status['status']}, Message: {status['message']}")
         return status['status']
 

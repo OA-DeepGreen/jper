@@ -41,8 +41,14 @@ def index():
         "publisher_id": None,
         "publisher_ids": publisher_ids,
         "notification_id": notification_id,
-        "status_values": []
+        "status_values": [],
+        "rerouting": None,
+        "deletion_reason": None
     }
+
+    # Rerouting / deletion reason - always needed
+    x['rerouting'] = request.values.get('Rerouting') if request.values.get('Rerouting') else None
+    x['deletion_reason'] = request.values.get('deletion_reason')
 
     # Get notification ID
     notification_id = request.values.get('notification_id')
@@ -130,6 +136,10 @@ def call_airflow_dag_to_delete_notifications(x):
             "conf": {"upto": x['upto'], "from": x['from'], "status_values": x['status_values'], "publisher_id": x['publisher_id']},
             "note": f"User request to delete notifications between {x['from']} and {x['upto']} for publisher_id {x['publisher_id']} with status values {x['status_values']}"
         }
+    # Always needed
+    data['conf']['rerouting'] = x['rerouting']
+    data['conf']['deletion_reason'] = x['deletion_reason']
+
     command = "dagRuns"
     api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
