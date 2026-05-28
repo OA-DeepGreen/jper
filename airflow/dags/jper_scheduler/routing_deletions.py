@@ -179,7 +179,7 @@ class RoutingDeletion(PublisherFiles):
         return { 'status': "success", 'message': f"Cleaned up files for notification {notification_id} in routing history ID {self.routing_history.id}" }
 
     # Clean all notifications
-    def delete_notifications(self, note_list, keep=None):
+    def delete_notifications(self, note_list, keep=None, deletion_reason=None):
         del_status = "success"
         for notification_id, status in note_list:
             notification_obj = models.RoutedNotification.pull(notification_id)
@@ -220,8 +220,12 @@ class RoutingDeletion(PublisherFiles):
                 now_utc = datetime.now(timezone.utc).isoformat()
                 self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
                 # Add a tombstone state to workflow states
+                if deletion_reason:
+                    message = deletion_reason
+                else:
+                    message = f"Notification {notification_id} deleted as part of cleanup with status {status}"
                 self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status=del_status,
-                                                        message="Notification deleted as part of cleanup",
+                                                        message=message,
                                                         log_url=self.airflow_log_location)
                 self.routing_history.save()
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
@@ -243,7 +247,7 @@ class RoutingDeletion(PublisherFiles):
                 note_list.append((note['notification_id'], note['status']))
         if len(note_list) > 0:
             app.logger.debug(f"Notifications to delete: {note_list}")
-            statusN = self.delete_notifications(note_list=note_list, keep=keep)
+            statusN = self.delete_notifications(note_list=note_list, keep=keep, deletion_reason=deletion_reason)
         else:
             app.logger.debug("No notifications to delete")
             statusN = { 'status': "success", 'message': "No notifications to delete" }
