@@ -117,7 +117,7 @@ def delete_data_ondemand():
             # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
             app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
             note_index = note['hits']['hits'][0]['_index']
-            routing_history = create_routing_history_record(note_index, notification_id)
+            routing_history = create_routing_history_record(note_index, notification_id, log_url=log_url)
             routing_id = routing_history.id
             publisher_id = routing_history.publisher_id
 

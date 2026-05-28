@@ -3,6 +3,7 @@ import os, shutil, zipfile, tarfile
 import esprit
 from urllib.parse import urlparse
 from octopus.core import app
+from octopus.modules.store import store
 from service import models
 
 # Utility function for processftp
@@ -206,7 +207,7 @@ def get_notifications_for(conn=None, notification_id=None, publisher_id=None, up
     data = response.json()
     return data
 
-def create_routing_history_record(note_index, notification_id):
+def create_routing_history_record(note_index, notification_id, log_url=None):
     app.logger.info(f"Creating routing history record for notification ID {notification_id} and publisher ID {obj.provider_id}")
 
     obj = None
@@ -259,6 +260,19 @@ def create_routing_history_record(note_index, notification_id):
         "number_matched_repositories": matches
     }]
     rh.add_workflow_state(action='New RH for old notification', file_location="", notification_id=notification_id,
-                                        status="success", message="New routing history for old notification", log_url="")
+                                        status="success", message="New routing history for old notification", log_url=log_url)
+
+    if store.StoreFactory.get().exists(notification_id):
+        app.logger.info(f"Found record in store. Adding file locations to routing history for notification id: {notification_id}")
+        store_files = store.StoreFactory.get().list_file_paths(notification_id)
+        for index, s_file in enumerate(store_files):
+            rh.add_final_file_location("store", s_file)
+            rh.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification_id,
+                                status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
+    else:
+        app.logger.info(f"No record found in store for notification id: {notification_id}. Setting file location to None.")
+        rh.add_workflow_state(action=f"No Store file", file_location="None", notification_id=notification_id,
+                                status='success', message='Reprocessed old notification, no file location found in store', log_url=log_url)
+
     rh.save()
     return rh
