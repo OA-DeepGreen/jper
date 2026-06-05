@@ -1034,17 +1034,12 @@ class RoutingHistoryDAO(dao.ESDAO):
     def pull_record_for_notification(cls, nid):
         query = {
             "query": {
-                "nested": {
-                    "path": "workflow_states",
-                    "query": {
-                        "bool": {
-                            "must": [{
-                                "match": {
-                                    "workflow_states.notification_id.exact": nid
-                                }
-                            }]
+                "bool": {
+                    "must": [{
+                        "match": {
+                            "workflow_states.notification_id.exact": nid
                         }
-                    }
+                    }]
                 }
             }
         }
