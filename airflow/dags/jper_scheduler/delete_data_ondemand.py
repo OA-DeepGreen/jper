@@ -93,6 +93,7 @@ def delete_data_ondemand():
 
     @task(task_id="delete_old_routing_id", retries=0, max_active_tis_per_dag=1)
     def delete_old_routing_id(routing_tuple):
+        # We now delete only notifications
         context = get_current_context()
         log_url = get_log_url(context)
 
@@ -125,7 +126,7 @@ def delete_data_ondemand():
         context["map_index_template"] = set_task_name(ti.map_index, routing_id)
         a = RoutingDeletion(publisher_id=publisher_id, routing_id=routing_id)
         a.airflow_log_location = log_url
-        status = a.clean_all(status_values=status_values, rerouting=rerouting, deletion_reason=deletion_reason)
+        status = a.clean_all(notification_id=notification_id, status_values=status_values, rerouting=rerouting, deletion_reason=deletion_reason)
         app.logger.info(f"Routing history deletion status: {status['status']}, Message: {status['message']}")
         return status['status']
 

@@ -135,11 +135,38 @@ class RoutingDeletion(PublisherFiles):
     #         else:
     #             app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
     #     return { 'status': "success", 'message': "Cleaned up routing history ID {self.routing_history.id}" }
+    def clean_wfs_final_files(self, notification_id=None, keep=None):
+        # Here, assume there is only one notification in the routing history
+        app.logger.debug(f"Cleaning final files for notification ID {notification_id} in routing history ID {self.routing_history.id}")
+        for final_location in self.routing_history.final_file_locations:
+            file_name = final_location["file_location"]
+            file_location = final_location["location_type"]
+            if keep and isinstance(keep, list) and len(keep)>0 and file_location in keep:
+                # retain files in the above locations. They are precious.
+                app.logger.debug(f'Retain file {file_name} from {file_location}')
+                continue
+            app.logger.debug(f"--- Looking at file {file_name} in location {file_location}")
+            if file_location == "store":
+                if dryRun:
+                    app.logger.info(f"DRY RUN: Would delete store file {file_name}")
+                else:
+                    self.clean_store_file(file_name)
+            elif 'green' in file_name or 'dg_storage' in file_name:
+                if dryRun:
+                    app.logger.info(f"DRY RUN: Would delete local file {file_name}")
+                else:
+                    self.clean_local_file(file_name, file_location)
+            elif 'xfer' in file_name:
+                if dryRun:
+                    app.logger.info(f"DRY RUN: Would delete sftp file {file_name}")
+                else:
+                    self.clean_sftp_file(file_name, file_location)
+            else:
+                app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
+        return { 'status': "success", 'message': f"Cleaned up files for only notification {notification_id} in routing history ID {self.routing_history.id}" }
 
     # Clean all files
     def clean_all_files_for_notification(self, notification_id=None, keep=None):
-        app.logger.info(f"Workflow states : {self.routing_history.workflow_states}")
-        app.logger.info(f"Final file locations : {self.routing_history.final_file_locations}")
         for wfs in self.routing_history.workflow_states:
             if 'notification_id' in wfs.keys() and wfs['notification_id'] == notification_id:
                 file_name = wfs["file_location"]
@@ -181,7 +208,7 @@ class RoutingDeletion(PublisherFiles):
     # Clean all notifications
     def delete_notifications(self, note_list, keep=None, deletion_reason=None):
         del_status = "success"
-        for notification_id, status in note_list:
+        for notification_id in note_list:
             notification_obj = models.RoutedNotification.pull(notification_id)
             if notification_obj:
                 app.logger.info(f"Deleting routed notification {notification_id}")
@@ -211,7 +238,13 @@ class RoutingDeletion(PublisherFiles):
                     app.logger.warn(f"Notification {notification_id} not found in either RoutedNotification or FailedNotification. Cannot delete it.")
 
             # Clean up all the final files except the ones in "keep" locations
-            statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
+            if len(self.routing_history.notification_states) == 1:
+                # If there is only one notification in the routing history, we can clean all final files linked to the routing history
+                app.logger.info(f"Only one notification in routing history {self.routing_history.id}. Cleaning all final files linked to the routing history.")
+                statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
+            else:
+                app.logger.info(f"Multiple notifications in routing history {self.routing_history.id}. Cleaning only final files linked to notification ID {notification_id}.")
+                statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
             app.logger.info(f"File cleanup status: {statusF['status']}, Message: {statusF['message']}")
 
             if not dryRun:
@@ -231,20 +264,23 @@ class RoutingDeletion(PublisherFiles):
         return { 'status': "success", 'message': "Cleaned up notifications for routing id {self.routing_history.id}" }
 
     # Clean everything for this routing history
-    def clean_all(self, status_values=None, rerouting=None, deletion_reason=None):
+    def clean_all(self, notification_id=None, status_values=None, rerouting=None, deletion_reason=None):
 
         if rerouting:
             keep = ["sftp_server"]
         # Clean up the notifications
-        note_list = []
-        for note in self.routing_history.notification_states:
-            okay = True
-            if status_values and len(status_values) > 0 and len(status_values) < 3:
-                # If all 3 status values are provided, we will always match the notification
-                # 'success-routed', 'success-no-matches', 'failure'
-                okay = is_notification_okay(note, status_values)
-            if okay:
-                note_list.append((note['notification_id'], note['status']))
+        if notification_id:
+            note_list = [notification_id]
+        else:
+            note_list = []
+            for note in self.routing_history.notification_states:
+                okay = True
+                if status_values and len(status_values) > 0 and len(status_values) < 3:
+                    # If all 3 status values are provided, we will always match the notification
+                    # 'success-routed', 'success-no-matches', 'failure'
+                    okay = is_notification_okay(note, status_values)
+                if okay:
+                    note_list.append(note['notification_id'])
         if len(note_list) > 0:
             app.logger.debug(f"Notifications to delete: {note_list}")
             statusN = self.delete_notifications(note_list=note_list, keep=keep, deletion_reason=deletion_reason)
