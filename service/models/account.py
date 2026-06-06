@@ -34,8 +34,14 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
 
         "publisher" : {
             "name" : "<name of the publisher>",
-            "url" : "<url for the main publisher web page>"
+            "url" : "<url for the main publisher web page>",
             "routing_status": "<True|False>"
+        },
+
+        "notification_retention_period" : {
+            "failed": <integer>,
+            "routed": <integer>,
+            "errored": <integer>
         },
 
         # "sword_repository" : {
@@ -98,6 +104,7 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
     #             "api_key": {"coerce" : "unicode"},
     #             "repository": {"contains" : "object"},
     #             "publisher": {"contains": "object"},
+    #             "notification_retention_period": {"contains": "object"},
     #             "sword": {"contains": "object"},
     #             "embargo": {"contains": "object"},
     #             "license": {"contains": "object"},
@@ -123,6 +130,13 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
     #                     "name": {"coerce": "unicode"},
     #                     "url": {"coerce": "unicode"},
     #                     "routing_status": {"coerce": "unicode"}
+    #                 }
+    #             },
+    #             "notification_retention_period": {
+    #                 "fields": {
+    #                     "failed": {"coerce": "integer"},
+    #                     "routed": {"coerce": "integer"},
+    #                     "errored": {"coerce": "integer"}
     #                 }
     #             },
     #             "sword": {
@@ -437,6 +451,83 @@ class Account(dataobj.DataObj, dao.AccountDAO, UserMixin):
         if val in ['active', 'inactive']:
             self._set_single("publisher.routing_status", val, coerce=self._utf8_unicode())
     # 2020-02-20 TD : end of convenience setter and getter for extra pub infos
+
+    @property
+    def notification_retention_period(self):
+        """
+        The amount of time in months a notification can be retained, after which it can be deleted.
+
+        0 indicates it can be retained forever.
+
+        ::
+            {
+                "failed" : "<int>",
+                "routed" : "<int>",
+                "errored" : "<int>"
+            }
+
+        :return: The publisher information as a python dict object
+        """
+        return self._get_single("notification_retention_period")
+
+    @notification_retention_period.setter
+    def notification_retention_period(self, obj):
+        """
+        Set the notification_retention_period object
+
+        The object will be validated and types coerced as needed.
+
+        The supplied object should be structured as follows:
+
+        ::
+            {
+                "failed" : "<int>",
+                "routed" : "<int>",
+                "errored" : "<int>"
+            }
+
+        :param obj: the notification_retention_period object as a dict
+        :return:
+        """
+        # validate the object structure quickly
+        allowed = ["failed", "routed", "errored"]
+        for k in list(obj.keys()):
+            if k not in allowed:
+                raise dataobj.DataSchemaException(
+                    "Notification retention period object must only contain the following keys: {x}".format(x=", ".join(allowed)))
+
+        # coerce the values of the keys
+        for k in allowed:
+            if k in obj:
+                obj[k] = self._coerce(obj[k], dataobj.to_int())
+
+        # finally write it
+        self._set_single("notification_retention_period", obj)
+
+    # add convenience setter and getter for retention period fields
+    @property
+    def notification_retention_period_failed(self):
+        return self._get_single("notification_retention_period.failed", coerce=dataobj.to_int())
+
+    @notification_retention_period_failed.setter
+    def notification_retention_period_failed(self, val):
+        self._set_single("notification_retention_period.failed", val, coerce=dataobj.to_int())
+
+    @property
+    def notification_retention_period_routed(self):
+        return self._get_single("notification_retention_period.routed", coerce=dataobj.to_int())
+
+    @notification_retention_period_routed.setter
+    def notification_retention_period_routed(self, val):
+        self._set_single("notification_retention_period.routed", val, coerce=dataobj.to_int())
+
+    @property
+    def notification_retention_period_errored(self):
+        return self._get_single("notification_retention_period.errored", coerce=dataobj.to_int())
+
+    @notification_retention_period_errored.setter
+    def notification_retention_period_errored(self, val):
+        self._set_single("notification_retention_period.errored", val, coerce=dataobj.to_int())
 
     @property
     def sword(self):
