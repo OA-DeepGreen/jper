@@ -111,8 +111,6 @@ class RoutingDeletion(PublisherFiles):
         for final_location in self.routing_history.final_file_locations:
             file_name = final_location["file_location"]
             file_location = final_location["location_type"]
-            if not file_name:
-                continue # Workflow state from checkunrouted has None as file location
             if keep and isinstance(keep, list) and len(keep)>0 and file_location in keep:
                 # retain files in the above locations. They are precious.
                 app.logger.debug(f'Retain file {file_name} from {file_location}')
@@ -143,11 +141,14 @@ class RoutingDeletion(PublisherFiles):
         for wfs in self.routing_history.workflow_states:
             if 'notification_id' in wfs.keys() and wfs['notification_id'] == notification_id:
                 file_name = wfs["file_location"]
+                action = wfs["action"]
+                message = wfs["message"]
+                if not file_name or file_name == "":
+                    app.logger.debug(f"No file linked to workflow state with action {action} and message {message}. Skipping.")
+                    continue
 
                 okay_to_delete = True
                 if keep and isinstance(keep, list) and len(keep)>0:
-                    action = wfs["action"]
-                    message = wfs["message"]
                     for k in keep:
                         if k in action or k in message:
                             okay_to_delete = False
