@@ -111,6 +111,8 @@ class RoutingDeletion(PublisherFiles):
         for final_location in self.routing_history.final_file_locations:
             file_name = final_location["file_location"]
             file_location = final_location["location_type"]
+            if not file_name:
+                continue # Workflow state from checkunrouted has None as file location
             if keep and isinstance(keep, list) and len(keep)>0 and file_location in keep:
                 # retain files in the above locations. They are precious.
                 app.logger.debug(f'Retain file {file_name} from {file_location}')
