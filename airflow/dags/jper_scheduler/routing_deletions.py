@@ -143,9 +143,8 @@ class RoutingDeletion(PublisherFiles):
                 file_name = wfs["file_location"]
                 action = wfs["action"]
                 message = wfs["message"]
-                if not file_name or file_name == "":
-                    app.logger.debug(f"No file linked to workflow state with action {action} and message {message}. Skipping.")
-                    continue
+                if not file_name or file_name == "None":
+                    continue # For checkunrouted or update states
 
                 okay_to_delete = True
                 if keep and isinstance(keep, list) and len(keep)>0:
@@ -160,6 +159,8 @@ class RoutingDeletion(PublisherFiles):
 
                 if not file_name or len(file_name) < 20 or file_name.count("/") < 2: # Minor sanity check
                     app.logger.warn(f"Wrongness: File name {file_name} fails basic sanity check. Skipping.")
+                    app.logger.info(f"Action : {action}")
+                    app.logger.info(f"Message : {message}")
                     continue
 
                 if dryRun:
