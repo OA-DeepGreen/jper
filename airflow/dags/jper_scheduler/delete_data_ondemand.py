@@ -85,14 +85,14 @@ def delete_data_ondemand():
             records = get_notifications_for(conn=conn, since=brom, upto=upto, page=page, page_size=page_size, publisher_id=publisher_id)
             if records == None or len(records) == 0:
                 app.logger.error(f"Open search returned null record for page {page} - finishing")
-                continue
+                break
             for hit in records['hits']['hits']:
                 notification_id = hit['_source']['id']
                 info_to_run.append((notification_id, status_values, rerouting, deletion_reason))
         return info_to_run[:3]
 
-    @task(task_id="delete_old_routing_id", retries=0, max_active_tis_per_dag=1)
-    def delete_old_routing_id(routing_tuple):
+    @task(task_id="delete_old_notification_id", retries=0, max_active_tis_per_dag=1)
+    def delete_old_notification_id(routing_tuple):
         # We now delete only notifications
         context = get_current_context()
         log_url = get_log_url(context)
@@ -113,7 +113,7 @@ def delete_data_ondemand():
             app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
             note = get_notifications_for(conn=conn, notification_id=notification_id)
             if not note or len(note.get('hits', {}).get('hits', [])) != 1:
-                app.logger.info(f"No notification found in ES with ID {notification_id} - exiting")
+                app.logger.info(f"No notification found in ES with ID {notification_id} - maybe deleted already? Exiting")
                 return 'success'
             # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
             app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
@@ -128,9 +128,11 @@ def delete_data_ondemand():
         a.airflow_log_location = log_url
         status = a.clean_all(notification_id=notification_id, status_values=status_values, rerouting=rerouting, deletion_reason=deletion_reason)
         app.logger.info(f"Routing history deletion status: {status['status']}, Message: {status['message']}")
+        if status['status'] == "error":
+            raise AirflowFailException(f"Error in deleting routing history for notification ID {notification_id}. Message: {status['message']}")
         return status['status']
 
     routing_tuple = list_old_routing_data_on_demand()
-    delete_old_routing_id.expand(routing_tuple=routing_tuple)
+    delete_old_notification_id.expand(routing_tuple=routing_tuple)
 
 delete_data_ondemand()
