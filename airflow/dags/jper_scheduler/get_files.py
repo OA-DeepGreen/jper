@@ -82,8 +82,9 @@ def get_and_process_deposit_records():
         max_map_length = conf.getint("core", "max_map_length")
         app.logger.debug(f"Putting together the list of input files (if any)")
         sum_files = []
-        for file in files:
-            sum_files.extend(file)
+        if files: # Protect if there are no files to transfer
+            for file in files:
+                sum_files.extend(file)
         if len(sum_files) == 0:
             app.logger.warn("Empty run")
             dag_run = session.merge(context['dag_run'])
