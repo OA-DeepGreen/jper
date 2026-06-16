@@ -50,7 +50,7 @@ class PublisherFiles:
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
-        except exception as e:
+        except Exception as e:
             app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
             app.logger.error(traceback.format_exc())
             return -1
