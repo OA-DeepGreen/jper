@@ -261,15 +261,14 @@ class RoutingDeletion(PublisherFiles):
             if n_active_notifications > 0: # The if condition is for sanity check. We should have already returned if there are no active notifications
                 app.logger.info(f"Setting notification {notification_id} to deleted in routing history")
                 now_utc = datetime.now(timezone.utc).isoformat()
-                self.routing_history.add_notification_state(status, notification_id, deleted=True, deleted_date=now_utc)
+                self.routing_history.add_notification_state(statusF['status'], notification_id, deleted=True, deleted_date=now_utc)
             # Add a tombstone state to workflow states
             if deletion_reason:
                 message = deletion_reason
             else:
-                message = f"Notification {notification_id} deleted as part of cleanup with status {status}"
-            self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id, status=del_status,
-                                                    message=message,
-                                                    log_url=self.airflow_log_location)
+                message = f"Notification {notification_id} deleted as part of cleanup with status {statusF['status']}"
+            self.routing_history.add_workflow_state("tombstone", "server, store, jper", notification_id=notification_id,
+                    status=statusF['status'], message=message, log_url=self.airflow_log_location)
             self.routing_history.save()
 
         return { 'status': "success", 'message': f"Cleaned up routing history ID {self.routing_history.id}" }
