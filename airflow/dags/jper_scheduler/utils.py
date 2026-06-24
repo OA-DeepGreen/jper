@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from octopus.core import app
 from octopus.modules.store import store
 from service import models
+from service.models.routing_history import RoutingHistory
 
 # Utility function for processftp
 # Function for the checkftp to unzip and move stuff up then zip again in incoming packages
@@ -207,8 +208,22 @@ def get_notifications_for(conn=None, notification_id=None, publisher_id=None, up
     data = response.json()
     return data
 
+def utils_log_routing_history(rh):
+    app.logger.debug("Begin Routing History")
+    app.logger.debug(f'Routing History> {rh.__dict__["data"]}')
+    app.logger.debug("Routing History> individual workflow states :")
+    for state in rh.workflow_states:
+        app.logger.debug(f"{state['action']} > {state}")
+    app.logger.debug("Routing History> notification states :")
+    for state in rh.notification_states:
+        app.logger.debug(f"{state['status']} > {state}")
+    app.logger.debug("Routing History> final file locations :")
+    for state in rh.final_file_locations:
+        app.logger.debug(f"{state['location_type']} > {state}")
+    app.logger.debug("END Routing History")
+
 def create_routing_history_record(note_index, notification_id, log_url=None):
-    app.logger.info(f"Creating routing history record for notification ID {notification_id} and publisher ID {obj.provider_id}")
+    app.logger.info(f"Creating routing history record for notification ID {notification_id}")
 
     obj = None
     matches = 0
@@ -227,7 +242,7 @@ def create_routing_history_record(note_index, notification_id, log_url=None):
     doi = metadata.get('doi', 'None')
     app.logger.info(f"Notification ID {notification_id} has DOI {doi} and matches {matches} repositories")
 
-    rh = models.RoutingHistory()
+    rh = RoutingHistory()
     rh.id = uuid.uuid4().hex
     try:
         acc = models.Account().pull(obj.provider.id)
@@ -242,15 +257,20 @@ def create_routing_history_record(note_index, notification_id, log_url=None):
         try:
             rh.sftp_server_url = acc.sftp_server_url
         except AttributeError as e:
+            print("URL attribute error")
             rh.sftp_server_url = ""
         try:
             rh.sftp_server_port = acc.sftp_server_port
         except AttributeError as e:
+            print("Port attribute error")
             rh.sftp_server_port = ""
         try:
-            rh.sftp_username = acc.sftp_username
+            rh.sftp_username = acc.sftp_server_username
         except AttributeError as e:
+            print("Username attribute error")
             rh.sftp_username = ""
+    app.logger.debug(f"Publisher : {rh.publisher_id}, {rh.publisher_email}")
+    app.logger.debug(f"SFTP info : URL {rh.sftp_server_url}, Port {rh.sftp_server_port}, Username {rh.sftp_username}")
     rh.original_file_location = "None"
     rh.final_file_locations = []
     rh.notification_states = [{
@@ -259,7 +279,7 @@ def create_routing_history_record(note_index, notification_id, log_url=None):
         "doi": doi,
         "number_matched_repositories": matches
     }]
-    rh.add_workflow_state(action='New RH for old notification', file_location="", notification_id=notification_id,
+    rh.add_workflow_state(action='New RH for old notification', file_location="None", notification_id=notification_id,
                                         status="success", message="New routing history for old notification", log_url=log_url)
 
     if store.StoreFactory.get().exists(notification_id):
@@ -275,4 +295,5 @@ def create_routing_history_record(note_index, notification_id, log_url=None):
                                 status='success', message='Reprocessed old notification, no file location found in store', log_url=log_url)
 
     rh.save()
-    return rh
+    # return rh
+    return (rh.id, rh.publisher_id)

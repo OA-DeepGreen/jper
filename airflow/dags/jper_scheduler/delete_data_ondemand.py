@@ -15,6 +15,7 @@ from airflow.configuration import conf
 from jper_scheduler.routing_deletions import RoutingDeletion
 from jper_scheduler.notification_helpers import notifications_before, iter_notifications_before
 from jper_scheduler.utils import set_task_name, get_log_url, get_notifications_for, create_routing_history_record
+from jper_scheduler.utils import utils_log_routing_history
 from service import models
 
 # Create a connection - ES stuff
@@ -91,9 +92,11 @@ def delete_data_ondemand():
                 info_to_run.append((notification_id, status_values, rerouting, deletion_reason))
         return info_to_run[:3]
 
-    @task(task_id="delete_old_notification_id", retries=0, max_active_tis_per_dag=1)
-    def delete_old_notification_id(routing_tuple):
-        # We now delete only notifications
+    @task(task_id="retrieve_create_notification", retries=0, max_active_tis_per_dag=1)
+    def retrieve_create_notification(routing_tuple):
+        # Separate task for retrieving notifications, as it could need a creation of routing history. This is
+        # best / most safely done in a separate task.
+        # If the deletion is done in the same task as the creation, a newly created routing history appears empty.
         context = get_current_context()
         log_url = get_log_url(context)
 
@@ -102,13 +105,24 @@ def delete_data_ondemand():
         status_values = routing_tuple[1]
         rerouting = routing_tuple[2]
         deletion_reason = routing_tuple[3]
+        routing_id = ""
+        publisher_id = ""
         app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
         c = b.pull_records(notification_id=notification_id)
         num_records = c.get('hits', {}).get('total', {}).get('value', 0)
-        if num_records == 1: # Found the notification with a routing ID
+        if num_records >= 1: # Found the notification with a routing ID
             hit = c['hits']['hits'][0]
             routing_id = hit['_source']['id']
-            publisher_id = hit['_source']['publisher_id']
+            try:
+                publisher_id = hit['_source']['publisher_id']
+            except KeyError:
+                # Improperly created routing history. Create a new one.
+                note = get_notifications_for(conn=conn, notification_id=notification_id)
+                note_index = note['hits']['hits'][0]['_index']
+                app.logger.info(f"Improperly created routing history ID {routing_id}. Creating a new one for this notification.")
+                rh_tuple = create_routing_history_record(note_index, notification_id, log_url=log_url)
+                routing_id = rh_tuple[0]
+                publisher_id = rh_tuple[1]
         else: # Is it an old notification without a routing ID?
             app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
             note = get_notifications_for(conn=conn, notification_id=notification_id)
@@ -118,9 +132,24 @@ def delete_data_ondemand():
             # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
             app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
             note_index = note['hits']['hits'][0]['_index']
-            routing_history = create_routing_history_record(note_index, notification_id, log_url=log_url)
-            routing_id = routing_history.id
-            publisher_id = routing_history.publisher_id
+            rh_tuple = create_routing_history_record(note_index, notification_id, log_url=log_url)
+            routing_id = rh_tuple[0]
+            publisher_id = rh_tuple[1]
+            app.logger.info(f"Publisher : {publisher_id}, RH : {routing_id}, Note : {notification_id}")
+
+        return(routing_id, publisher_id, notification_id, status_values, rerouting, deletion_reason)
+
+    @task(task_id="delete_old_notification_id", retries=0, max_active_tis_per_dag=1)
+    def delete_notification(routing_tuple):
+        # We now delete only notifications here
+        context = get_current_context()
+        log_url = get_log_url(context)
+        routing_id = routing_tuple[0]
+        publisher_id = routing_tuple[1]
+        notification_id = routing_tuple[2]
+        status_values = routing_tuple[3]
+        rerouting = routing_tuple[4]
+        deletion_reason = routing_tuple[5]
 
         ti = context['ti']  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, routing_id)
@@ -132,7 +161,13 @@ def delete_data_ondemand():
             raise AirflowFailException(f"Error in deleting routing history for notification ID {notification_id}. Message: {status['message']}")
         return status['status']
 
+    @task_group(group_id='ProcessAndDeleteNotification')
+    def process_one_notification(routing_tuple, **context):
+        local_tuple = retrieve_create_notification(routing_tuple=routing_tuple)
+        delete_notification(routing_tuple=local_tuple)
+
     routing_tuple = list_old_routing_data_on_demand()
-    delete_old_notification_id.expand(routing_tuple=routing_tuple)
+    process_one_notification.expand(routing_tuple=routing_tuple)
+
 
 delete_data_ondemand()
