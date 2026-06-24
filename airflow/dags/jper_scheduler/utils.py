@@ -1,7 +1,11 @@
+import uuid
 import os, shutil, zipfile, tarfile
+import esprit
 from urllib.parse import urlparse
 from octopus.core import app
-
+from octopus.modules.store import store
+from service import models
+from service.models.routing_history import RoutingHistory
 
 # Utility function for processftp
 # Function for the checkftp to unzip and move stuff up then zip again in incoming packages
@@ -156,3 +160,140 @@ def get_log_url(context):
     new_path = f"{parsed_url.path}?{parsed_url.query}"
     app.logger.info(f"Log for this job : {new_path}")
     return new_path
+
+def get_notifications_for(conn=None, notification_id=None, publisher_id=None, upto=None, since=None, scroll_id=None, page=1, page_size=10000):
+    if notification_id:
+        # Fetch notifications from Elasticsearch for the given notification ID
+        qr = {
+            "size": page_size,
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"id.exact": notification_id}}
+                    ]
+                }
+            }
+        }
+        response = esprit.raw.initialise_scroll(conn, query=qr, keepalive='2m')
+    else:
+        # Fetch notifications from Elasticsearch for the given date range and pagination parameters
+        qr = {
+            "size": page_size,
+            "query": {
+                "bool": {
+                    "filter": {
+                        "range": {
+                            "created_date": {
+                                "gte": since,
+                                "lte": upto
+                            }
+                        }
+                    }
+                    
+                }
+            },
+            "sort": [{"created_date": {"order": "desc"}}]
+        }
+        if publisher_id:
+            qr["query"]["bool"] = {
+                "must": {
+                    "provider.id.exact": publisher_id
+                }
+            }
+
+        if page == 1: # Initial query to fetch the first page and get the scroll_id for pagination
+            response = esprit.raw.initialise_scroll(conn, query=qr, keepalive='2m')
+        else:
+            response = esprit.raw.scroll_next(conn, scroll_id=scroll_id, keepalive='2m')
+    data = response.json()
+    return data
+
+def utils_log_routing_history(rh):
+    app.logger.debug("Begin Routing History")
+    app.logger.debug(f'Routing History> {rh.__dict__["data"]}')
+    app.logger.debug("Routing History> individual workflow states :")
+    for state in rh.workflow_states:
+        app.logger.debug(f"{state['action']} > {state}")
+    app.logger.debug("Routing History> notification states :")
+    for state in rh.notification_states:
+        app.logger.debug(f"{state['status']} > {state}")
+    app.logger.debug("Routing History> final file locations :")
+    for state in rh.final_file_locations:
+        app.logger.debug(f"{state['location_type']} > {state}")
+    app.logger.debug("END Routing History")
+
+def create_routing_history_record(note_index, notification_id, log_url=None):
+    app.logger.info(f"Creating routing history record for notification ID {notification_id}")
+
+    obj = None
+    matches = 0
+    note_state = "success"
+    if note_index.startswith('jper-routed'):
+        app.logger.info(f"Processing routed notification id: {notification_id}")
+        obj = models.RoutedNotification.pull(notification_id)
+        if obj and obj.repositories:
+            matches = len(obj.repositories)
+    elif note_index.startswith('jper-failed'):
+        app.logger.info(f"Processing failed notification id: {notification_id}")
+        obj = models.FailedNotification.pull(notification_id)
+        note_state = "failure"
+
+    metadata = obj.metadata if obj and hasattr(obj, 'metadata') else {}
+    doi = metadata.get('doi', 'None')
+    app.logger.info(f"Notification ID {notification_id} has DOI {doi} and matches {matches} repositories")
+
+    rh = RoutingHistory()
+    rh.id = uuid.uuid4().hex
+    try:
+        acc = models.Account().pull(obj.provider.id)
+    except AttributeError as e:
+        acc = models.Account().pull(obj.provider_id)
+    except Exception as e:
+        app.logger.debug(f"Error pulling account for provider id {obj.provider_id} : {str(e)}")
+        acc = None
+    if acc:
+        rh.publisher_id = acc.id if acc else None
+        rh.publisher_email = acc.email if acc else None
+        try:
+            rh.sftp_server_url = acc.sftp_server_url
+        except AttributeError as e:
+            print("URL attribute error")
+            rh.sftp_server_url = ""
+        try:
+            rh.sftp_server_port = acc.sftp_server_port
+        except AttributeError as e:
+            print("Port attribute error")
+            rh.sftp_server_port = ""
+        try:
+            rh.sftp_username = acc.sftp_server_username
+        except AttributeError as e:
+            print("Username attribute error")
+            rh.sftp_username = ""
+    app.logger.debug(f"Publisher : {rh.publisher_id}, {rh.publisher_email}")
+    app.logger.debug(f"SFTP info : URL {rh.sftp_server_url}, Port {rh.sftp_server_port}, Username {rh.sftp_username}")
+    rh.original_file_location = "None"
+    rh.final_file_locations = []
+    rh.notification_states = [{
+        "status": note_state,
+        "notification_id": notification_id,
+        "doi": doi,
+        "number_matched_repositories": matches
+    }]
+    rh.add_workflow_state(action='New RH for old notification', file_location="None", notification_id=notification_id,
+                                        status="success", message="New routing history for old notification", log_url=log_url)
+
+    if store.StoreFactory.get().exists(notification_id):
+        app.logger.info(f"Found record in store. Adding file locations to routing history for notification id: {notification_id}")
+        store_files = store.StoreFactory.get().list_file_paths(notification_id)
+        for index, s_file in enumerate(store_files):
+            rh.add_final_file_location("store", s_file)
+            rh.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification_id,
+                                status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
+    else:
+        app.logger.info(f"No record found in store for notification id: {notification_id}. Setting file location to None.")
+        rh.add_workflow_state(action=f"No Store file", file_location="None", notification_id=notification_id,
+                                status='success', message='Reprocessed old notification, no file location found in store', log_url=log_url)
+
+    rh.save()
+    # return rh
+    return (rh.id, rh.publisher_id)
