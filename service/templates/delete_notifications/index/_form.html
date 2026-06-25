@@ -3,28 +3,44 @@
         <div class="col span-9">
             <ul class="form-fields">
                 <li>
-                    <label>Delete old notifications</label>
+                    <label>Delete a single notification</label>
+                </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text">Notification ID:</span>
+                        <input type="text" name="notification_id" value="{{notification_id}}"/>
+                    </label>
+                </li>
+                <li>
+                    <label> If a notification ID is supplied above, the options below are ignored.  </label>
+                </li>
+                <hr>
+                <li>
+                    <label>OR Delete a group of old notifications</label>
                 </li>
                 <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">From:</span>
-                        <input type="text" name="brom" value="{{brom}}"/>
+                        <input type="text" name="since" value="{{since}}"/>
                     </label>
+                </li>
+                <li>
                     <label>
                         <span class="form-fields__label-text">To:</span>
                         <input type="text" name="upto" value="{{upto}}"/>
+                    </label>
                 </li>
-                    <li class="form-fields__item--text">
-                        <label>
-                            <span class="form-fields__label-text" style="width: 35%">{{ publisher_ids['label'] }}</span>
-                            <select name="publisher_id">
-                                <option value="" {% if publisher_ids['selected'] == "" %}selected{% endif %}>Filter by {{ publisher_ids['label'] }}</option>
-                                {% for val in publisher_ids['values'] %}
-                                    <option value="{{ val }}" {% if publisher_ids['selected'] == val %}selected{% endif %}>{{ val }}</option>
-                                {% endfor %}
-                            </select>
-                        </label>
-                    </li>
+                <li class="form-fields__item--text">
+                    <label>
+                        <span class="form-fields__label-text" style="width: 35%">Publisher ID</span>
+                        <select name="publisher_id">
+                            <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
+                            {% for val in publisher_ids %}
+                                <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </li>
                <li class="form-fields__item--text">
                     <label>
                         <span class="form-fields__label-text">Status: <br/><br/></span>
@@ -34,6 +50,18 @@
                         <label for="success-no-matches"> Success - no matches</label><br>
                         <input type="checkbox" id="failure" name="status" value="failure">
                         <label for="failure"> Failure</label>
+                    </label>
+                </li>
+                <hr>
+                <li>
+                    <span class="form-fields__label-text">Rerouting?: <br/><br/></span>
+                    <input type="checkbox" id="rerouting" name="Rerouting" value="rerouting">
+                    <label for="rerouting">Will the notification(s) be re-routed?</label>
+                </li>
+                <li>
+                    <label>
+                        <span class="form-fields__label-text">Reason for deletion: <br><br></span>
+                        <input type="text" name="deletion_reason" value="{{deletion_reason}}"/><br>
                     </label>
                 </li>
             </ul>
