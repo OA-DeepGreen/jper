@@ -6,10 +6,8 @@
                     <label>Delete a single notification</label>
                 </li>
                 <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">Notification ID:</span>
-                        <input type="text" name="notification_id" value="{{notification_id}}"/>
-                    </label>
+                    <span class="form-fields__label-text">Notification ID:</span>
+                    <input type="text" name="notification_id" value="{{notification_id}}"/>
                 </li>
                 <li>
                     <label> If a notification ID is supplied above, the options below are ignored.  </label>
@@ -19,38 +17,30 @@
                     <label>OR Delete a group of old notifications</label>
                 </li>
                 <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">From:</span>
-                        <input type="text" name="since" value="{{since}}"/>
-                    </label>
+                    <span class="form-fields__label-text">From:</span>
+                    <input type="text" name="since" value="{{since}}"/>
                 </li>
                 <li>
-                    <label>
-                        <span class="form-fields__label-text">To:</span>
-                        <input type="text" name="upto" value="{{upto}}"/>
-                    </label>
+                    <span class="form-fields__label-text">To:</span>
+                    <input type="text" name="upto" value="{{upto}}"/>
                 </li>
                 <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text" style="width: 35%">Publisher ID</span>
-                        <select name="publisher_id">
-                            <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
-                            {% for val in publisher_ids %}
-                                <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
+                    <span class="form-fields__label-text">Publisher ID</span>
+                    <select name="publisher_id">
+                        <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
+                        {% for val in publisher_ids %}
+                            <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
+                        {% endfor %}
+                    </select>
                 </li>
                <li class="form-fields__item--text">
-                    <label>
-                        <span class="form-fields__label-text">Status: <br/><br/></span>
-                        <input type="checkbox" id="success-routed" name="status" value="success-routed">
-                        <label for="success-routed"> Success - routed</label><br>
-                        <input type="checkbox" id="success-no-matches" name="status" value="success-no-matches">
-                        <label for="success-no-matches"> Success - no matches</label><br>
-                        <input type="checkbox" id="failure" name="status" value="failure">
-                        <label for="failure"> Failure</label>
-                    </label>
+                    <span class="form-fields__label-text">Status: <br/><br/></span>
+                    <input type="checkbox" id="success-routed" name="status" value="success-routed">
+                    <label for="success-routed"> Success - routed</label><br>
+                    <input type="checkbox" id="success-no-matches" name="status" value="success-no-matches">
+                    <label for="success-no-matches"> Success - no matches</label><br>
+                    <input type="checkbox" id="failure" name="status" value="failure">
+                    <label for="failure"> Failure</label>
                 </li>
                 <hr>
                 <li>
@@ -59,10 +49,8 @@
                     <label for="rerouting">Will the notification(s) be re-routed?</label>
                 </li>
                 <li>
-                    <label>
-                        <span class="form-fields__label-text">Reason for deletion: <br><br></span>
-                        <input type="text" name="deletion_reason" value="{{deletion_reason}}"/><br>
-                    </label>
+                    <span class="form-fields__label-text">Reason for deletion: <br><br></span>
+                    <input type="text" name="deletion_reason" value="{{deletion_reason}}"/><br>
                 </li>
             </ul>
         </div>
@@ -77,3 +65,4 @@
         </div>
     </div>
 </form>
+
