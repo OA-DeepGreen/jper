@@ -358,6 +358,7 @@ def reprocess_repository():
         global notifications_to_process
         # Always do the cleanup
         delete_empty_folders(outputPath)
+        files_to_process = []
         # Basic sanity check to avoid processing too many notifications at once and overwhelming Airflow
         max_map_length = conf.getint("core", "max_map_length")
         if notifications_to_process > max_map_length:
@@ -369,12 +370,16 @@ def reprocess_repository():
         print(f"Parameters received: {context['params']}")
         if len(context['params']) > 0:
             repository_tuple = context['params'].get('repository_id', None)
-            upto = context['params'].get('upto', None)
-            since = context['params'].get('from', None)
-            repository_name = repository_tuple.split()[0]
-            repository_id = repository_tuple.split()[1]
+            if repository_tuple:
+                upto = context['params'].get('upto', None)
+                since = context['params'].get('from', None)
+                repository_name = repository_tuple.split()[0]
+                repository_id = repository_tuple.split()[1]
+            else:
+                app.logger.debug("No repository requested for reprocessing.")
 
-            if since and upto and repository_tuple:
+
+            if repository_tuple and since and upto:
                 print(f"Fetching notifications for repository_id: {repository_tuple} between {since} and {upto}")
                 # Construct the path for storing the notifications to reprocess
                 input_path = f"{outputPath}/{repository_name}_{repository_id}/TODO"
@@ -389,7 +394,6 @@ def reprocess_repository():
         # Retrieve the next <notifications_to_process> (if any) files to process.
         path = Path(outputPath).rglob('TODO/**/*.json')
         local_count = 0
-        files_to_process = []
         for file in path:
             files_to_process.append(file.__str__())
             local_count += 1
