@@ -196,9 +196,9 @@ def get_notifications_for(conn=None, notification_id=None, publisher_id=None, up
         }
         if publisher_id:
             qr["query"]["bool"] = {
-                "must": {
-                    "provider.id.exact": publisher_id
-                }
+                "must": [
+                    {"term": {"provider.id.exact": publisher_id}}
+                ]
             }
 
         if page == 1: # Initial query to fetch the first page and get the scroll_id for pagination
