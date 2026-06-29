@@ -14,7 +14,7 @@
             </li>
             <li class="form-fields__item--text">
 
-                    <span class="form-fields__label-text">for routed notifications/span>
+                    <span class="form-fields__label-text">for routed notifications</span>
                     <input type="text" name="retention_routed" class="form-control"
                            value="{{account.data.get('notification_retention_period',{}).get('routed',0)}}">
 
@@ -23,7 +23,7 @@
 
                     <span class="form-fields__label-text">for errored notifications</span>
                     <input type="text" name="retention_errored" class="form-control"
-                           value="{{account.data.get('notification_retention_period',{}).get('errored','')}}">
+                           value="{{account.data.get('notification_retention_period',{}).get('errored',0)}}">
 
             </li>
         </ul>
