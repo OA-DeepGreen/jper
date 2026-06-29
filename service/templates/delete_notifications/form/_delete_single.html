@@ -1,0 +1,11 @@
+<ul class="form-fields" id="single_notification_options">
+    <h3>Delete a single notification</h3>
+    <li class="form-fields__item--text">
+        <label>
+            <span class="form-fields__label-text">Notification ID:</span>
+            <input type="text" name="notification_id" value="{{notification_id}}"/>
+        </label>
+    </li>
+    {% include "delete_notifications/form/_form_fields_for_all_choices.html" %}
+    {% include "delete_notifications/form/_form_submit.html" %}
+</ul>

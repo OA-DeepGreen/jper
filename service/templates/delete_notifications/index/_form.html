@@ -1,67 +1,10 @@
 <form class="form" action="" method="POST">
     <div class="row line-space">
         <div class="col span-9">
-            <ul class="form-fields">
-                <li>
-                    <label>Delete a single notification</label>
-                </li>
-                <li class="form-fields__item--text">
-                    <span class="form-fields__label-text">Notification ID:</span>
-                    <input type="text" name="notification_id" value="{{notification_id}}"/>
-                </li>
-                <li>
-                    <label> If a notification ID is supplied above, the options below are ignored.  </label>
-                </li>
-                <hr>
-                <li>
-                    <label>OR Delete a group of old notifications</label>
-                </li>
-                <li class="form-fields__item--text">
-                    <span class="form-fields__label-text">From:</span>
-                    <input type="text" name="since" value="{{since}}"/>
-                </li>
-                <li>
-                    <span class="form-fields__label-text">To:</span>
-                    <input type="text" name="upto" value="{{upto}}"/>
-                </li>
-                <li class="form-fields__item--text">
-                    <span class="form-fields__label-text">Publisher ID</span>
-                    <select name="publisher_id">
-                        <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
-                        {% for val in publisher_ids %}
-                            <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
-                        {% endfor %}
-                    </select>
-                </li>
-               <li class="form-fields__item--text">
-                    <span class="form-fields__label-text">Status: <br/><br/></span>
-                    <input type="checkbox" id="success-routed" name="status" value="success-routed">
-                    <label for="success-routed"> Success - routed</label><br>
-                    <input type="checkbox" id="success-no-matches" name="status" value="success-no-matches">
-                    <label for="success-no-matches"> Success - no matches</label><br>
-                    <input type="checkbox" id="failure" name="status" value="failure">
-                    <label for="failure"> Failure</label>
-                </li>
-                <hr>
-                <li>
-                    <span class="form-fields__label-text">Rerouting?: <br/><br/></span>
-                    <input type="checkbox" id="rerouting" name="Rerouting" value="rerouting">
-                    <label for="rerouting">Will the notification(s) be re-routed?</label>
-                </li>
-                <li>
-                    <span class="form-fields__label-text">Reason for deletion: <br><br></span>
-                    <input type="text" name="deletion_reason" value="{{deletion_reason}}"/><br>
-                </li>
-            </ul>
-        </div>
-    </div>
-    <div class="row line-space">
-        <div class="col span-12">
-            <ul class="form-fields">
-                <li class="form-fields__item--text">
-                    <button class="btn btn--3d btn--primary move-up" type="submit">Delete notifications</button>
-                </li>
-            </ul>
+            {% include 'delete_notifications/form/_select_type.html' %}
+            {% include 'delete_notifications/form/_delete_single.html' %}
+            {% include 'delete_notifications/form/_delete_routed_and_failed.html' %}
+            {% include 'delete_notifications/form/_delete_errored.html' %}
         </div>
     </div>
 </form>

@@ -1,0 +1,7 @@
+<ul class="form-fields" id="errored_options">
+    <h3>Delete notifications with processing errors</h3>
+    <p>Delete notifications where a workflow state has status error, and the processing of the notification for routing did not succeed</p>
+    {% include "delete_notifications/form/_filter_notifications.html" %}
+    {% include "delete_notifications/form/_form_fields_for_all_choices.html" %}
+    {% include "delete_notifications/form/_form_submit.html" %}
+</ul>
