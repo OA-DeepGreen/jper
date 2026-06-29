@@ -1,0 +1,18 @@
+<ul class="form-fields" id="routed_and_failed_options">
+    <h3>Delete Routed or failed notifications</h3>
+
+    <li class="form-fields__item--text">
+        <label>
+            <span class="form-fields__label-text">Status: <br/><br/></span>
+            <input type="checkbox" id="success-routed" name="status" value="success-routed">
+            <label for="success-routed"> Success - routed</label><br>
+            <input type="checkbox" id="success-no-matches" name="status" value="success-no-matches">
+            <label for="success-no-matches"> Success - failed (no matches</label><br>
+    {#                        <input type="checkbox" id="failure" name="status" value="failure">#}
+    {#                        <label for="failure"> Failure</label>#}
+        </label>
+    </li>
+    {% include "delete_notifications/form/_filter_notifications.html" %}
+    {% include "delete_notifications/form/_form_fields_for_all_choices.html" %}
+    {% include "delete_notifications/form/_form_submit.html" %}
+</ul>
