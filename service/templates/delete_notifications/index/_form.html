@@ -32,11 +32,11 @@
                 </li>
                 <li class="form-fields__item--text">
                     <label>
-                        <span class="form-fields__label-text" style="width: 35%">Publisher ID</span>
-                        <select name="publisher_id">
-                            <option value="" {% if not publisher_id %}selected{% endif %}>Filter by Publisher ID</option>
-                            {% for val in publisher_ids %}
-                                <option value="{{ val }}" {% if publisher_id == val %}selected{% endif %}>{{ val }}</option>
+                        <span class="form-fields__label-text">Publisher Email</span>
+                        <select name="publisher_email">
+                            <option value="" {% if not publisher_email %}selected{% endif %}>Filter by Publisher emails</option>
+                            {% for val in publisher_emails %}
+                                <option value="{{ val }}" {% if publisher_email == val %}selected{% endif %}>{{ val }}<z/option>
                             {% endfor %}
                         </select>
                     </label>
