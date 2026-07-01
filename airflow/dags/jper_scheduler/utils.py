@@ -367,4 +367,4 @@ def create_routing_history_record(note_index, notification_id, log_url=None):
 
     rh.save()
     # return rh
-    return (rh.id, rh.publisher_id)
+    return (rh.id, rh.publisher_id, doi)

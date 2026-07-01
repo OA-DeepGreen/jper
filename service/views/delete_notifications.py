@@ -1,8 +1,10 @@
 import os
-from flask import Blueprint, request, url_for, flash, redirect, render_template, abort
+from this import d
+from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_from_directory
 from flask_login.utils import current_user
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from pathlib import Path
 from service.lib.validation_helper import validate_date, is_newer
 
 # For the interface with Airflow REST API
@@ -13,11 +15,13 @@ from service import models
 from airflow.configuration import conf as airflow_conf
 
 blueprint = Blueprint('delete_notifications', __name__)
+del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
 
 @blueprint.route('/', methods=["GET", "POST"])
 def index():
     if not current_user.is_super:
         abort(401)
+    files_todo, files_done, files_failed = get_list_todo_done_current()
 
     default_from = validate_date((datetime.now() - relativedelta(years=6)).strftime("%d/%m/%Y"),
                                  param='since')
@@ -34,7 +38,8 @@ def index():
     if request.method == 'GET':
         return render_template('delete_notifications/index.html', publisher_id=None,
                                publisher_emails=publisher_emails, since=default_from, upto=default_upto,
-                               status_values=[], notification_id=notification_id, deletion_type=None)
+                               status_values=[], notification_id=notification_id, deletion_type=None,
+                               files_todo=files_todo, files_done=files_done, files_failed=files_failed)
 
     # POST
     form_options = {
@@ -59,7 +64,8 @@ def index():
         flash("Please select a deletion type")
         return render_template('delete_notifications/index.html', publisher_id=None,
                                publisher_emails=publisher_emails, since=default_from, upto=default_upto,
-                               status_values=[], notification_id=notification_id, deletion_type=None)
+                               status_values=[], notification_id=notification_id, deletion_type=None,
+                               files_todo=files_todo, files_done=files_done, files_failed=files_failed)
 
     # get common options - rerouting and reason
     # Rerouting
@@ -79,12 +85,14 @@ def index():
             flash("Please enter a notification ID")
             return render_template('delete_notifications/index.html', publisher_id=None,
                                    publisher_emails=publisher_emails, since=default_from, upto=default_upto,
-                                   status_values=[], notification_id=notification_id, deletion_type=None)
+                                   status_values=[], notification_id=notification_id, deletion_type=None,
+                                   files_todo=files_todo, files_done=files_done, files_failed=files_failed)
 
     # Get filter options used for both routed and failed notifications and errored notifications
 
     # Get publisher_id
     publisher_email = request.values.get('publisher_email')
+    publisher_id = None
     if publisher_email:
         publisher_id = pub_ids_reversed[publisher_emails[publisher_email]]
     form_options['publisher_email'] = publisher_email
@@ -100,7 +108,7 @@ def index():
         flash(f"Error validating 'from' date: {e}")
         return render_template('delete_notifications/index.html', publisher_id=form_options['publisher_id'],
                         publisher_emails=form_options['publisher_emails'], since=since, upto=form_options['upto'],
-                        status_values=form_options['status_values'])
+                        status_values=form_options['status_values'], files_todo=files_todo, files_done=files_done, files_failed=files_failed)
     form_options['from'] = since
 
     # Get upto
@@ -113,7 +121,7 @@ def index():
         flash(f"Error validating 'upto' date: {e}")
         return render_template('delete_notifications/index.html', publisher_id=form_options['publisher_id'],
                         publisher_emails=form_options['publisher_emails'], since=form_options['from'], upto=upto,
-                        status_values=form_options['status_values'])
+                        status_values=form_options['status_values'], files_todo=files_todo, files_done=files_done, files_failed=files_failed)
     form_options['upto'] = upto
 
     # if is_newer(upto, default_upto):
@@ -176,10 +184,7 @@ def call_airflow_dag_to_delete_notifications(form_options):
     api_url = f"{airflow_rest_url}{deletion_dag}/{command}"
     r = requests.post(api_url, headers=headers, data=json.dumps(data))
     if r.status_code >= 200 and r.status_code < 300:
-        if form_options['notification_id']:
-            flash(f"Successfully triggered Airflow DAG to delete notification with ID {form_options['notification_id']}.")
-        else:
-            flash(f"Successfully triggered Airflow DAG to delete notifications between {form_options['from']} and {form_options['upto']}.")
+        flash(f"Successful {data['note']}, {data['conf']['rerouting']}, {data['conf']['deletion_reason']}")
     else:
         flash(f"Failed to trigger Airflow DAG. Status code: {r.status_code}, response: {r.text}")
         return render_template('delete_notifications/deletion_sent.html', publisher_email=form_options['publisher_email'],
@@ -194,3 +199,83 @@ def call_airflow_dag_to_delete_notifications(form_options):
     return render_template('delete_notifications/deletion_sent.html', publisher_email=form_options['publisher_email'],
                            publisher_emails=form_options['publisher_emails'], since=form_options['from'], upto=form_options['upto'],
                            status_values=form_options['status_values'], airflow_url=airflow_display_url)
+
+def get_list_todo_done_current():
+    path_todo = Path(del_log_path).rglob('TODO/*.json')
+    path_done = Path(del_log_path).rglob('DONE/*.json')
+    path_failed = Path(del_log_path).rglob('FAILED/*.json')
+
+    files_todo = []
+    files_done = []
+    files_failed = []
+
+    for file in path_todo:
+        stats = {}
+        stats["name"] = file.name
+        stats["last_modified"] = file.stat().st_mtime
+        with open(file, 'r') as f:
+            data = json.loads(f.read())
+        stats["from"] = data["from"]
+        stats["upto"] = data["upto"]
+        stats["status_values"] = data["status_values"]
+        stats["deletion_reason"] = data["deletion_reason"]
+        stats["publisher_email"] = data["publisher_email"]
+        stats["total_notifications"] = data["total_notifications"]
+        stats["remaining_notifications"] = data["remaining_notifications"]
+        stats["notifications"] = []
+        for index, note in enumerate(data["notifications"]):
+            stats["notifications"].append(note[0])
+            if index == 2:
+                break
+        files_todo.append(stats)
+    files_todo2 = sorted(files_todo, key=lambda d: d['last_modified'], reverse=True)
+
+    for file in path_done:
+        stats = {}
+        stats["name"] = file.name
+        stats["last_modified"] = file.stat().st_mtime
+        with open(file, 'r') as f:
+            data = json.loads(f.read())
+        stats["from"] = data["from"]
+        stats["upto"] = data["upto"]
+        stats["status_values"] = data["status_values"]
+        stats["deletion_reason"] = data["deletion_reason"]
+        stats["publisher_email"] = data["publisher_email"]
+        stats["completed_notifications"] = data["completed_notifications"]
+        stats["notifications"] = []
+        for index, note in enumerate(data["notifications"]):
+            stats["notifications"].append(note[0])
+            if index == 2:
+                break
+        files_done.append(stats)
+    files_done2 = sorted(files_done, key=lambda d: d['last_modified'], reverse=True)
+
+    for file in path_failed:
+        stats = {}
+        stats["name"] = file.name
+        stats["last_modified"] = file.stat().st_mtime
+        with open(file, 'r') as f:
+            data = json.loads(f.read())
+        stats["from"] = data["from"]
+        stats["upto"] = data["upto"]
+        stats["status_values"] = data["status_values"]
+        stats["deletion_reason"] = data["deletion_reason"]
+        stats["publisher_email"] = data["publisher_email"]
+        stats["completed_notifications"] = data["completed_notifications"]
+        stats["notifications"] = []
+        for index, note in enumerate(data["notifications"]):
+            stats["notifications"].append(note[0])
+            if index == 2:
+                break
+        files_failed.append(stats)
+    files_failed2 = sorted(files_failed, key=lambda d: d['last_modified'], reverse=True)
+
+    return files_todo2, files_done2, files_failed2
+
+@blueprint.route('/<path:filename>')
+def serve(filename):
+    words = filename.split("/")
+    state = words[0]
+    temp_name = words[1].split(".")[0]
+    return_name = f"{temp_name}_{state}.json"
+    return send_from_directory(del_log_path, filename, as_attachment=True, download_name=return_name)

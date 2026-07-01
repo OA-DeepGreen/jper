@@ -1,8 +1,10 @@
 import os
+from posix import stat
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from service.models.routing_history import RoutingHistory
 from jper_scheduler.publisher_transfer import PublisherFiles
 from octopus.core import app
 from octopus.modules.store import store
@@ -10,33 +12,6 @@ from octopus.modules.store import store
 from service import models
 
 dryRun = app.config.get("AIRFLOW_DELETION_DRY_RUN", True)
-
-
-# Check if notification is okay to delete based on status values provided for on-demand deletion
-def is_notification_okay(note, status_values):
-    # If status values are provided, only delete notifications with those status values
-    if note["status"] == "failure" and "failure" in status_values:
-        return True
-    if note["status"] == "success":
-        num_repo = note.get("number_matched_repositories", None)
-        if not num_repo:
-            # Needed in case of failure in processftp_dir where the notification is created but the number of matched repositories
-            # is not added to the notification states in routing history. In that case, we will pull the notification object to
-            # get the number of matched repositories.
-            obj = models.RoutedNotification.pull(note["notification_id"])
-            if not obj:
-                obj = models.FailedNotification.pull(note["notification_id"])
-            if obj and obj.repositories:
-                num_repo = len(obj.repositories)
-        if not num_repo:
-            return False  # If still failure, return False to avoid deleting notifications that we are not sure about
-        if "success-routed" in status_values:
-            if num_repo > 0:
-                return True
-        if "success-no-matches" in status_values:
-            if num_repo == 0:
-                return True
-    return False
 
 
 # This class inherits from PublisherFiles (publisher_transfer.py) and will only
@@ -240,10 +215,10 @@ class RoutingDeletion(PublisherFiles):
             "cleanup_files": cleanup_files,
         }
 
-    # Clean all notifications
-    def delete_notification(self, notification_id):
-        del_status = "success"
+
+    def delete_notification_routed(self, notification_id):
         notification_obj = models.RoutedNotification.pull(notification_id)
+        del_status = "success"
         if notification_obj:
             app.logger.info(f"Deleting routed notification {notification_id}")
             app.logger.debug(f"Routed notification object: {notification_obj}")
@@ -256,21 +231,56 @@ class RoutingDeletion(PublisherFiles):
                     app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
                     del_status = "failure"
         else:
-            notification_obj = models.FailedNotification.pull(notification_id)
-            if notification_obj:
-                app.logger.info(f"Deleting failed notification {notification_id}")
-                app.logger.debug(f"Failed notification object: {notification_obj}")
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete failed notification {notification_id}")
-                else:
-                    try:
-                        notification_obj.delete()
-                    except Exception as e:
-                        app.logger.error(f"Failed to delete failed notification {notification_id}. Error: {str(e)}")
-                        del_status = "failure"
+            app.logger.warn(f"Notification {notification_id} not found in RoutedNotification")
+        return {
+            "status": del_status
+        }
+
+    def delete_notification_no_matches(self, notification_id):
+        notification_obj = models.FailedNotification.pull(notification_id)
+        del_status = "success"
+        if notification_obj:
+            app.logger.info(f"Deleting failed notification {notification_id}")
+            app.logger.debug(f"Failed notification object: {notification_obj}")
+            if dryRun:
+                app.logger.info(f"DRY RUN: Would delete routed notification {notification_id}")
             else:
-                app.logger.warn(f"Notification {notification_id} not found in either RoutedNotification or FailedNotification.")
-                return { 'status': "uncertain", 'message': "Notification not found." }
+                try:
+                    notification_obj.delete()
+                except Exception as e:
+                    app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
+                    del_status = "failure"
+        else:
+            app.logger.warn(f"Notification {notification_id} not found in FailedNotification")
+        return {
+            "status": del_status
+        }
+
+    # Clean all notifications
+    def delete_notification(self, notification_id=None, status_values=None, note_pass=None):
+        del_status = "success"
+        both = False # Do I look in all types of notifications : routed, no matches, error?
+        if status_values or len(status_values) == 2:  # The date-range + publisher option
+            both = True
+        if note_pass and note_pass == "Single notification": # Explicit notification to delete
+            both = True
+
+        if both:
+            status = self.delete_notification_routed(notification_id)
+            if status["status"] == "failure":
+                status = self.delete_notification_no_matches(notification_id)
+            del_status = status["status"]
+        else:
+            if status_values[0] == "success-routed": # Routed
+                status = self.delete_notification_routed(notification_id)
+            elif status_values[0] == "success-no-matches": # Failed
+                status = self.delete_notification_no_matches(notification_id)
+            elif status_values[0] == 'failure': # Error
+                app.logger.info(f"Error finding notification {notification_id} in jper indices. Nothing to delete.")
+                status = {"status": "success", "message": "No notification found in jper indices"}
+            else: # Should not hapen
+                status = {"status": "failure", "message": "Unknown status"}
+            del_status = status["status"]
 
         return {
             "status": del_status,
@@ -284,32 +294,30 @@ class RoutingDeletion(PublisherFiles):
         status_values=None,
         rerouting=None,
         deletion_reason=None,
+        note_pass=None,
     ):
 
-        wfs_message = ""
         keep = []
         if rerouting:
             keep = ["sftp_server"]
 
+        note_message = ""
         # Delete up the notification object
         app.logger.debug(f"Notification to delete: {notification_id}")
-        if not dryRun:
-            statusN = self.delete_notification(notification_id=notification_id)
-            app.logger.info(f"Notification cleanup status: {statusN['status']}, Message: {statusN['message']}")
-            if statusN['status'] == "success":
-                mess = f"Notification {notification_id} deleted"
-            elif statusN['status'] == "uncertain":
-                mess = f"Notification {notification_id} not found"
-            else:
-                mess = f"Notification {notification_id} not deleted"
-            wfs_message = mess
+        statusN = self.delete_notification(notification_id=notification_id, status_values=status_values, note_pass=note_pass)
+        app.logger.info(f"Notification cleanup status: {statusN['status']}, Message: {statusN['message']}")
+        if statusN['status'] == "success":
+            mess = f"Notification {notification_id} deleted"
+        else:
+            mess = "Error in previous steps - please check messages above."
+        note_message = mess
 
-        app.logger.info(f"Looking to see if there are any files to clean up")
+        app.logger.info("Looking to see if there are any files to clean up")
 
         # At this point, we should have a decent routing history. Proceed to do the file cleanup
         n_active_notifications = 0
         if len(self.routing_history.notification_states) == 0:
-            app.logger.info(f"Notification without routing history? We have an error upstream.")
+            app.logger.info("Notification without routing history? We have an error upstream.")
             return {
                 "status": "error",
                 "message": f"Notification {notification_id} has no routing history states. This should not happen.",
@@ -328,35 +336,17 @@ class RoutingDeletion(PublisherFiles):
                 app.logger.info("Cleaning all final files linked to the routing history.")
                 statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
             elif n_active_notifications == 1:
-                app.logger.info(
-                    f"Last active notification in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}."
-                )
-                app.logger.info(
-                    f"First clean files for notification ID {notification_id} in routing history {self.routing_history.id}."
-                )
+                app.logger.info(f"Last active notification in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}.")
+                app.logger.info(f"First clean files for notification ID {notification_id} in routing history {self.routing_history.id}.")
                 # Ignore statusF for clean_all_files_for_notificationas it will be success always.
-                statusF = self.clean_all_files_for_notification(
-                    notification_id=notification_id, keep=keep
-                )
-                app.logger.info(
-                    f"Now clean all final files linked to the routing history ID {self.routing_history.id}"
-                )
-                statusF = self.clean_wfs_final_files(
-                    notification_id=notification_id, keep=keep
-                )
+                statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
+                app.logger.info(f"Now clean all final files linked to the routing history ID {self.routing_history.id}.")
+                statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
             else:
-                app.logger.info(
-                    f"{n_active_notifications} active notifications in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}."
-                )
-                app.logger.info(
-                    f"Cleaning only files linked to notification ID {notification_id} in routing history {self.routing_history.id}."
-                )
-                statusF = self.clean_all_files_for_notification(
-                    notification_id=notification_id, keep=keep
-                )
-        app.logger.info(
-            f"File cleanup status: {statusF['status']}, Message: {statusF['message']}"
-        )
+                app.logger.info(f"{n_active_notifications} active notifications in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}.")
+                app.logger.info(f"Cleaning only files linked to notification ID {notification_id} in routing history {self.routing_history.id}.")
+                statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
+        app.logger.info(f"File cleanup status: {statusF['status']}, Message: {statusF['message']}")
 
         if not dryRun:
             # Set the notification to deleted
@@ -374,6 +364,7 @@ class RoutingDeletion(PublisherFiles):
                 message = deletion_reason
             else:
                 message = f"Notification {notification_id} deleted as part of cleanup with status {statusF['status']}"
+            message = message + ", " + note_message
             # Add list of files to the above message and pass it along to the tombstone
             for k, v in statusF['cleanup_files'].items():
                 message += f". Deletion status for :::: {k} files : ["
