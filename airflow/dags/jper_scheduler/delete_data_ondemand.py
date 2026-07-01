@@ -29,7 +29,7 @@ from service import models
 from service.models.routing_history import RoutingHistory
 
 host = app.config.get("ELASTIC_SEARCH_HOST", "localhost")  # includes port
-max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
+max_query = app.config.get("AIRFLOW_DELETION_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
 
