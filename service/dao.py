@@ -44,7 +44,7 @@ class RoutedNotificationDAO(dao.TimeBoxedTypeESDAO):
     """
 
     __type__ = 'routed'
-    """ The base index type to use to store these objects - 
+    """ The base index type to use to store these objects -
     this will be appended by the time-boxing features of the DAO with the creation timestamp """
 
     @classmethod
@@ -60,7 +60,7 @@ class RoutedNotificationDAO(dao.TimeBoxedTypeESDAO):
 #     """
 #     DAO for StalledNotifications
 #     """
-# 
+#
 #     __type__ = "stalled"
 #     """ The index type to use to store these objects """
 
@@ -1013,7 +1013,7 @@ class RoutingHistoryDAO(dao.ESDAO):
             if workflow_action and workflow_action != '':
                 query['query']['bool']["must"].append({"match": {"workflow_states.action.exact": workflow_action}})
 
-            if status and status:
+            if status and status != '':
                 if status.lower() == "error":
                     query['query']['bool']["must"].append({"match": {"workflow_states.status.exact": "failure"}})
                 elif status.lower() == "routed":
@@ -1021,12 +1021,12 @@ class RoutingHistoryDAO(dao.ESDAO):
                     if not 'filter' in query['query']['bool']:
                         query['query']['bool']["filter"] = {}
                     query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"gte": 1}}})
-                elif status.lower() == "failed":
+                elif status.lower() == "failed": # Note that the must_not clause is correct here.
                     query['query']['bool']['must_not'] = [{"match": {"workflow_states.status.exact": "failure"}}]
                     if not 'filter' in query['query']['bool']:
                         query['query']['bool']["filter"] = {}
                     query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
-        print(query)
+        # print(query)
         ans = cls.query(q=query)
         return ans
 

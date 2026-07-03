@@ -1,7 +1,85 @@
 {% extends "base.html" %}
 {% block content %}
-  {% include 'delete_notifications/index/_heading.html' %}
-  {% include 'delete_notifications/index/_form.html' %}
+    {% include 'delete_notifications/index/_heading.html' %}
+    {% include 'delete_notifications/index/_form.html' %}
+    <hr style="height: 5px; background-color: black">
+    Notifications to delete: Note that filenames are the same across the TODO, DONE, and FAILED directories to preserve
+    consistency of creation date-time. So, when downloaded, the filename will have a TODO / DONE / FAILED suffix
+    automatically added.<p>
+    <hr style="height: 1px; background-color: green">
+    {% if files_todo|length == 0 %}
+        No notifications to delete.<p>
+    {% else %}
+        {% for item in files_todo %}
+            File name : <a href="/delete_notifications/TODO/{{item["name"]}}">{{ item["name"] }}</a><br>
+            Last modified : {{ item["last_modified"] | datetimeformat }}<br>
+            Publisher : {{ item["publisher_email"] }}<br>
+            Search from : {{ item["from"] }}<br>
+            Search upto : {{ item["upto"] }}<br>
+            Search statuses : {{ item["status_values"] }}<br>
+            Deletion reason : {{ item["deletion_reason"] }}<br>
+            Total notifications selected : {{ item["total_notifications"] }}<br>
+            Remaining notifications : {{ item["remaining_notifications"] }}<br>
+            {% if item["notifications"]|length == 0 %}
+            No notifications to delete.<p>
+            {% elif item["notifications"]|length > 2 %}
+            Notifications : {{ item["notifications"]|join(", ") }} ...<p>
+            {% else %}
+            Notifications : {{ item["notifications"]|join(", ") }}<p>
+            {% endif %}
+            <hr style="height: 1px; background-color: green">
+        {% endfor %}
+    {% endif %}
+    <hr style="height: 5px; background-color: black">
+    Notifications successfully deleted:<p>
+    <hr style="height: 1px; background-color: green">
+    {% if files_done|length == 0 %}
+        No notifications deleted.<p>
+    {% else %}
+        {% for item in files_done %}
+            File name : <a href="/delete_notifications/DONE/{{item["name"]}}">{{ item["name"] }}</a><br>
+            Last modified : {{ item["last_modified"] | datetimeformat }}<br>
+            Publisher : {{ item["publisher_email"] }}<br>
+            Search from : {{ item["from"] }}<br>
+            Search upto : {{ item["upto"] }}<br>
+            Search statuses : {{ item["status_values"] }}<br>
+            Deletion reason : {{ item["deletion_reason"] }}<br>
+            Completed notifications : {{ item["completed_notifications"] }}<br>
+            {% if item["notifications"]|length == 0 %}
+            No notifications to delete.<p>
+            {% elif item["notifications"]|length > 2 %}
+            Notifications : {{ item["notifications"]|join(", ") }} ...<p>
+            {% else %}
+            Notifications : {{ item["notifications"]|join(", ") }}<p>
+            {% endif %}
+            <hr style="height: 1px; background-color: green">
+        {% endfor %}
+    {% endif %}
+    <hr style="height: 5px; background-color: black">
+    Notifications errored in deletion:<p>
+    <hr style="height: 1px; background-color: green">
+    {% if files_done|length == 0 %}
+        No notifications in error.<p>
+    {% else %}
+        {% for item in files_failed %}
+            File name : <a href="/delete_notifications/FAILED/{{item["name"]}}">{{ item["name"] }}</a><br>
+            Last modified : {{ item["last_modified"] | datetimeformat }}<br>
+            Publisher : {{ item["publisher_email"] }}<br>
+            Search from : {{ item["from"] }}<br>
+            Search upto : {{ item["upto"] }}<br>
+            Search statuses : {{ item["status_values"] }}<br>
+            Deletion reason : {{ item["deletion_reason"] }}<br>
+            Completed notifications : {{ item["completed_notifications"] }}<br>
+            {% if item["notifications"]|length == 0 %}
+            No notifications to delete.<p>
+            {% elif item["notifications"]|length > 2 %}
+            Notifications : {{ item["notifications"]|join(", ") }} ...<p>
+            {% else %}
+            Notifications : {{ item["notifications"]|join(", ") }}<p>
+            {% endif %}
+            <hr style="height: 1px; background-color: green">
+        {% endfor %}
+    {% endif %}
 {% endblock %}
 {% block extra_js_bottom %}
     <script>

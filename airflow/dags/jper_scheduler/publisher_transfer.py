@@ -142,6 +142,15 @@ class PublisherFiles:
         else:
             self.username = self.id
 
+        # Months after which the deletion task will clean the notifications
+        self.retain_routed = 0
+        self.retain_failed = 0
+        self.retain_errored = 0
+        if 'notification_retention_period' in publisher.keys():
+            self.retain_routed = publisher['notification_retention_period']['routed']
+            self.retain_failed = publisher['notification_retention_period']['failed']
+            self.retain_errored = publisher['notification_retention_period']['errored']
+
         self.acc = publisher
         self.apiurl += '?api_key=' + self.acc['api_key']
 

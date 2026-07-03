@@ -41,6 +41,13 @@ from flask import render_template
 from octopus.lib.webapp import custom_static
 
 from service import models
+from datetime import datetime
+
+# Register the custom filter
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
+    return datetime.fromtimestamp(value).strftime(format)
+
 
 @app.login_manager.user_loader
 def load_account_for_login_manager(userid):
