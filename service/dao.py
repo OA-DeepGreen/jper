@@ -1026,7 +1026,7 @@ class RoutingHistoryDAO(dao.ESDAO):
                     if not 'filter' in query['query']['bool']:
                         query['query']['bool']["filter"] = {}
                     query['query']['bool']["filter"].append({'range': {'notification_states.number_matched_repositories': {"lt": 1}}})
-        print(query)
+        # print(query)
         ans = cls.query(q=query)
         return ans
 
