@@ -1,13 +1,10 @@
 # Python stuff
-from logging import info
-from operator import le
 import os
 import math
 import json
 import fcntl
 from pathlib import Path
 from datetime import datetime
-from this import d
 
 # Create a connection - ES stuff
 from airflow.dags.one_time_runs.create_routing_history import write_notifications
@@ -267,7 +264,7 @@ def update_deletion_log_files(del_log_file, airflow_log_url, notification_id, st
     dag_id="Delete_Data_OnDemand",
     max_active_runs=1,
     schedule=None,
-    schedule_interval=app.config.get("AIRMAINT_DELETE_DEMAND_SCHED", "None"),
+    schedule_interval=app.config.get("AIRMAINT_DELETE_DEMAND_SCHED", None),
     start_date=datetime(2025, 10, 22),
     description="Delete data according to on-demand request",
     catchup=False,
