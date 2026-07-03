@@ -6,32 +6,28 @@ import fcntl
 from pathlib import Path
 from datetime import datetime
 
-# Create a connection - ES stuff
-from airflow.dags.one_time_runs.create_routing_history import write_notifications
 import esprit
+from airflow.dags.one_time_runs.create_routing_history import write_notifications
 from airflow.decorators import dag, task, task_group
 
 # Airflow stuff
 from airflow.exceptions import AirflowException, AirflowFailException, AirflowTaskTerminated
 from airflow.operators.python import get_current_context
 from airflow.utils.session import provide_session
-from dateutil.relativedelta import relativedelta
 
 # My code
 from jper_scheduler.routing_deletions import RoutingDeletion
 from jper_scheduler.utils import create_routing_history_record, get_log_url, get_notifications_for, set_task_name
 from octopus.core import app
-
-from service import models
 from service.models.routing_history import RoutingHistory
+
+del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
+notifications_to_process = app.config.get("AIRFLOW_DELETION_NOTIFICATION_BATCH_SIZE", 3000) # Notifications to process at a given time.
 
 host = app.config.get("ELASTIC_SEARCH_HOST", "localhost")  # includes port
 max_query = app.config.get("AIRFLOW_DELETION_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
-
-del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
-notifications_to_process = app.config.get("AIRFLOW_DELETION_NOTIFICATION_BATCH_SIZE", 3000) # Notifications to process at a given time.
 
 ##### Write to a file, every notification that we have been asked to delete.
 
