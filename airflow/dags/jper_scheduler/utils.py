@@ -261,9 +261,7 @@ def utils_log_routing_history(rh):
 
 
 def create_routing_history_record(note_index, notification_id, log_url=None):
-    app.logger.info(
-        f"Creating routing history record for notification ID {notification_id}"
-    )
+    app.logger.info(f"Creating routing history record for notification ID {notification_id}")
 
     obj = None
     matches = 0
