@@ -10,6 +10,7 @@ from octopus.core import app
 from octopus.modules.store import store
 
 from service import models
+from jper_scheduler.utils import create_routing_history_record
 
 dryRun = app.config.get("AIRFLOW_DELETION_DRY_RUN", True)
 
@@ -20,12 +21,9 @@ dryRun = app.config.get("AIRFLOW_DELETION_DRY_RUN", True)
 class RoutingDeletion(PublisherFiles):
     def __init__(self, publisher_id=None, routing_id=None):
         if not publisher_id or not routing_id:
-            app.logger.debug(
-                f"Invalid routing {routing_id} or publisher {publisher_id}"
-            )
+            app.logger.debug(f"Invalid publisher {publisher_id} or routing_id {routing_id}")
             return None
         super().__init__(publisher_id, routing_id=routing_id)
-
     def routing_history_status(self):
         status = "active"
         statusList = []
