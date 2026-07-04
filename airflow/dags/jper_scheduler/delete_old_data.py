@@ -18,7 +18,6 @@ from jper_scheduler.publisher_transfer import PublisherFiles
 from jper_scheduler.utils import create_routing_history_record, get_log_url, set_task_name
 from jper_scheduler.routing_deletions import find_notifications_from_ES_directly, find_notifications_from_routing_history
 from jper_scheduler.routing_deletions import write_notifications_to_delete, update_deletion_log_files
-from service.tests.functional.load_route_zip import note
 
 del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_DAILY_PATH", '/logs/daily_deletion_logs')
 
