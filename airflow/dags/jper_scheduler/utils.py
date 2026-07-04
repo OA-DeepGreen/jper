@@ -246,6 +246,7 @@ def get_notifications_for(
 
 
 def utils_log_routing_history(rh):
+    # Debug log the routing history during code development
     app.logger.debug("Begin Routing History")
     app.logger.debug(f"Routing History> {rh.__dict__['data']}")
     app.logger.debug("Routing History> individual workflow states :")
