@@ -25,7 +25,7 @@
           {% for item in files_gathered %}
               <tr>
                 <td>{{ item["name"] }}</td>
-                <td>{{ item["date_requested"] | datetimeformat }}</td>
+                <td>{{ item["date_requested"] }}</td>
                 <td>{{ item["last_modified"] | datetimeformat }}</td>
                 <td>
                     <dl>

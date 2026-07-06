@@ -1,5 +1,4 @@
 import os
-from this import d
 from flask import Blueprint, request, url_for, flash, redirect, render_template, abort, send_from_directory
 from flask_login.utils import current_user
 from datetime import datetime
@@ -209,25 +208,27 @@ def get_list_todo_done_current():
     # last modified
     for file_io in path_todo:
         stats = _read_file(file_io, 'todo')
-        files_gathered[stats['filename']] = stats
+        files_gathered[stats['name']] = stats
 
     for file_io in path_done:
         stats = _read_file(file_io, 'done')
-        if stats['filename'] in files_gathered:
-            files_gathered[stats['filename']].update(stats)
+        if stats['name'] in files_gathered:
+            files_gathered[stats['name']].update(stats)
         else:
-            files_gathered[stats['filename']] = stats
+            files_gathered[stats['name']] = stats
 
     for file_io in path_failed:
         stats = _read_file(file_io, 'failed')
-        if stats['filename'] in files_gathered:
-            files_gathered[stats['filename']].update(stats)
+        if stats['name'] in files_gathered:
+            files_gathered[stats['name']].update(stats)
         else:
-            files_gathered[stats['filename']] = stats
+            files_gathered[stats['name']] = stats
+    print(files_gathered)
+    print('-'*50)
+    # files_gathered_sort = sorted(files_gathered.values(), key=lambda d: d[1]['last_modified'], reverse=True)
+    # print(files_gathered_sort)
 
-    files_gathered_sort = sorted(files_gathered.items(), key=lambda d: d[1]['last_modified'], reverse=True)
-
-    return files_gathered_sort
+    return files_gathered.values()
 
 @blueprint.route('/<path:filename>')
 def serve(filename):
@@ -253,8 +254,10 @@ def _read_file(file_io, file_type):
     stats["publisher_email"] = data["publisher_email"]
     stats["total_notifications"] = data["total_notifications"]
     stats["remaining_notifications"] = data["remaining_notifications"]
-    if file_type == "done" or file_type == "failed":
-        stats["completed_notifications"] = data["completed_notifications"]
+    if file_type == "done":
+        stats["done_notifications"] = data.get("completed_notifications", 0)
+    elif file_type == "failed":
+        stats["failed_notifications"] = data.get("completed_notifications", 0)
     stats["notifications"] = []
     # Getting only 3 or fewer notifications for display.
     for index, note in enumerate(data["notifications"]):
