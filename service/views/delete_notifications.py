@@ -21,7 +21,7 @@ del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion
 def index():
     if not current_user.is_super:
         abort(401)
-    files_todo, files_done, files_failed = get_list_todo_done_current()
+    files_gathered = get_list_todo_done_current()
 
     default_from = validate_date((datetime.now() - relativedelta(years=6)).strftime("%d/%m/%Y"),
                                  param='since')
@@ -39,7 +39,7 @@ def index():
         return render_template('delete_notifications/index.html', publisher_id=None,
                                publisher_emails=publisher_emails, since=default_from, upto=default_upto,
                                status_values=[], notification_id=notification_id, deletion_type=None,
-                               files_todo=files_todo, files_done=files_done, files_failed=files_failed)
+                               files_gathered=files_gathered)
 
     # POST
     form_options = {
@@ -204,73 +204,30 @@ def get_list_todo_done_current():
     path_todo = Path(del_log_path).rglob('TODO/*.json')
     path_done = Path(del_log_path).rglob('DONE/*.json')
     path_failed = Path(del_log_path).rglob('FAILED/*.json')
+    files_gathered = {}
+    # filename - time started
+    # last modified
+    for file_io in path_todo:
+        stats = _read_file(file_io, 'todo')
+        files_gathered[stats['filename']] = stats
 
-    files_todo = []
-    files_done = []
-    files_failed = []
+    for file_io in path_done:
+        stats = _read_file(file_io, 'done')
+        if stats['filename'] in files_gathered:
+            files_gathered[stats['filename']].update(stats)
+        else:
+            files_gathered[stats['filename']] = stats
 
-    for file in path_todo:
-        stats = {}
-        stats["name"] = file.name
-        stats["last_modified"] = file.stat().st_mtime
-        with open(file, 'r') as f:
-            data = json.loads(f.read())
-        stats["from"] = data["from"]
-        stats["upto"] = data["upto"]
-        stats["status_values"] = data["status_values"]
-        stats["deletion_reason"] = data["deletion_reason"]
-        stats["publisher_email"] = data["publisher_email"]
-        stats["total_notifications"] = data["total_notifications"]
-        stats["remaining_notifications"] = data["remaining_notifications"]
-        stats["notifications"] = []
-        for index, note in enumerate(data["notifications"]):
-            stats["notifications"].append(note[0])
-            if index == 2:
-                break
-        files_todo.append(stats)
-    files_todo2 = sorted(files_todo, key=lambda d: d['last_modified'], reverse=True)
+    for file_io in path_failed:
+        stats = _read_file(file_io, 'failed')
+        if stats['filename'] in files_gathered:
+            files_gathered[stats['filename']].update(stats)
+        else:
+            files_gathered[stats['filename']] = stats
 
-    for file in path_done:
-        stats = {}
-        stats["name"] = file.name
-        stats["last_modified"] = file.stat().st_mtime
-        with open(file, 'r') as f:
-            data = json.loads(f.read())
-        stats["from"] = data["from"]
-        stats["upto"] = data["upto"]
-        stats["status_values"] = data["status_values"]
-        stats["deletion_reason"] = data["deletion_reason"]
-        stats["publisher_email"] = data["publisher_email"]
-        stats["completed_notifications"] = data["completed_notifications"]
-        stats["notifications"] = []
-        for index, note in enumerate(data["notifications"]):
-            stats["notifications"].append(note[0])
-            if index == 2:
-                break
-        files_done.append(stats)
-    files_done2 = sorted(files_done, key=lambda d: d['last_modified'], reverse=True)
+    files_gathered_sort = sorted(files_gathered.items(), key=lambda d: d[1]['last_modified'], reverse=True)
 
-    for file in path_failed:
-        stats = {}
-        stats["name"] = file.name
-        stats["last_modified"] = file.stat().st_mtime
-        with open(file, 'r') as f:
-            data = json.loads(f.read())
-        stats["from"] = data["from"]
-        stats["upto"] = data["upto"]
-        stats["status_values"] = data["status_values"]
-        stats["deletion_reason"] = data["deletion_reason"]
-        stats["publisher_email"] = data["publisher_email"]
-        stats["completed_notifications"] = data["completed_notifications"]
-        stats["notifications"] = []
-        for index, note in enumerate(data["notifications"]):
-            stats["notifications"].append(note[0])
-            if index == 2:
-                break
-        files_failed.append(stats)
-    files_failed2 = sorted(files_failed, key=lambda d: d['last_modified'], reverse=True)
-
-    return files_todo2, files_done2, files_failed2
+    return files_gathered_sort
 
 @blueprint.route('/<path:filename>')
 def serve(filename):
@@ -279,3 +236,29 @@ def serve(filename):
     temp_name = words[1].split(".")[0]
     return_name = f"{temp_name}_{state}.json"
     return send_from_directory(del_log_path, filename, as_attachment=True, download_name=return_name)
+
+def _read_file(file_io, file_type):
+    stats = {'type': file_type}
+    with open(file_io, 'r') as f:
+        data = json.loads(f.read())
+    stats["name"] = file_io.name
+    file_dt = file_io.name.replace('deletion_log_', '').replace('.json', '')
+    date_created = datetime.strptime(file_dt,'%Y%m%d_%H%M%S')
+    stats["date_requested"] = date_created.strftime('%d/%m/%Y')
+    stats["last_modified"] = file_io.stat().st_mtime
+    stats["from"] = data["from"]
+    stats["upto"] = data["upto"]
+    stats["status_values"] = data["status_values"]
+    stats["deletion_reason"] = data["deletion_reason"]
+    stats["publisher_email"] = data["publisher_email"]
+    stats["total_notifications"] = data["total_notifications"]
+    stats["remaining_notifications"] = data["remaining_notifications"]
+    if file_type == "done" or file_type == "failed":
+        stats["completed_notifications"] = data["completed_notifications"]
+    stats["notifications"] = []
+    # Getting only 3 or fewer notifications for display.
+    for index, note in enumerate(data["notifications"]):
+        stats["notifications"].append(note[0])
+        if index == 2:
+            break
+    return stats

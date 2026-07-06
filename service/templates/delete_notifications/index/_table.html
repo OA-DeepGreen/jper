@@ -1,0 +1,51 @@
+<h3>List of deleted jobs</h3>
+  {% if files_gathered|length == 0 %}
+    <p>No notifications to delete.<p>
+  {% endif %}
+  <div class="row cms">
+    <div class="col span-12">
+      <table class="tablesorter-green" id="users">
+        <thead>
+          <tr>
+            <th rowspan="2">File name</th>
+            <th rowspan="2">Date requested</th>
+            <th rowspan="2">Last modified</th>
+            <th rowspan="2">Search criteria</th>
+            <th colspan="4">Number of notifications</th>
+            <th rowspan="2">Notifications</th>
+          </tr>
+          <tr>
+            <th>Total</th>
+            <th>Done</th>
+            <th>Failed</th>
+            <th>Remaining</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in files_gathered %}
+              <tr>
+                <td>{{ item["name"] }}</td>
+                <td>{{ item["date_requested"] | datetimeformat }}</td>
+                <td>{{ item["last_modified"] | datetimeformat }}</td>
+                <td>
+                    <dl>
+                        <dt>Publisher</dt><dd>{{ item["publisher_email"] }}</dd><br/>
+                        <dt>Search from</dt><dd>{{ item["from"] }}</dd><br/>
+                        <dt>Search upto</dt><dd>{{ item["upto"] }}</dd><br/>
+                        <dt>Search statuses</dt><dd>{{ item["status_values"] }}</dd><br/>
+                        <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
+                    </dl>
+                </td>
+                <td>{{ item["total_notifications"] }}</td>
+                <td>{{ item["done_notifications"] }} (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)</td>
+                <td>{{ item["failed_notifications"] }} (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>) </td>
+                <td>{{ item["remaining_notifications"] }} (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)</td>
+                <td>{{ item["notifications"]|join("<br/>") }}
+                    {% if item["total_notifications"] > 3 %}...{% endif %}
+                </td>
+              </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
