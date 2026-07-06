@@ -25,24 +25,54 @@
           {% for item in files_gathered %}
               <tr>
                 <!--<td>{{ item["name"] }}</td>-->
-                <td>{{ item["date_requested"] }}</td>
+                <td>{{ item["date_requested"] | datetimeformat }}</td>
                 <td>{{ item["last_modified"] | datetimeformat }}</td>
                 <td>
                     <dl>
-                        <dt>Publisher</dt><dd>{{ item["publisher_email"] }}</dd><br/>
-                        <dt>Search from</dt><dd>{{ item["from"] }}</dd><br/>
-                        <dt>Search upto</dt><dd>{{ item["upto"] }}</dd><br/>
-                        <dt>Search statuses</dt><dd>{{ item["status_values"] }}</dd><br/>
-                        <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
+                        {% if item["notification_id"] %}
+                            <dt>Notification</dt><dd>{{ item["notification_id"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["publisher_email"] %}
+                            <dt>Publisher</dt><dd>{{ item["publisher_email"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["from"] %}
+                           <dt>Search from</dt><dd>{{ item["from"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["upto"] %}
+                           <dt>Search upto</dt><dd>{{ item["upto"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["status_values"] %}
+                           <dt>Search statuses</dt><dd>{{ item["status_values"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["rerouting"] != None %}
+                            <dt>Rerouting</dt><dd>{{ item["rerouting"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["deletion_reason"] %}
+                            <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
+                        {% endif %}
                     </dl>
                 </td>
                 <td>{{ item["total_notifications"] }}</td>
-                <td>{{ item.get("done_notifications",0) }} (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)</td>
-                <td>{{ item.get("failed_notifications",0) }} (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>) </td>
-                <td>{{ item.get("remaining_notifications",0) }} (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)</td>
-                <!--<td>{{ item["notifications"]|join("<br/>") }}
+                <td>{{ item.get("done_notifications", 0) }}
+                    {% if item.get("done_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+                <td>{{ item.get("failed_notifications", 0) }}
+                    {% if item.get("failed_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+                <td>{{ item.get("remaining_notifications", 0) }}
+                    {% if item.get("remaining_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+                <!--
+                <td>{{ item["notifications"]|join("<br/>") }}
                     {% if item["total_notifications"] > 3 %}...{% endif %}
-                </td>-->
+                </td>
+                -->
               </tr>
           {% endfor %}
         </tbody>
