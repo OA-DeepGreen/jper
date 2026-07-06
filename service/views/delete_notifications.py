@@ -246,11 +246,13 @@ def _read_file(file_io, file_type):
     file_dt = file_io.name.replace('deletion_log_', '').replace('.json', '')
     stats["date_requested"] = datetime.strptime(file_dt,'%Y%m%d_%H%M%S')
     stats["last_modified"] = file_io.stat().st_mtime
+    stats["notification_id"] = data["notification_id"]
     stats["from"] = data["from"]
     stats["upto"] = data["upto"]
     stats["status_values"] = data["status_values"]
-    stats["deletion_reason"] = data["deletion_reason"]
     stats["publisher_email"] = data["publisher_email"]
+    stats["rerouting"] = data["rerouting"]
+    stats["deletion_reason"] = data["deletion_reason"]
     stats["total_notifications"] = data["total_notifications"]
     stats["remaining_notifications"] = data["remaining_notifications"]
     if file_type == "done":
