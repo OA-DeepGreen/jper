@@ -122,10 +122,10 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
     if not info_to_run:
         if notification_id:
             info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id)]
-        elif status_values[0] == 'failure': # Error
+        elif status_values and status_values[0] == 'failure': # Error
             info_to_run = find_notifications_from_routing_history(brom, upto, publisher_id, status_values, rerouting, deletion_reason)
         else:
-            if len(status_values) == 2:
+            if not status_values or len(status_values) == 2:
                 index = "jper-routed*,jper-failed"
             elif status_values[0] == "success-routed":
                 index = "jper-routed*"
@@ -214,7 +214,6 @@ def update_deletion_log_files(del_log_file, airflow_log_url, notification_id, st
         data = json.loads(f.read())
 
         for note_list in data["notifications"]:
-            print("My notifications: ", note_list)
             if notification_id in note_list:
                 tmp_list = note_list
         try:
@@ -498,7 +497,7 @@ class RoutingDeletion(PublisherFiles):
     def delete_notification(self, notification_id=None, status_values=None, note_pass=None):
         del_status = "success"
         both = False # Do I look in all types of notifications : routed, no matches, error?
-        if status_values or len(status_values) == 2:  # The date-range + publisher option
+        if not status_values or len(status_values) == 2:  # The date-range + publisher option
             both = True
         if note_pass and note_pass == "Single notification": # Explicit notification to delete
             both = True
@@ -610,7 +609,6 @@ class RoutingDeletion(PublisherFiles):
                     message += f"{f_name}, "
                 message += "]"
             app.logger.info(message)
-            print(f"Clean up files status : {statusF['cleanup_files']}")
             self.routing_history.add_workflow_state(
                 "tombstone",
                 "server, store, jper",

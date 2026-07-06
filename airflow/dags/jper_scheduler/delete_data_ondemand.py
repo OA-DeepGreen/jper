@@ -102,7 +102,7 @@ def delete_data_ondemand():
         if not publisher_id:
             note_pass = "Single notification"
 
-        if len(status_values) == 0 or len(status_values) == 2 or status_values[0] == "failure":
+        if not status_values or len(status_values) == 0 or len(status_values) == 2 or status_values[0] == "failure":
             index = "jper-routed*,jper-failed"
         elif status_values[0] == "success-routed":
             index = "jper-routed*"
@@ -120,28 +120,13 @@ def delete_data_ondemand():
             hit = c['hits']['hits'][0]
             routing_id = hit['_source']['id']
             doi = None
-            if "metadata" in hit["_source"].keys() and "identifier" in hit["_source"]["metadata"].keys():
-                for k in hit["_source"]["metadata"]["identifier"]:
-                    if k["type"] == "doi":
-                        doi = k["id"]
+            for n_state in hit["_source"]["notification_states"]:
+                if n_state.get("notification_id", None) == notification_id:
+                    doi = n_state.get("doi")
+                    break
             if "publisher_id" in hit["_source"].keys():
                 if not publisher_id:
                     publisher_id = hit["_source"]["publisher_id"]
-            elif "provider" in hit["_source"].keys() and "id" in hit["_source"]["provider"].keys():
-                if not publisher_id:
-                    publisher_id = hit["_source"]["provider"]["id"]
-            else:
-                # Improperly created routing history (should not happen?). Create a new one.
-                app.logger.debug(f"Improperly created routing history ID {routing_id}. Creating a new one for this notification.")
-                conn = esprit.raw.Connection(host_name, index, port=port)
-                note = get_notifications_for(conn=conn, notification_id=notification_id)
-                note_index = note["hits"]["hits"][0]["_index"]
-                rh_tuple = create_routing_history_record(note_index, notification_id, log_url=log_url)
-                routing_id = rh_tuple[0]
-                if not publisher_id:
-                    publisher_id = rh_tuple[1]
-                if not doi:
-                    doi = rh_tuple[2]
         else: # Is it an old notification without a routing ID?
             app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
             conn = esprit.raw.Connection(host_name, index, port=port)
