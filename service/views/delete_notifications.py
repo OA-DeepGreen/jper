@@ -244,8 +244,7 @@ def _read_file(file_io, file_type):
         data = json.loads(f.read())
     stats["name"] = file_io.name
     file_dt = file_io.name.replace('deletion_log_', '').replace('.json', '')
-    date_created = datetime.strptime(file_dt,'%Y%m%d_%H%M%S')
-    stats["date_requested"] = date_created.strftime('%d/%m/%Y')
+    stats["date_requested"] = datetime.strptime(file_dt,'%Y%m%d_%H%M%S')
     stats["last_modified"] = file_io.stat().st_mtime
     stats["from"] = data["from"]
     stats["upto"] = data["upto"]
@@ -260,8 +259,8 @@ def _read_file(file_io, file_type):
         stats["failed_notifications"] = data.get("completed_notifications", 0)
     stats["notifications"] = []
     # Getting only 3 or fewer notifications for display.
-    for index, note in enumerate(data["notifications"]):
-        stats["notifications"].append(note[0])
-        if index == 2:
-            break
+    # for index, note in enumerate(data["notifications"]):
+    #     stats["notifications"].append(note[0])
+    #     if index == 2:
+    #         break
     return stats

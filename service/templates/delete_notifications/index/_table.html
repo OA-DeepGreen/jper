@@ -7,12 +7,12 @@
       <table class="tablesorter-green" id="users">
         <thead>
           <tr>
-            <th rowspan="2">File name</th>
+            <!--<th rowspan="2">File name</th>-->
             <th rowspan="2">Date requested</th>
             <th rowspan="2">Last modified</th>
             <th rowspan="2">Search criteria</th>
             <th colspan="4">Number of notifications</th>
-            <th rowspan="2">Notifications</th>
+            <!--<th rowspan="2">Notifications</th>-->
           </tr>
           <tr>
             <th>Total</th>
@@ -24,7 +24,7 @@
         <tbody>
           {% for item in files_gathered %}
               <tr>
-                <td>{{ item["name"] }}</td>
+                <!--<td>{{ item["name"] }}</td>-->
                 <td>{{ item["date_requested"] }}</td>
                 <td>{{ item["last_modified"] | datetimeformat }}</td>
                 <td>
@@ -37,12 +37,12 @@
                     </dl>
                 </td>
                 <td>{{ item["total_notifications"] }}</td>
-                <td>{{ item["done_notifications"] }} (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)</td>
-                <td>{{ item["failed_notifications"] }} (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>) </td>
-                <td>{{ item["remaining_notifications"] }} (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)</td>
-                <td>{{ item["notifications"]|join("<br/>") }}
+                <td>{{ item.get("done_notifications",0) }} (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)</td>
+                <td>{{ item.get("failed_notifications",0) }} (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>) </td>
+                <td>{{ item.get("remaining_notifications",0) }} (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)</td>
+                <!--<td>{{ item["notifications"]|join("<br/>") }}
                     {% if item["total_notifications"] > 3 %}...{% endif %}
-                </td>
+                </td>-->
               </tr>
           {% endfor %}
         </tbody>
