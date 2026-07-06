@@ -121,7 +121,7 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
 
     if not info_to_run:
         if notification_id:
-            info_to_run = [notification_id]
+            info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id)]
         elif status_values[0] == 'failure': # Error
             info_to_run = find_notifications_from_routing_history(brom, upto, publisher_id, status_values, rerouting, deletion_reason)
         else:
@@ -144,6 +144,7 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
     info_to_write["publisher_id"] = publisher_id
     info_to_write["publisher_email"] = publisher_email
     info_to_write["status_values"] = status_values
+    info_to_write["notification_id"] = notification_id
     info_to_write["from"] = brom
     info_to_write["upto"] = upto
     info_to_write["rerouting"] = rerouting
@@ -213,13 +214,14 @@ def update_deletion_log_files(del_log_file, airflow_log_url, notification_id, st
         data = json.loads(f.read())
 
         for note_list in data["notifications"]:
+            print("My notifications: ", note_list)
             if notification_id in note_list:
                 tmp_list = note_list
         try:
             data["notifications"].remove(tmp_list)
         except ValueError:
             app.logger.info(f"No notification found with id {notification_id} in DONE log file")
-            app.logger.info(f"You are likely rerunning a successful task. Stopping here.")
+            app.logger.info("You are likely rerunning a successful task. Stopping here.")
             raise ValueError(f"No notification found with id {notification_id} while updating DONE log file")
         data["remaining_notifications"] = len(data["notifications"])
         f.seek(0)
@@ -233,6 +235,7 @@ def update_deletion_log_files(del_log_file, airflow_log_url, notification_id, st
     if not tmp_list:
         app.logger.info(f"No notification found with id {notification_id}?")
         raise ValueError(f"No notification found with id {notification_id} while updating DONE log file")
+
     tmp_list.extend([doi, airflow_log_url])
     if final_file.exists():
         with open(final_file, 'r+') as f:
