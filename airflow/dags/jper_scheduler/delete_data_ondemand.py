@@ -79,6 +79,12 @@ def delete_data_ondemand():
             return info_to_run
         else:
             info_to_run = read_notifications_to_delete(max_map_length)
+            if len(info_to_run) == 0:
+                app.logger.warn("Empty run")
+                dag_run = session.merge(context['dag_run'])
+                dag_run.note = "Empty run"
+                session.commit()
+
             return info_to_run
 
     @task(task_id="get_create_RH_for_note", retries=0, max_active_tis_per_dag=1)
