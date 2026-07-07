@@ -50,6 +50,12 @@
                         {% if item["deletion_reason"] %}
                             <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
                         {% endif %}
+                        {% if item["logs_list"] %}
+                            {% for log_url in item["logs_list"] %}
+                            <dt>Log URL</dt><dd><a href="{{ log_url }}">Log url {{ loop.index }}</a></dd><br/>
+                            {% endfor %}
+                        {% endif %}
+
                     </dl>
                 </td>
                 <td>{{ item["total_notifications"] }}</td>

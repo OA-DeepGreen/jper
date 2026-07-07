@@ -123,10 +123,10 @@ def index():
                         status_values=form_options['status_values'], files_todo=files_todo, files_done=files_done, files_failed=files_failed)
     form_options['upto'] = upto
 
-    # if is_newer(upto, default_upto):
-    #     flash(f"date {upto} has to be older than 6 months")
-    #     return render_template('delete_notifications/index.html', publisher_id=x['publisher_id'],
-    #                        upto=x['upto'], status_values=x['status_values'])
+    if is_newer(upto, default_upto):
+        flash(f"date {upto} has to be older than 6 months")
+        return render_template('delete_notifications/index.html', publisher_id=x['publisher_id'],
+                           upto=x['upto'], status_values=x['status_values'])
 
     if deletion_type == "routed_and_failed":
         # status values
@@ -240,6 +240,7 @@ def serve(filename):
 
 def _read_file(file_io, file_type):
     stats = {'type': file_type}
+
     with open(file_io, 'r') as f:
         data = json.loads(f.read())
     stats["name"] = file_io.name
@@ -260,6 +261,21 @@ def _read_file(file_io, file_type):
     elif file_type == "failed":
         stats["failed_notifications"] = data.get("completed_notifications", 0)
     stats["notifications"] = []
+
+    substr = "map_index"
+    extra_substr = "tab=logs"
+    logs_list = []
+    jper_url = app.config.get("BASE_URL", "http://localhost")
+    if jper_url.endswith('/'):
+        jper_url = jper_url[:-1]
+    for note in data["notifications"]:
+        if substr in note[-1]:
+            idx = note[-1].index(substr)
+            log_url = f"{jper_url}{note[-1][:idx]}{extra_substr}"
+            if not log_url in logs_list:
+                logs_list.append(log_url)
+    stats["logs_list"] = logs_list
+
     # Getting only 3 or fewer notifications for display.
     # for index, note in enumerate(data["notifications"]):
     #     stats["notifications"].append(note[0])
