@@ -136,13 +136,6 @@ def clean_old_data():
             notes_errored = find_notifications_from_routing_history(since, upto, publisher, ["error"], None, deletion_reason)
             log_errored = write_selection_to_log(notes_errored, publisher, b.publisher_email, upto, since, "errored", deletion_reason)
 
-        if len(notes_routed) > 3:
-            notes_routed = notes_routed[:3]
-        if len(notes_failed) > 3:
-            notes_failed = notes_failed[:3]
-        if len(notes_errored) > 3:
-            notes_errored = notes_errored[:3]
-
         b = RoutingHistory()
         for note_info in notes_routed:
             note_id = note_info[0]

@@ -79,7 +79,7 @@ def delete_data_ondemand():
             return info_to_run
         else:
             info_to_run = read_notifications_to_delete(max_map_length)
-            return info_to_run[:3]
+            return info_to_run
 
     @task(task_id="get_create_RH_for_note", retries=0, max_active_tis_per_dag=1)
     def get_create_routing_history(routing_tuple):
