@@ -55,6 +55,7 @@
                             <dt>Log URL</dt><dd><a href="{{ log_url }}">Log url {{ loop.index }}</a></dd><br/>
                             {% endfor %}
                         {% endif %}
+                        <dt> <a href="/delete_notifications/csv/{{item["name"]}}">CSV download</a></dt><dd></dd><br/>
 
                     </dl>
                 </td>
@@ -74,11 +75,6 @@
                         (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)
                     {% endif %}
                 </td>
-                <!--
-                <td>{{ item["notifications"]|join("<br/>") }}
-                    {% if item["total_notifications"] > 3 %}...{% endif %}
-                </td>
-                -->
               </tr>
           {% endfor %}
         </tbody>

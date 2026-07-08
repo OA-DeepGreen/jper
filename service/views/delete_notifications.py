@@ -223,12 +223,10 @@ def get_list_todo_done_current():
             files_gathered[stats['name']].update(stats)
         else:
             files_gathered[stats['name']] = stats
-    print(files_gathered)
-    print('-'*50)
-    # files_gathered_sort = sorted(files_gathered.values(), key=lambda d: d[1]['last_modified'], reverse=True)
+    files_gathered_sort = sorted(files_gathered.values(), key=lambda d: d['last_modified'], reverse=True)
     # print(files_gathered_sort)
 
-    return files_gathered.values()
+    return files_gathered_sort
 
 @blueprint.route('/<path:filename>')
 def serve(filename):
@@ -237,6 +235,84 @@ def serve(filename):
     temp_name = words[1].split(".")[0]
     return_name = f"{temp_name}_{state}.json"
     return send_from_directory(del_log_path, filename, as_attachment=True, download_name=return_name)
+
+@blueprint.route('/csv/<path:filename>')
+def serve_csv(filename):
+    jper_url = app.config.get("BASE_URL", "http://localhost")
+    if jper_url.endswith('/'):
+        jper_url = jper_url[:-1]
+
+    del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
+    if del_log_path.endswith('/'):
+        del_log_path = del_log_path[:-1]
+
+    words = filename.split("/")
+    temp_name = words[0].split(".")[0]
+
+    notes_list = []
+    csv_info = {}
+
+    todo_file = f"{del_log_path}/TODO/{words[0]}"
+    if os.path.exists(todo_file):
+        with open(todo_file, 'r') as f:
+            data = json.loads(f.read())
+        if "notifications" in data.keys():
+            for item in data["notifications"]:
+                notes_list.append(f"{item[0]}, TODO,")
+        for key in data.keys():
+            if key != "notifications":
+                csv_info[key] = data[key]
+
+    done_file = f"{del_log_path}/DONE/{words[0]}"
+    if os.path.exists(done_file):
+        with open(done_file, 'r') as f:
+            data = json.loads(f.read())
+        if "notifications" in data.keys():
+            for item in data["notifications"]:
+                notes_list.append(f"{item[0]}, DONE, {jper_url}{item[6]}")
+        for key in data.keys():
+            if key != "notifications" and key not in csv_info.keys():
+                csv_info[key] = data[key]
+
+    failed_file = f"{del_log_path}/FAILED/{words[0]}"
+    if os.path.exists(failed_file):
+        with open(failed_file, 'r') as f:
+            data = json.loads(f.read())
+        if "notifications" in data.keys():
+            for item in data["notifications"]:
+                notes_list.append(f"{item[0]}, FAILED, {jper_url}{item[6]}")
+        for key in data.keys():
+            if key != "notifications":
+                if key == "completed_notifications":
+                    csv_info["failed_notifications"] = data[key]
+                elif key not in csv_info.keys():
+                    csv_info[key] = data[key]
+
+    return_name = f"{temp_name}.csv"
+    temp_log_path = os.path.join(del_log_path, "TEMP")
+    if not os.path.exists(temp_log_path):
+        os.makedirs(temp_log_path)
+    csv_path = os.path.join(temp_log_path,  return_name)
+    if os.path.exists(csv_path):
+        try:
+            os.remove(csv_path)
+        except Exception as e:
+            print(f"Failed to remove {csv_path}: {e}")
+
+    with open(csv_path, 'w') as f:
+        f.write(f"Publisher, {csv_info['publisher_email']}")
+        f.write("\n")
+        f.write(f"Selection, {csv_info['status_values']}, {csv_info['from']}, {csv_info['upto']}, {csv_info['rerouting']}")
+        f.write("\n")
+        done = 0
+        failed = 0
+        f.write("\n")
+        f.write(f"Notifications (Total, Done, Failed), {csv_info['total_notifications']}, {done}, {failed}")
+        f.write("\n")
+        for item in notes_list:
+            f.write(item + "\n")
+
+    return send_from_directory(temp_log_path, return_name, as_attachment=True, download_name=return_name)
 
 def _read_file(file_io, file_type):
     stats = {'type': file_type}
