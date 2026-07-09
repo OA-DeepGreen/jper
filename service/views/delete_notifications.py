@@ -252,7 +252,16 @@ def serve_csv(filename):
     notes_list = []
     csv_info = {}
 
+    return_name = f"{temp_name}.csv"
+    proper_name = f"{return_name}.complete"
+    temp_log_path = os.path.join(del_log_path, "TEMP")
+    csv_path = os.path.join(temp_log_path,  proper_name)
+    if os.path.exists(csv_path):
+        return send_from_directory(temp_log_path, proper_name, as_attachment=True, download_name=return_name)
+
+
     todo_file = f"{del_log_path}/TODO/{words[0]}"
+    todo_complete = False
     if os.path.exists(todo_file):
         with open(todo_file, 'r') as f:
             data = json.loads(f.read())
@@ -262,6 +271,11 @@ def serve_csv(filename):
         for key in data.keys():
             if key != "notifications":
                 csv_info[key] = data[key]
+        # For whatever reason
+        if len(data["notifications"]) == 0:
+            todo_complete = True
+    else:
+        todo_complete = True
 
     done_file = f"{del_log_path}/DONE/{words[0]}"
     if os.path.exists(done_file):
@@ -289,10 +303,14 @@ def serve_csv(filename):
                     csv_info[key] = data[key]
 
     return_name = f"{temp_name}.csv"
+    if todo_complete:
+        proper_name = f"{return_name}.complete"
+    else:
+        proper_name = return_name
     temp_log_path = os.path.join(del_log_path, "TEMP")
     if not os.path.exists(temp_log_path):
         os.makedirs(temp_log_path)
-    csv_path = os.path.join(temp_log_path,  return_name)
+    csv_path = os.path.join(temp_log_path,  proper_name)
     if os.path.exists(csv_path):
         try:
             os.remove(csv_path)
