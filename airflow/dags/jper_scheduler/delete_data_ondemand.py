@@ -138,10 +138,8 @@ def delete_data_ondemand():
             conn = esprit.raw.Connection(host_name, index, port=port)
             note = get_notifications_for(conn=conn, notification_id=notification_id)
             if not note or len(note.get("hits", {}).get("hits", [])) != 1:
-                app.logger.info(f"No notification found in ES with ID {notification_id}.")
-                publisher_id = None
-                doi = None
-                routing_id = None
+                app.logger.info(f"No notification found in ES with ID {notification_id}. Routing towards FAILED.")
+                update_deletion_log_files(del_log_file, log_url, notification_id, "failed", doi)
                 raise AirflowSkipException(f"No notification found in ES with ID {notification_id}.")
             else:
                 # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
