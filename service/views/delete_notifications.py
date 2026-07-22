@@ -63,8 +63,7 @@ def index():
         flash("Please select a deletion type")
         return render_template('delete_notifications/index.html', publisher_id=None,
                                publisher_emails=publisher_emails, since=default_from, upto=default_upto,
-                               status_values=[], notification_id=notification_id, deletion_type=None,
-                               files_todo=files_todo, files_done=files_done, files_failed=files_failed)
+                               status_values=[], notification_id=notification_id, deletion_type=None)
 
     # get common options - rerouting and reason
     # Rerouting
@@ -84,8 +83,7 @@ def index():
             flash("Please enter a notification ID")
             return render_template('delete_notifications/index.html', publisher_id=None,
                                    publisher_emails=publisher_emails, since=default_from, upto=default_upto,
-                                   status_values=[], notification_id=notification_id, deletion_type=None,
-                                   files_todo=files_todo, files_done=files_done, files_failed=files_failed)
+                                   status_values=[], notification_id=notification_id, deletion_type=None)
 
     # Get filter options used for both routed and failed notifications and errored notifications
 
@@ -107,7 +105,7 @@ def index():
         flash(f"Error validating 'from' date: {e}")
         return render_template('delete_notifications/index.html', publisher_id=form_options['publisher_id'],
                         publisher_emails=form_options['publisher_emails'], since=since, upto=form_options['upto'],
-                        status_values=form_options['status_values'], files_todo=files_todo, files_done=files_done, files_failed=files_failed)
+                        status_values=form_options['status_values'])
     form_options['from'] = since
 
     # Get upto
@@ -120,13 +118,13 @@ def index():
         flash(f"Error validating 'upto' date: {e}")
         return render_template('delete_notifications/index.html', publisher_id=form_options['publisher_id'],
                         publisher_emails=form_options['publisher_emails'], since=form_options['from'], upto=upto,
-                        status_values=form_options['status_values'], files_todo=files_todo, files_done=files_done, files_failed=files_failed)
+                        status_values=form_options['status_values'])
     form_options['upto'] = upto
 
     if is_newer(upto, default_upto):
         flash(f"date {upto} has to be older than 6 months")
-        return render_template('delete_notifications/index.html', publisher_id=x['publisher_id'],
-                           upto=x['upto'], status_values=x['status_values'])
+        return render_template('delete_notifications/index.html', publisher_id=form_options['publisher_id'],
+                           upto=form_options['upto'], status_values=form_options['status_values'])
 
     if deletion_type == "routed_and_failed":
         # status values
@@ -189,9 +187,9 @@ def call_airflow_dag_to_delete_notifications(form_options):
         return render_template('delete_notifications/deletion_sent.html', publisher_email=form_options['publisher_email'],
                                publisher_emails=form_options['publisher_emails'], since=form_options['from'], upto=form_options['upto'],
                                status_values=form_options['status_values'])
-    print(f"Airflow deletion request: {r.request.body}")
-    print(f"Airflow deletion url: {r.url}")
-    print(f"Airflow deletion response: {r.text}")
+    # print(f"Airflow deletion request: {r.request.body}")
+    # print(f"Airflow deletion url: {r.url}")
+    # print(f"Airflow deletion response: {r.text}")
     if jper_url.endswith('/'):
         jper_url = jper_url[:-1]
     airflow_display_url = f"{jper_url}/airflow/dags/{deletion_dag}/graph"
@@ -223,6 +221,12 @@ def get_list_todo_done_current():
             files_gathered[stats['name']].update(stats)
         else:
             files_gathered[stats['name']] = stats
+
+    app.logger.debug(f"files_gathered: {files_gathered.keys()}")
+    for file_name in files_gathered.keys():
+        stats = files_gathered[file_name]
+        stats["remaining_notifications"] = stats.get("total_notifications", 0) - stats.get("done_notifications", 0)
+        files_gathered[file_name] = stats
     files_gathered_sort = sorted(files_gathered.values(), key=lambda d: d['last_modified'], reverse=True)
     # print(files_gathered_sort)
 
