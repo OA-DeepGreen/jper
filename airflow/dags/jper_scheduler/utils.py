@@ -214,10 +214,9 @@ def get_notifications_for(
     if notification_id:
         # Fetch notifications from Elasticsearch for the given notification ID
         qr = {
-            "size": page_size,
             "query": {"bool": {"must": [{"term": {"id.exact": notification_id}}]}},
         }
-        response = esprit.raw.initialise_scroll(conn, query=qr, keepalive="10m")
+        response = esprit.raw.search(conn, query=qr)
     else:
         # Fetch notifications from Elasticsearch for the given date range and pagination parameters
         qr = {
