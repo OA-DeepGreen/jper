@@ -597,10 +597,11 @@ class RoutingDeletion(PublisherFiles):
                     deleted_date=now_utc,
                 )
             # Add a tombstone state to workflow states
+            message = f"Notification {notification_id} deleted with status {statusF['status']}"
+            if rerouting:
+                message = message + ". Retaining file on sftp server"
             if deletion_reason:
-                message = deletion_reason
-            else:
-                message = f"Notification {notification_id} deleted as part of cleanup with status {statusF['status']}"
+                message = message + ", " + deletion_reason
             message = message + ", " + note_message
             # Add list of files to the above message and pass it along to the tombstone
             for k, v in statusF['cleanup_files'].items():
