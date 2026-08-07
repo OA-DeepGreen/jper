@@ -9,7 +9,6 @@ from octopus.modules.store import store
 from service import packages, models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
-from service.lib.repackage_notifications import repackage_notification
 
 from airflow.exceptions import AirflowSkipException, AirflowFailException
 from airflow.decorators import dag, task
@@ -21,8 +20,6 @@ from jper_scheduler.utils import set_task_name, get_log_url
 # Create a connection - ES stuff
 host = app.config.get("ELASTIC_SEARCH_HOST", 'localhost') # includes port
 index = 'jper-routed*,jper-failed' # Comma-separated list of ES indices to query for notifications to reprocess
-# index = 'jper-routed*'
-# index = 'jper-failed'
 max_query = app.config.get("AIRFLOW_REPROCESS_MAX_QUERY", 5000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
@@ -31,10 +28,12 @@ conn = esprit.raw.Connection(host_name, index, port=port)
 subject_repo_bibids = {}
 out_subdir = 1
 
-outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/reprocess_repository')
+outputPath = app.config.get("AIRFLOW_REPROCESS_OUTPUT_PATH", '/logs/recreate_routing_history') # Base path for storing notifications to reprocess. This should be a shared filesystem accessible by all Airflow workers, and should have subdirectories "TODO", "DONE", and "FAILED" for tracking processing status.
 files_per_dir = 1000 # Number of notifications to write per subdirectory before creating a new one
 write_count = 0  # Local (=global here) writing counter
 notifications_to_process = app.config.get("AIRFLOW_REPROCESS_NOTIFICATION_BATCH_SIZE", 1000) # Notifications to process at a given time.
+
+##### Below are utility functions for fetching notifications from ES, writing to files, and cleaning up empty folders. #####
 
 def delete_empty_folders(root):
     # Clean up all empty folders in the outputPath
@@ -43,6 +42,13 @@ def delete_empty_folders(root):
             full_path = os.path.join(dirpath, dirname)
             if not os.listdir(full_path): # Test if the directory is empty
                 os.rmdir(full_path)
+
+def move_notification_to(file_name, dest):
+    # Move the processed file to a "processed" directory to avoid reprocessing in future runs
+    out_file_name = file_name.replace("/TODO/", f"/{dest}/")
+    out_dir = os.path.dirname(out_file_name)
+    os.makedirs(out_dir, exist_ok=True)
+    os.rename(file_name, out_file_name)
 
 def write_notifications(out_dir=None, notifications=None):
     # Write the given notifications to JSON files in the output directory, creating
@@ -92,29 +98,28 @@ def get_notifications_for(upto=None, since=None, scroll_id=None, page=1, page_si
     data = response.json()
     return data
 
-def get_all_notifications(out_dir=None, since=None, upto=None):
+def save_all_notifications(out_dir=None):
     # Loop to fetch notifications in given date range and write to files,
     # paginating through results until no more notifications are returned
     page = 1
 
-    if not since or not upto:
-        print("Error: since and upto parameters are required to fetch notifications.")
-        return 0
-    
-    print(f"Fetching notifications between {since} and {upto} : page {page}")
-    b = get_notifications_for(upto=upto, since=since, page=page, page_size=max_query)
+    print(f"Fetching all notifications : page {page}")
+    b = get_notifications_for(page=page, page_size=max_query)
     print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
     write_notifications(out_dir=out_dir, notifications=b['hits']['hits'])
 
     scroll_id = b['_scroll_id']
     while len(b['hits']['hits']) == max_query:
         page = page + 1
-        print(f"Fetching notifications between {since} and {upto} : page {page}")
-        b = get_notifications_for(upto=upto, since=since, scroll_id=scroll_id, page=page, page_size=max_query)
+        print(f"Fetching notifications : page {page}")
+        b = get_notifications_for(scroll_id=scroll_id, page=page, page_size=max_query)
         print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
         if len(b['hits']['hits']) == 0:
             break
         write_notifications(out_dir=out_dir, notifications=b['hits']['hits'])
+
+##### Above are utility functions for fetching and writing notifications.
+# Below are functions for processing notifications and updating routing history.
 
 def get_identifier(identifier, type):
     # Given a list of identifier objects, return the id for the given type
@@ -124,87 +129,90 @@ def get_identifier(identifier, type):
             res.append(id['id'])
     return res
 
-def is_article_license_gold(metadata, provider_id):
-    # Check if the article license is a gold license based on the provider's gold license list
-    if metadata.get('license_ref'):
-        license_typ = metadata["license_ref"].get('type', None)
-        license_url = metadata["license_ref"].get('url', None)
-        provider = models.Account.pull(provider_id)
-        if not provider:
-            return False
-        gold_license = []
-        if provider and provider.license and provider.license.get('gold_license', []):
-            gold_license = provider.license.get('gold_license')
-        if license_typ in gold_license or license_url in gold_license:
-            return True
-    return False
+def add_new_routing_history(notification, doi="", log_url=None):
+    routing_history_id = uuid.uuid4().hex
+    rh = models.RoutingHistory()
+    rh.id = routing_history_id
+    acc = None
+    try:
+        acc = models.Account().pull(notification.provider_id)
+    except Exception as e:
+        app.logger.debug(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
 
-def add_update_routing_history(notification, repository_id, request_type, doi="", log_url=None):
+    rh.publisher_id = acc.id if acc else None
+    rh.publisher_email = acc.email if acc else None
+    rh.sftp_server_url = acc.sftp_server_url if acc and hasattr(acc, 'sftp_server_url') else ""
+    rh.sftp_server_port = acc.sftp_server_port if acc and hasattr(acc, 'sftp_server_port') else ""
+    rh.sftp_username = acc.sftp_server_username if acc and hasattr(acc, 'sftp_server_username') else ""
+    rh.original_file_location = "None"
+    rh.final_file_locations = []
+    rh.notification_states = [{
+        "status": "success",
+        "notification_id": notification.id,
+        "doi": doi,
+        "number_matched_repositories": len(notification.repositories) if notification.repositories else 0
+    }]
+    rh.add_workflow_state(action="New RH for existing Notification", file_location="None", notification_id=notification.id,
+                                        status='success', message='New Routing History', log_url=log_url)
+    rh.save()
+    return rh
+
+def update_routing_history(notification, doi="", routing_history=None, log_url=None):
     # Add or update a record in the routing history to reflect that this notification has been reprocessed for the given repository
     notification_id = notification.id
-    routing_history = None
-    rh = models.RoutingHistory.pull_records(notification_id=notification_id)['hits']['hits']
-    if len(rh) > 0:
-        routing_history = models.RoutingHistory(rh[0]['_source'])
-    action = f"Reprocess"
-    file_location = "None"
-    status = "success"
-    message = f"Notification reprocessed for repository {repository_id}"
+    if not routing_history:
+        app.logger.info(f"No existing routing history found for notification id: {notification_id}, creating a new one.")
+        routing_history = add_new_routing_history(notification, doi=doi, log_url=log_url)
 
-    if routing_history:
-        routing_history.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                           status=status, message=message, log_url=log_url)
-        routing_history.save()
-    else: # If no existing routing history record exists for this notification, create a new one
-        routing_history_id = uuid.uuid4().hex
-        rh = models.RoutingHistory()
-        rh.id = routing_history_id
+    # From here on we have a routing history object.
+    if len(routing_history.final_file_locations) == 0:
+        store_files = store.StoreFactory.get().list_file_paths(notification_id)
+        for index, s_file in enumerate(store_files):
+            routing_history.add_final_file_location("store", s_file)
+            routing_history.add_workflow_state(action=f"Store file {index}", file_location=s_file, notification_id=notification.id,
+                                status='success', message='Reprocessed old notification, added file locations from store', log_url=log_url)
+        modified = True
+
+    if routing_history.publisher_id is None:
+        acc = None
         try:
-            acc = models.Account().pull(notification.provider.id)
-        except AttributeError as e:
             acc = models.Account().pull(notification.provider_id)
         except Exception as e:
             app.logger.debug(f"Error pulling account for provider id {notification.provider_id} : {str(e)}")
-            acc = None
         if acc:
-            rh.publisher_id = acc.id if acc else None
-            rh.publisher_email = acc.email if acc else None
-            try:
-                rh.sftp_server_url = acc.sftp_server_url
-            except AttributeError as e:
-                rh.sftp_server_url = ""
-            try:
-                rh.sftp_server_port = acc.sftp_server_port
-            except AttributeError as e:
-                rh.sftp_server_port = ""
-            try:
-                rh.sftp_username = acc.sftp_username
-            except AttributeError as e:
-                rh.sftp_username = ""
-        rh.original_file_location = "None"
-        rh.final_file_locations = []
-        rh.notification_states = [{
-            "status": status,
-            "notification_id": notification_id,
-            "doi": doi,
-            "number_matched_repositories": 1
-        }]
-        rh.add_workflow_state(action=action, file_location=file_location, notification_id=notification_id,
-                                           status=status, message=message, log_url=log_url)
-        rh.save()
+            routing_history.publisher_id = acc.id
+            routing_history.publisher_email = acc.email
+            routing_history.sftp_server_url = acc.sftp_server_url if acc and hasattr(acc, 'sftp_server_url') else ""
+            routing_history.sftp_server_port = acc.sftp_server_port if acc and hasattr(acc, 'sftp_server_port') else ""
+            routing_history.sftp_username = acc.sftp_server_username if acc and hasattr(acc, 'sftp_server_username') else ""
+        else:
+            routing_history.publisher_id = None
+            routing_history.publisher_email = None
+            routing_history.sftp_server_url = ""
+            routing_history.sftp_server_port = ""
+            routing_history.sftp_username = ""
 
-def process_notification(note_json=None, bibids={}, log_url=None):
-    # Process a single notification, extract the relevant metadata, and check if it matches TUBFR routing criteria
+    for notification_state in routing_history.notification_states:
+        if notification_state['notification_id'] == notification_id:
+            # Update existing notification state
+            modified = True
+            if notification_state.get('number_matched_repositories', 0) == 0:
+                if notification.repositories and len(notification.repositories) > 0: # Update if we have new info to add
+                   routing_history.add_notification_state(status='success', notification_id=notification.id, doi=doi,
+                                number_matched_repositories=len(notification.repositories))
+            break
+
+    routing_history.save()
+
+def process_notification(notification_id=None, note_json=None, routing_history=None, log_url=None):
+    # Process a single notification, extract the relevant metadata
     note = note_json['_source']
-    app.logger.info(f"Processing notification {note['id']} for bibid : {bibids}")
+    app.logger.info(f"Processing notification {notification_id}")
 
     obj = None
-    repo_id = list(bibids.values())[0]
     if note_json['_index'].startswith('jper-routed'):
         app.logger.info(f"Processing routed notification id: {note['id']}")
         obj = models.RoutedNotification(note)
-        if repo_id in obj.repositories:
-            return 0 # No need to process if we already know this notification has been matched already to this repository
 
     from_failed = False
     if note_json['_index'].startswith('jper-failed'):
@@ -213,20 +221,22 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         if not pf:
             app.logger.warn(f"No packaging format found")
 
+        ## A block of code to get and clean up the metadata of the notification so that it is in a clean state for importing into a model object
         try:
             metadata, pmd = packages.PackageManager.extract(note["id"], pf)
+            app.logger.debug(f"Successfully extracted metadata for notification id: {note['id']}")
         except AttributeError as e:
             app.logger.error(f"Error in a saved date? Cannot process further : {str(e)}")
-            return -1
+            return 'failure'
         except packages.PackageException as e:
             app.logger.error(f"Error accessing data from store? Cannot process further : {str(e)}")
-            return -1
+            return 'failure'
 
-        metadata_json = json.loads(metadata.json())['metadata']
+        print(f"Extracted metadata for notification id: {note['id']} : {metadata}")
         if not metadata:
             app.logger.warn(f"Metadata is empty")
-            return 0
         else:
+            metadata_json = json.loads(metadata.json())['metadata']
             kkeys = metadata_json.keys()
             for key in kkeys:
                 if "date" in key:
@@ -246,122 +256,62 @@ def process_notification(note_json=None, bibids={}, log_url=None):
                             # A weird / corrupted format with a 3-digit (not letter) month? Set it to date_submitted
                             metadata_json[key] = metadata_json["date_submitted"]
                             print(f"Updating {key} to {metadata_json[key]}")
-
-        note["metadata"] = metadata_json
+            note["metadata"] = metadata_json
 
         obj = models.RoutedNotification(note)
         from_failed = True
 
     if not obj:
         print(f"Could not pull notification object for id: {note['id']}")
-        return 0
+        return 'skip'
 
-    notification_id = obj.id
     app.logger.info(f"Processing notification id: {notification_id}")
     metadata = note['metadata']
     if "identifier" not in metadata.keys():
         app.logger.warning(f"No identifier found in metadata for notification id: {notification_id}")
         app.logger.info(f"Metadata keys are : {metadata.keys()}")
         app.logger.debug(metadata)
-        return 0
     if "publication_date" not in metadata.keys():
         app.logger.warning(f"No publication_date or identifier found in metadata for notification id: {notification_id}")
         app.logger.debug(metadata)
-        return 0
     issn_data = get_identifier(metadata["identifier"], "issn")
     publ_date = metadata.get("publication_date", None)
     dt = datetime.datetime.strptime(publ_date, "%Y-%m-%dT%H:%M:%SZ")
     publ_year = str(dt.year)
-    app.logger.info(f"Notification id: {notification_id} has publication year: {publ_year} and ISSN(s): {issn_data}")
     doi = get_identifier(metadata["identifier"], "doi")
     if 'provider' not in note.keys() or 'id' not in note['provider'].keys():
         app.logger.warning(f"No provider id found in notification for id: {notification_id}")
-        return 0
     provider_id = note.get('provider', None).get('id', None)
-    if doi is None:
-        doi = "unknown"
-    elif len(doi) == 0:
-        doi = "unknown"
-    else:
-        doi = doi[0]
-    if len(issn_data) == 0:
-        app.logger.warning(f"No ISSN found in metadata for notification id: {notification_id}")
-        return 0
-    gold_article_license = is_article_license_gold(metadata, provider_id)
-    app.logger.info(f"Notification id: {notification_id} has DOI: {doi} and gold article license: {gold_article_license}")
-    al_repos = None
-    for count in range(5):
-        if al_repos:
-            break
-        try:
-            app.logger.debug(f"Counter : {count} Calling select_active_participant_bibids for notification id: {notification_id}")
-            al_repos = routing._select_active_participant_bibids(issn_data, publ_year, doi, gold_article_license,
-                                                    bibids, subject_repo_bibids)
-            app.logger.debug(f"Counter : {count} select_active_participant_bibids returned {len(al_repos)} repositories for notification id: {notification_id}")
-        except Exception as e:
-                app.logger.error(f"Counter : {count} Error in select_active_participant_bibids for notification id: {notification_id} : {str(e)}")
-                app.logger.info(f"Sleeping for 30 seconds before retrying select_active_participant_bibids for notification id: {notification_id}")
-                al_repos = None
-                time.sleep(30)
 
-    match_ids = []
-    match_data = obj.match_data()
-    app.logger.info(f"Match data for notification id: {notification_id} : {match_data}")
-    for count in range(5):
-        if len(match_ids) > 0:
-            break
-        try:
-            match_ids = routing._match_repositories(al_repos, obj, match_data)
-        except Exception as e:
-            app.logger.error(f"Error in matching repositories for notification id: {notification_id} : {str(e)}")
-            app.logger.info(f"Sleeping for 30 seconds before retrying matching for notification id: {notification_id}")
-            match_ids = []
-            time.sleep(30)
+    # Update notification
+    repos = obj.repositories
+    obj.repositories = list(set(repos))
+    obj.save()
+    app.logger.info(f"Saved routed notification id: {notification_id}")
+    # Update routing history
+    update_routing_history(obj, doi=doi, routing_history=routing_history, log_url=log_url)
+    return 'success'
 
-    print(f"Matched {notification_id} to {len(match_ids)} repositories : {match_ids}")
-    if len(match_ids) > 0:
-        # Update notification
-        repos = obj.repositories
-        repos.extend(match_ids)
-        obj.repositories = list(set(repos))
-        obj.save()
-        repackage_notification(notification_id, repo_ids=[repo_id], packaging_formats=[], add_new_links=True)
+##### The main DAG definition starts here. It consists of two tasks:
+# one - fetch all notifications to process and write them to files
+# two - process each notification file and update routing history accordingly.
+# The DAG is designed to be run once to the recreate routing history for all the notifications in jper.
+# After processing, it moves the notification files to "DONE" or "FAILED" subdirectories based on the outcome. #####
 
-        app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
-        if from_failed:
-            # If this notification was from the failed index, we need to move it to the routed index
-            f = models.FailedNotification.pull(notification_id)
-            if f:
-                f.delete()
-                app.logger.info(f"Deleted failed notification id: {notification_id}")
-        # Update routing history
-        request_type = "machine"
-        request_deposit_helper.request_deposit([notification_id], match_ids[0], request_type=request_type)
-        add_update_routing_history(obj, match_ids[0], request_type, doi=doi, log_url=log_url)
-    return len(match_ids)
-
-def move_notification_to(file_name, dest):
-    # Move the processed file to a "processed" directory to avoid reprocessing in future runs
-    out_file_name = file_name.replace("/TODO/", f"/{dest}/")
-    out_dir = os.path.dirname(out_file_name)
-    os.makedirs(out_dir, exist_ok=True)
-    os.rename(file_name, out_file_name)
-
-@dag(dag_id="Reprocess_Repository", max_active_runs=1,
+@dag(dag_id="Create_Routing_History_From_Notification", max_active_runs=1,
      schedule=None, schedule_interval=app.config.get("AIRFLOW_REPROCESS_SCHEDULE", 'None'),
      start_date=datetime.datetime(2025, 10, 22),
-     description=f"Jper Reprocess notifications on demand",
+     description=f"Create or update routing history records for all notifications",
      catchup=False,
-     tags=["teamCottageLabs", "jper_reprocess"])
-def reprocess_repository():
-
-    @task(task_id="notifications_in_date_range", retries=3, max_active_tis_per_dag=4)
+     tags=["teamCottageLabs", "jper_one_time_runs"])
+def reprocess_all_notifications():
+#
+    @task(task_id="gall_notifications", retries=3, max_active_tis_per_dag=4)
     @provide_session
-    def get_all_notifications_in_date_range(session=None, **context):
+    def get_all_notifications(session=None, **context):
         global notifications_to_process
         # Always do the cleanup
         delete_empty_folders(outputPath)
-        files_to_process = []
         # Basic sanity check to avoid processing too many notifications at once and overwhelming Airflow
         max_map_length = conf.getint("core", "max_map_length")
         if notifications_to_process > max_map_length:
@@ -369,34 +319,19 @@ def reprocess_repository():
             print(f"Processing only the first {max_map_length} notifications to avoid Airflow errors.")
             notifications_to_process = max_map_length
 
-        # Get parameters from context - these are passed when triggering the DAG
-        print(f"Parameters received: {context['params']}")
-        if len(context['params']) > 0:
-            repository_tuple = context['params'].get('repository_id', None)
-            if repository_tuple:
-                upto = context['params'].get('upto', None)
-                since = context['params'].get('from', None)
-                repository_name = repository_tuple.split()[0]
-                repository_id = repository_tuple.split()[1]
-            else:
-                app.logger.debug("No repository requested for reprocessing.")
-
-
-            if repository_tuple and since and upto:
-                print(f"Fetching notifications for repository_id: {repository_tuple} between {since} and {upto}")
-                # Construct the path for storing the notifications to reprocess
-                input_path = f"{outputPath}/{repository_name}_{repository_id}/TODO"
-                print(f"Notifications will be written to: {input_path}")
-                get_all_notifications(out_dir=input_path, since=since, upto=upto)
-            else:
-                print("Error: Missing required parameters. 'repository_id', 'from' (since), and 'upto' are required to fetch notifications.")
-                print("Please trigger this reprocessing DAG with the required parameters.")
-                print("Continuing - looking for any existing notifications to process.")
+        path = Path(outputPath).rglob('**/*.json')
+        if len(list(path)) == 0:
+            print(f"No existing notifications found in {outputPath}/TODO. Fetching from Elasticsearch and writing to files for processing.")
+            # Construct the path for storing the notifications to reprocess
+            input_path = f"{outputPath}/TODO"
+            print(f"Notifications will be written to: {input_path}")
+            save_all_notifications(out_dir=input_path)
 
         # At this point, the notifications already exist.
         # Retrieve the next <notifications_to_process> (if any) files to process.
         path = Path(outputPath).rglob('TODO/**/*.json')
         local_count = 0
+        files_to_process = []
         for file in path:
             files_to_process.append(file.__str__())
             local_count += 1
@@ -411,7 +346,7 @@ def reprocess_repository():
             session.commit()
 
         return files_to_process
-
+#
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
         retries=3, max_active_tis_per_dag=4)
     def process_one_notification(note):
@@ -420,30 +355,36 @@ def reprocess_repository():
         context["map_index_template"] = set_task_name(ti.map_index, note)
         log_url = get_log_url(context)
 
-        # note = /<outputPath>/name_id/TODO/xxxx/<note_id>.json
+        # note = /<outputPath>/TODO/xxxx/<note_id>.json
         file_name = note
         file_path = Path(file_name)
-        repository_tuple = file_path.parts[-4]
-        repository_name = repository_tuple.split("_")[0]
-        repository_id = repository_tuple.split("_")[1]
-        bibids = {repository_name: repository_id}
-        app.logger.debug(f"Processing notification {file_name} for repository {bibids}")
+        app.logger.debug(f"Processing notification {file_name}")
+
         data = None
         with open(file_name, 'r') as file:
           data = json.load(file)
-        num_matched = process_notification(note_json=data, bibids=bibids, log_url=log_url)
 
-        if num_matched == -1:
+        notification_id = file_path.stem
+        rh = models.RoutingHistory.pull_records(notification_id=notification_id)['hits']['hits']
+        if len(rh) > 0:
+            app.logger.info(f"Existing routing history {rh[0]['_id']} found for notification id: {notification_id}, will update it.")
+            routing_history = models.RoutingHistory(rh[0]['_source'])
+        else:
+            app.logger.info(f"No existing routing history found for notification id: {notification_id}, will create a new one.")
+            routing_history = None
+        status = process_notification(notification_id=notification_id, note_json=data, routing_history=routing_history, log_url=log_url)
+
+        if status == "failure":
             move_notification_to(file_name, "FAILED")
             raise AirflowFailException(f"Failure during processing. Will not rerun this task.")
 
         # Move the processed file to "DONE"
         move_notification_to(file_name, "DONE")
 
-        if num_matched == 0:
-            raise AirflowSkipException(f"No repositories matched for notification {file_name}. Check log for details.")
-
-    notes_to_process = get_all_notifications_in_date_range()
+        if status == "skip":
+            raise AirflowSkipException(f"Skipping notification {file_name}. Look at log above for details.")
+#
+    notes_to_process = get_all_notifications()
     process_one_notification.expand(note=notes_to_process)
-
-reprocess_repository()
+#
+reprocess_all_notifications()

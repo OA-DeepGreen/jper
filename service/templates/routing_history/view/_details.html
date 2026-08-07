@@ -8,7 +8,7 @@
       <dt>Publisher:</dt>
       {% if rec.publisher_email and rec.publisher_id %}
         <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_email | safe }}</a></dd>
-      {% elif rec.get('publisher_id', '') %}
+      {% elif rec.publisher_id %}
         <dd><a href="/account/{{ rec.publisher_id }}">{{ rec.publisher_id | safe }}</a></dd>
       {% endif %}
       {% for n_state in rec.notification_states %}
@@ -22,7 +22,7 @@
             {% endif %}
             {% if n_state['status'] == 'failure' %}
               | error
-            {% elif n_state.get(['number_matched_repositories'],0) > 0 %}
+            {% elif n_state.get('number_matched_repositories',0) > 0 %}
               | routed - matched {{ n_state['number_matched_repositories'] }}
             {% else %}
               | failed

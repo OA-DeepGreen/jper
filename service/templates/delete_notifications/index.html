@@ -1,5 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
-  {% include 'delete_notifications/index/_heading.html' %}
-  {% include 'delete_notifications/index/_form.html' %}
+    {% include 'delete_notifications/index/_heading.html' %}
+    {% include 'delete_notifications/index/_form.html' %}
+    {% include 'delete_notifications/index/_number_of_results.html' %}
+    {% include 'delete_notifications/index/_table.html' %}
+{% endblock %}
+{% block extra_js_bottom %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var deletionTypeInputs = document.querySelectorAll('input[name="deletion_type"]');
+
+            var optionSections = [
+                document.getElementById("single_notification_options"),
+                document.getElementById("routed_and_failed_options"),
+                document.getElementById("errored_options")
+            ];
+
+            function showSelectedDeletionOptions() {
+                optionSections.forEach(function (section) {
+                    if (section) {
+                        section.style.display = "none";
+                    }
+                });
+
+                var selectedInput = document.querySelector('input[name="deletion_type"]:checked');
+
+                if (selectedInput) {
+                    var selectedOptionsId = selectedInput.value + "_options";
+                    var selectedOptions = document.getElementById(selectedOptionsId);
+
+                    if (selectedOptions) {
+                        selectedOptions.style.display = "block";
+                    }
+                }
+            }
+
+            deletionTypeInputs.forEach(function (input) {
+                input.addEventListener("change", showSelectedDeletionOptions);
+            });
+
+            showSelectedDeletionOptions();
+        });
+    </script>
 {% endblock %}

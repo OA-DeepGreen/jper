@@ -50,7 +50,7 @@ class PublisherFiles:
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
-        except exception as e:
+        except Exception as e:
             app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
             app.logger.error(traceback.format_exc())
             return -1
@@ -141,6 +141,15 @@ class PublisherFiles:
             self.username = uname
         else:
             self.username = self.id
+
+        # Months after which the deletion task will clean the notifications
+        self.retain_routed = 0
+        self.retain_failed = 0
+        self.retain_errored = 0
+        if 'notification_retention_period' in publisher.keys():
+            self.retain_routed = publisher['notification_retention_period']['routed']
+            self.retain_failed = publisher['notification_retention_period']['failed']
+            self.retain_errored = publisher['notification_retention_period']['errored']
 
         self.acc = publisher
         self.apiurl += '?api_key=' + self.acc['api_key']

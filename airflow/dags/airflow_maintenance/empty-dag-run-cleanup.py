@@ -64,6 +64,8 @@ def dag_run_cleanup():
     def clean_up_empty_runs():
         find_and_delete_dag_runs_by_note("Empty run", dag_id="Process_Publisher_Deposits", dry_run=False)
         find_and_delete_dag_runs_by_note("Empty run", dag_id="Reprocess_Repository", dry_run=False)
+        find_and_delete_dag_runs_by_note("Empty run", dag_id="Delete_Data_OnDemand", dry_run=False)
+        find_and_delete_dag_runs_by_note("Empty run", dag_id="Delete_Old_Data", dry_run=False)
         return
 
     clean_up_empty_runs()

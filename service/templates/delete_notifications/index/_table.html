@@ -1,0 +1,83 @@
+<h3>List of deleted jobs</h3>
+  {% if files_gathered|length == 0 %}
+    <p>No notifications to delete.<p>
+  {% endif %}
+  <div class="row cms">
+    <div class="col span-12">
+      <table class="tablesorter-green" id="users">
+        <thead>
+          <tr>
+            <!--<th rowspan="2">File name</th>-->
+            <th rowspan="2">Date requested</th>
+            <th rowspan="2">Last modified</th>
+            <th rowspan="2">Search criteria</th>
+            <th colspan="4">Number of notifications</th>
+            <!--<th rowspan="2">Notifications</th>-->
+          </tr>
+          <tr>
+            <th>Total</th>
+            <th>Done</th>
+            <th>Failed</th>
+            <th>Remaining</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in files_gathered %}
+              <tr>
+                <!--<td>{{ item["name"] }}</td>-->
+                <td>{{ item["date_requested"] }}</td>
+                <td>{{ item["last_modified"] | datetimeformat }}</td>
+                <td>
+                    <dl>
+                        {% if item["notification_id"] %}
+                            <dt>Notification</dt><dd>{{ item["notification_id"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["publisher_email"] %}
+                            <dt>Publisher</dt><dd>{{ item["publisher_email"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["from"] %}
+                           <dt>Search from</dt><dd>{{ item["from"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["upto"] %}
+                           <dt>Search upto</dt><dd>{{ item["upto"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["status_values"] %}
+                           <dt>Search statuses</dt><dd>{{ item["status_values"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["rerouting"] != None %}
+                            <dt>Rerouting</dt><dd>{{ item["rerouting"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["deletion_reason"] %}
+                            <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
+                        {% endif %}
+                        {% if item["logs_list"] %}
+                            {% for log_url in item["logs_list"] %}
+                            <dt>Log URL</dt><dd><a href="{{ log_url }}">Log url {{ loop.index }}</a></dd><br/>
+                            {% endfor %}
+                        {% endif %}
+                        <dt> <a href="/delete_notifications/csv/{{item["name"]}}">CSV download</a></dt><dd></dd><br/>
+
+                    </dl>
+                </td>
+                <td>{{ item["total_notifications"] }}</td>
+                <td>{{ item.get("done_notifications", 0) }}
+                    {% if item.get("done_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/DONE/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+                <td>{{ item.get("failed_notifications", 0) }}
+                    {% if item.get("failed_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/FAILED/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+                <td>{{ item.get("remaining_notifications", 0) }}
+                    {% if item.get("remaining_notifications", 0) > 0 %}
+                        (<a href="/delete_notifications/TODO/{{item["name"]}}">File</a>)
+                    {% endif %}
+                </td>
+              </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
