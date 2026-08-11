@@ -1,0 +1,26 @@
+{% if answer and answer.keys() %}
+    <div class="box box--padding-large box--brd-mgreyblue">
+        <h2>XML Transformation result</h2>
+        <dl>
+            <!-- filename -->
+            <dt>Filename</dt>
+            <dd>{{ answer.get('filename', '') }}</dd><br/>
+
+            <!-- format -->
+            <dt>Format</dt>
+            <dd>{{ answer.get('xsl_format', '') }}</dd><br/>
+
+            <dt>Result</dt>
+            <dd>
+                <p>{{ answer.get('message', '') }}</p><br/>
+                {% if answer.get('success', False) %}
+                    <pre style="white-space:pre-wrap;">
+                        <code class="language-xml">{{ answer.get('xml', '') }}</code>
+                    </pre>
+                {%  else %}
+                    <pre style="white-space:pre-wrap;">{{ answer.get('long_message', '') }}</pre>
+                {% endif %}
+            </dd><br/>
+        </dl>
+    </div>
+{%  endif %}
