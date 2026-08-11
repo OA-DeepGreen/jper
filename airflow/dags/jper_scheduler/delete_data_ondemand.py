@@ -87,7 +87,7 @@ def delete_data_ondemand():
 
             return info_to_run
 
-    @task(task_id="get_create_RH_for_note", retries=0, max_active_tis_per_dag=1)
+    @task(task_id="get_create_RH_for_note", retries=0, max_active_tis_per_dag=12)
     def get_create_routing_history(routing_tuple):
         # Investigate the notification, as it could need a creation of routing history.
         context = get_current_context()
@@ -164,7 +164,7 @@ def delete_data_ondemand():
             note_pass,
         )
 
-    @task(task_id="delete_old_notification_id", retries=0, max_active_tis_per_dag=1)
+    @task(task_id="delete_old_notification_id", retries=0, max_active_tis_per_dag=12)
     def delete_notification(routing_tuple):
         # If the deletion is done in the same task as the creation (here), the routing history is empty if newly created, without
         # any of the added informatoin for some reason.
