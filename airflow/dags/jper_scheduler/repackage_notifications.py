@@ -33,7 +33,7 @@ def regenerate_metsmods():
             app.logger.info("Missing parameters for on-demand METS/MODS regeneration - exiting")
             return []
 
-        max_length = conf.getint("core", "max_map_length")        
+        max_length = conf.getint("core", "max_map_length")
         if len(notifications_list) > max_length:
             app.logger.info(f"Too many notifications given for on-demand METS/MODS regeneration - exiting.")
             app.logger.info(f"Max allowed is {max_length}, but received {len(notifications_list)}")
@@ -42,7 +42,7 @@ def regenerate_metsmods():
         app.logger.info(f"Parameters to search for routing history records:")
         app.logger.info(f"notifications_list: {notifications_list}")
         app.logger.info(f"format: {format}")
-        return notifications_list[:3]
+        return notifications_list
 
     @task(task_id="regenerate_metsmods_for_notification", retries=0, max_active_tis_per_dag=1)
     def regenerate_metsmods_for_notification(notification_id):
