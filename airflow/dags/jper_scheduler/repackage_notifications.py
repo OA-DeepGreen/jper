@@ -14,7 +14,7 @@ from airflow.configuration import conf
 # This DAG goes along with the view in service/views/regenerate_metsmods.py.
 
 @dag(dag_id="Repackage_Notification", max_active_runs=1,
-     schedule=None, schedule_interval=app.config.get("AIRFLOW_REGENERATE_METSMODS_SCHED", 'None'),
+     schedule=None, schedule_interval=app.config.get("AIRFLOW_REGENERATE_METSMODS_SCHED", None),
      start_date=datetime(2025, 10, 22), description="Regenerate METS/MODS on demand for given notifications",
      catchup=False, tags=["teamCottageLabs", "regenerate_ondemand"])
 def regenerate_metsmods():
