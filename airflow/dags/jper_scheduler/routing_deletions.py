@@ -42,10 +42,12 @@ def find_notifications_from_routing_history(since, upto, publisher_id, status_va
     for hit in records.get('hits', {}).get('hits', []):
         for note_state in hit.get("notification_states", []):
             notification_id = note_state.get("notification_id", "None")
-            if "scheduled" in deletion_reason:
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id, hit.get("id")))
+            tmp_stat = note_state.get("status", "failure")
+            if temp_stat == "failure":
+                notification_index = "jper-failed"
             else:
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+                notification_index = "jper-routed"
+            info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id))
     return info_to_run
 
 #####
@@ -72,7 +74,13 @@ def find_notifications_from_ES_directly(conn, since, upto, publisher_id, status_
     info_to_run = []
     for hit in records["hits"]["hits"]:
         notification_id = hit["_id"]
-        info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+        notification_index = hit["_index"]
+        num_repos = len(hit["fields"]["repositories"])
+        doi = None
+        for item in hit["fields"]["metadata.identifier.id"]:
+            if len(item) > 12:
+                doi = item
+        info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi))
 
     if num_records > page_size:
         page = 2
@@ -92,7 +100,13 @@ def find_notifications_from_ES_directly(conn, since, upto, publisher_id, status_
                 break
             for hit in records["hits"]["hits"]:
                 notification_id = hit["_id"]
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+                notification_index = hit["_index"]
+                num_repos = len(hit["fields"]["repositories"])
+                doi = None
+                for item in hit["fields"]["metadata.identifier.id"]:
+                    if len(item) > 12:
+                        doi = item
+                info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi))
     return info_to_run
 
 ##### Write to a file, every notification that we have been asked to delete.
@@ -121,7 +135,7 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
 
     if not info_to_run:
         if notification_id:
-            info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id)]
+            info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id, None, None)]
         elif status_values and status_values[0] == 'failure': # Error
             info_to_run = find_notifications_from_routing_history(brom, upto, publisher_id, status_values, rerouting, deletion_reason)
         else:

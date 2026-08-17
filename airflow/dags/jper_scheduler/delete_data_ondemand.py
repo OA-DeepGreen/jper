@@ -4,21 +4,20 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-import esprit
-from airflow.dags.one_time_runs.create_routing_history import write_notifications
-from airflow.decorators import dag, task, task_group
-
 # Airflow stuff
-from airflow.exceptions import AirflowSkipException, AirflowFailException, AirflowTaskTerminated
+from airflow.exceptions import AirflowSkipException, AirflowFailException
+from airflow.decorators import dag, task, task_group
 from airflow.operators.python import get_current_context
 from airflow.utils.session import provide_session
 from airflow.configuration import conf
 
 # My code
-from jper_scheduler.routing_deletions import RoutingDeletion, write_notifications_to_delete, read_notifications_to_delete, update_deletion_log_files
-from jper_scheduler.utils import create_routing_history_record, get_log_url, get_notifications_for, set_task_name
+import esprit
 from octopus.core import app
+from service import models
 from service.models.routing_history import RoutingHistory
+from jper_scheduler.utils import create_routing_history_record_for_del, get_log_url, get_notifications_for, set_task_name
+from jper_scheduler.routing_deletions import RoutingDeletion, write_notifications_to_delete, read_notifications_to_delete, update_deletion_log_files
 
 del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/request_deletion_logs')
 del_file = Path(del_log_path) / "TODO" / f"deletion_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -64,7 +63,7 @@ def delete_data_ondemand():
                 app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
                 app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
                 app.logger.info(f"Deletion reason provided: {deletion_reason}")
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, None, str(del_file)))
+                info_to_run.append((notification_id, "Unknown", status_values, rerouting, deletion_reason, None, None, None, str(del_file)))
             else:
                 publisher_id = context["params"].get("publisher_id", None)
                 if not publisher_id:
@@ -93,13 +92,21 @@ def delete_data_ondemand():
         context = get_current_context()
         log_url = get_log_url(context)
 
+        print("Routing tuple:", routing_tuple)
+        print("Length of routing tuple:", len(routing_tuple))
+
         b = RoutingHistory()
         notification_id = routing_tuple[0]
-        status_values = routing_tuple[1]
-        rerouting = routing_tuple[2]
-        deletion_reason = routing_tuple[3]
-        publisher_id = routing_tuple[4]
-        del_log_file = Path(routing_tuple[5])
+        notification_index = routing_tuple[1]
+        status_values = routing_tuple[2]
+        rerouting = routing_tuple[3]
+        deletion_reason = routing_tuple[4]
+        publisher_id = routing_tuple[5]
+        num_repos = routing_tuple[6]
+        doi = routing_tuple[7]
+        del_log_file = Path(routing_tuple[8])
+
+        publisher_email = None
 
         ti = context["ti"]  # TaskInstance
         context["map_index_template"] = set_task_name(ti.map_index, notification_id)
@@ -108,49 +115,84 @@ def delete_data_ondemand():
         if not publisher_id:
             note_pass = "Single notification"
 
-        if not status_values or len(status_values) == 0 or len(status_values) == 2 or status_values[0] == "failure":
-            index = "jper-routed*,jper-failed"
-        elif status_values[0] == "success-routed":
-            index = "jper-routed*"
-        elif status_values[0] == "success-no-matches":
-            index = "jper-failed"
+        if note_pass == "Group of notifications":
+            index = notification_index
+            acc = models.Account().pull(publisher_id)
+            if acc:
+                publisher_email = acc.email if acc else None
+                sftp_url = acc.sftp_server_url
+                try:
+                    sftp_url = acc.sftp_server_url
+                except AttributeError as e:
+                    print("URL attribute error")
+                    sftp_url = ""
+                try:
+                    sftp_port = acc.sftp_server_port
+                except AttributeError as e:
+                    print("Port attribute error")
+                    sftp_port = ""
+                try:
+                    sftp_username = acc.sftp_server_username
+                except AttributeError as e:
+                    print("Username attribute error")
+                    sftp_username = ""
+
         else:
-            app.logger.error(f"Unknown status value: {status_values[0]}")
-            raise ValueError(f"Unknown status value: {status_values[0]}")
+            if not status_values or len(status_values) == 0 or len(status_values) == 2 or status_values[0] == "failure":
+                index = "jper-routed*,jper-failed"
+            elif status_values[0] == "success-routed":
+                index = "jper-routed*"
+            elif status_values[0] == "success-no-matches":
+                index = "jper-failed"
+            else:
+                app.logger.error(f"Unknown status value: {status_values[0]}")
+                raise ValueError(f"Unknown status value: {status_values[0]}")
 
         routing_id = ""
         app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
         c = b.pull_records(notification_id=notification_id)
         num_records = c.get('hits', {}).get('total', {}).get('value', 0)
         if num_records >= 1: # Found the notification with a routing ID
-            hit = c['hits']['hits'][0]
+            hit = c['hits']['hits'][0] # Screwup in dev. Just pick the first one.
             routing_id = hit['_source']['id']
             doi = None
             for n_state in hit["_source"]["notification_states"]:
                 if n_state.get("notification_id", None) == notification_id:
                     doi = n_state.get("doi")
                     break
-            if "publisher_id" in hit["_source"].keys():
-                if not publisher_id:
-                    publisher_id = hit["_source"]["publisher_id"]
+            if not publisher_id and "publisher_id" in hit["_source"].keys():
+                publisher_id = hit["_source"]["publisher_id"]
         else: # Is it an old notification without a routing ID?
-            app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
-            conn = esprit.raw.Connection(host_name, index, port=port)
-            note = get_notifications_for(conn=conn, notification_id=notification_id)
-            if not note or len(note.get("hits", {}).get("hits", [])) != 1:
-                app.logger.info(f"No notification found in ES with ID {notification_id}. Routing towards FAILED.")
-                update_deletion_log_files(del_log_file, log_url, notification_id, "failed", doi)
-                raise AirflowSkipException(f"No notification found in ES with ID {notification_id}.")
-            else:
-                # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
-                app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
-                note_index = note["hits"]["hits"][0]["_index"]
-                rh_tuple = create_routing_history_record(note_index, notification_id, log_url=log_url)
-                routing_id = rh_tuple[0]
-                if not publisher_id:
-                    publisher_id = rh_tuple[1]
-                doi = rh_tuple[2]
-                app.logger.info(f"Publisher : {publisher_id}, RH : {routing_id}, Note : {notification_id}")
+            if note_pass == "Single notification":
+                # The following should happen only in case of a mis-typed notification ID on the jper portal
+                app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
+                conn = esprit.raw.Connection(host_name, index, port=port)
+                note = get_notifications_for(conn=conn, notification_id=notification_id)
+                if not note or len(note.get("hits", {}).get("hits", [])) != 1:
+                    app.logger.info(f"No notification found in ES with ID {notification_id}. Routing towards FAILED.")
+                    update_deletion_log_files(del_log_file, log_url, notification_id, "failed", doi)
+                    raise AirflowSkipException(f"No notification found in ES with ID {notification_id}.")
+
+            # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
+            app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
+            note_index = note["hits"]["hits"][0]["_index"]
+            note_info = {
+                "id" : notification_id,
+                "index" : note_index,
+                "pub_id" : publisher_id,
+                "pub_email" : publisher_email,
+                "num_repos" : num_repos,
+                "doi" : doi,
+                "sftp_url" : sftp_url,
+                "sftp_port" : sftp_port,
+                "sftp_username" : sftp_username
+            }
+            rh_tuple = create_routing_history_record_for_del(note_info, log_url=log_url)
+            routing_id = rh_tuple[0]
+            if not publisher_id:
+                publisher_id = rh_tuple[1]
+            doi = rh_tuple[2]
+            app.logger.info(f"Publisher : {publisher_id}, RH : {routing_id}, Note : {notification_id}")
 
         return (
             routing_id,
