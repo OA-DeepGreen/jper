@@ -82,18 +82,19 @@ def delete_data_ondemand():
                 app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
                 app.logger.info(f"Deletion reason provided: {deletion_reason}")
                 # Get the full information before passing it along.
-                conn = esprit.raw.Connection(host_name, "jper-*", port=port)
+                conn = esprit.raw.Connection(host_name, "jper-routed*,jper-failed,jper-unrouted", port=port)
                 note = get_notifications_for(conn=conn, notification_id=notification_id)['hits']['hits']
                 if len(note) == 0:
                     app.logger.error(f"Notification not found in routed or failed notifications: {notification_id}")
                     raise AirflowFailException(f"Notification not found in routed or failed notifications: {notification_id}")
+                app.logger.info(note)
                 note = note[0]
                 index = note["_index"]
                 publisher_id = note['_source']['provider']['id']
                 if "repositories" in note['_source']:
                     num_repos = len(note['_source']['repositories'])
                 else:
-                    num_repos = 0
+                    num_repos = 0 # Is the index jper-failed? Should we check?
                 doi = None
                 for m_data in note["_source"]["metadata"]['identifier']:
                     if m_data["type"] == "doi":
