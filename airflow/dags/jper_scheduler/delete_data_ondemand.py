@@ -5,7 +5,6 @@ import time
 
 from pathlib import Path
 from datetime import datetime
-from sre_parse import SUCCESS
 
 # Airflow stuff
 from airflow.exceptions import AirflowSkipException, AirflowFailException
@@ -15,13 +14,13 @@ from airflow.utils.session import provide_session
 from airflow.configuration import conf
 
 # My code
+import esprit
 from octopus.core import app
-from service import models, routing
+from service import models
 from service.models.routing_history import RoutingHistory
 from jper_scheduler.utils import create_routing_history_record_for_del, get_log_url, get_notifications_for, set_task_name
 from jper_scheduler.routing_deletions import RoutingDeletion, bulk_set_notification_deleted_in_rh, write_notifications_to_delete, read_notifications_to_delete
 from jper_scheduler.routing_deletions import update_deletion_log_files, do_bulk_creation, bulk_set_rh_tombstone, do_bulk_deletion, get_single_note_extrainfo
-
 
 import logging
 logging.getLogger("opensearch").setLevel(logging.WARNING)
@@ -31,6 +30,11 @@ del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/request_delet
 del_file = Path(del_log_path) / "TODO" / f"deletion_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
 max_query = app.config.get("AIRFLOW_DELETION_MAX_QUERY", 2000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
+host = app.config.get("ELASTIC_SEARCH_HOST", "localhost")  # includes port
+if host.endswith("/"):
+    host = host[:-1]
+port = host.split(':')[-1]
+host_name = host.split(port)[0][:-1]
 
 # Create a filter to silence logging from logging_mixin.py at WARNING level and below
 class SilenceUnnecessaryLogs(logging.Filter):
@@ -77,7 +81,25 @@ def delete_data_ondemand():
                 app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
                 app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
                 app.logger.info(f"Deletion reason provided: {deletion_reason}")
-                info_to_run.append((notification_id, "Unknown", status_values, rerouting, deletion_reason, None, None, None, str(del_file)))
+                # Get the full information before passing it along.
+                conn = esprit.raw.Connection(host_name, "jper-*", port=port)
+                note = get_notifications_for(conn=conn, notification_id=notification_id)['hits']['hits']
+                if len(note) == 0:
+                    app.logger.error(f"Notification not found in routed or failed notifications: {notification_id}")
+                    raise AirflowFailException(f"Notification not found in routed or failed notifications: {notification_id}")
+                note = note[0]
+                index = note["_index"]
+                publisher_id = note['_source']['provider']['id']
+                if "repositories" in note['_source']:
+                    num_repos = len(note['_source']['repositories'])
+                else:
+                    num_repos = 0
+                doi = None
+                for m_data in note["_source"]["metadata"]['identifier']:
+                    if m_data["type"] == "doi":
+                        doi = m_data["id"]
+                info_to_run.append((notification_id, index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi, str(del_file)))
+                # info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi))
             else:
                 # Multiple notifications to delete.
                 publisher_id = context["params"].get("publisher_id", None)
@@ -85,7 +107,7 @@ def delete_data_ondemand():
                     app.logger.error("Publisher ID not provided - cannot search for routing history records")
                     raise AirflowFailException("Publisher ID not provided - cannot search for routing history records")
 
-            write_notifications_to_delete(context["params"], del_file=del_file)
+            write_notifications_to_delete(context["params"], del_file=del_file, info_to_run=info_to_run)
 
         # Process the notifications from all the available deletion requests
         if len(info_to_run) == 1:
@@ -132,7 +154,6 @@ def delete_data_ondemand():
             # if kount % 200 == 0:
             #     app.logger.info(f"Processing routing tuple #{kount}")
             #     break
-
             notification_id = routing_tuple[0]
             notification_index = routing_tuple[1]
             status_values = routing_tuple[2]
@@ -143,50 +164,39 @@ def delete_data_ondemand():
             doi = routing_tuple[7]
             del_log_file = Path(routing_tuple[8])
 
-
-            if not publisher_id:
-                routing_tuple = routing_tuple_array[0]
-                status = get_single_note_extrainfo(routing_tuple)
-                if status["status"] == "failure":
-                    raise AirflowSkipException(f"No notification found in ES with ID {notification_id}?")
-                doi = status["doi"]
-                routing_id = status["routing_id"]
-                publisher_id = status["publisher_id"]
-                notification_index = status["index"]
+            if publisher_id == tmp_publisher_id:
+                publisher_email = tmp_publisher_email
+                sftp_url = tmp_sftp_url
+                sftp_port = tmp_sftp_port
+                sftp_username = tmp_sftp_username
             else:
-                if publisher_id == tmp_publisher_id:
-                    publisher_email = tmp_publisher_email
-                    sftp_url = tmp_sftp_url
-                    sftp_port = tmp_sftp_port
-                    sftp_username = tmp_sftp_username
-                else:
-                    publisher_email = None
-                    acc = models.Account().pull(publisher_id)
-                    if not acc:
-                        app.logger.error(f"Account not found for publisher_id: {publisher_id}")
-                        raise AirflowFailException(f"Publisher account not found for publisher_id: {publisher_id}")
-                    publisher_email = acc.email
+                publisher_email = None
+                acc = models.Account().pull(publisher_id)
+                if not acc:
+                    app.logger.error(f"Account not found for publisher_id: {publisher_id}")
+                    raise AirflowFailException(f"Publisher account not found for publisher_id: {publisher_id}")
+                publisher_email = acc.email
+                sftp_url = acc.sftp_server_url
+                try:
                     sftp_url = acc.sftp_server_url
-                    try:
-                        sftp_url = acc.sftp_server_url
-                    except AttributeError as e:
-                        app.logger.error(f"URL attribute error: {e}")
-                        sftp_url = ""
-                    try:
-                        sftp_port = acc.sftp_server_port
-                    except AttributeError as e:
-                        app.logger.error(f"Port attribute error: {e}")
-                        sftp_port = ""
-                    try:
-                        sftp_username = acc.sftp_server_username
-                    except AttributeError as e:
-                        app.logger.error(f"Username attribute error: {e}")
-                        sftp_username = ""
-                    tmp_publisher_id = publisher_id
-                    tmp_publisher_email = publisher_email
-                    tmp_sftp_url = sftp_url
-                    tmp_sftp_port = sftp_port
-                    tmp_sftp_username = sftp_username
+                except AttributeError as e:
+                    app.logger.error(f"URL attribute error: {e}")
+                    sftp_url = ""
+                try:
+                    sftp_port = acc.sftp_server_port
+                except AttributeError as e:
+                    app.logger.error(f"Port attribute error: {e}")
+                    sftp_port = ""
+                try:
+                    sftp_username = acc.sftp_server_username
+                except AttributeError as e:
+                    app.logger.error(f"Username attribute error: {e}")
+                    sftp_username = ""
+                tmp_publisher_id = publisher_id
+                tmp_publisher_email = publisher_email
+                tmp_sftp_url = sftp_url
+                tmp_sftp_port = sftp_port
+                tmp_sftp_username = sftp_username
 
             app.logger.debug(f"Processing routing tuple #{kount}")
 
@@ -240,9 +250,14 @@ def delete_data_ondemand():
         failed_to_delete = {}
         for note in note_list_success:
             notes_to_delete.append(note[1])
-        success, failed = do_bulk_deletion("jper-routed*", notes_to_delete)
+        if len(notes_to_delete) == 1:
+            index = notification_index
+        else:
+            index = "jper-routed*"
+        success, failed = do_bulk_deletion(index, notes_to_delete)
         if failed:
             app.logger.error(f"Failed to delete {len(failed)} routed notifications")
+            app.logger.info(f"{failed}")
             for ff in failed:
                 failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
         # del_status = models.RoutedNotification.bulk_delete(notes_to_delete)

@@ -13,7 +13,7 @@ from octopus.core import app
 from octopus.modules.store import store
 
 from service import models
-from jper_scheduler.utils import get_notifications_for
+from jper_scheduler.utils import get_notifications_for, create_routing_history_record_for_del
 
 from opensearchpy import OpenSearch
 from opensearchpy.helpers import bulk
@@ -90,7 +90,7 @@ def bulk_set_rh_tombstone(note_rh_list, log_url, failed_set_note_del, del_cleanu
     notes_to_tombstone = []
     for note_rh in note_rh_list:
         note_id = note_rh[1]
-        if note_id in failed_to_delete and '404' in failed_to_delete[note_id]:
+        if note_id in failed_to_delete and '404' in failed_to_delete[note_id] and 'not found' in failed_to_delete[note_id]:
             pass
         else:
             notes_to_tombstone.append(note_rh)
@@ -231,7 +231,6 @@ def do_bulk_creation(routing_history_tocreate):
 ##### ##### #####
 
 def get_single_note_extrainfo(routing_tuple):
-    index = "jper-routed*,jper-failed"
     notification_id = routing_tuple[0]
     publisher_id = None
     num_repos = routing_tuple[6]
@@ -244,20 +243,25 @@ def get_single_note_extrainfo(routing_tuple):
     c = b.pull_records(notification_id=notification_id)
     num_records = c.get('hits', {}).get('total', {}).get('value', 0)
     if num_records >= 1: # Found the notification with a routing ID
-        hit = c['hits']['hits'][0] # Screwup in dev. Just pick the first one.
-        routing_id = hit['_source']['id']
+        note = c['hits']['hits'][0] # Screwup in dev. Just pick the first one.
+        routing_id = note['_source']['id']
+        app.logger.info(f"Found routing history record {routing_id} for notification ID {notification_id}")
         doi = None
-        for n_state in hit["_source"]["notification_states"]:
+        for n_state in note["_source"]["notification_states"]:
             if n_state.get("notification_id", None) == notification_id:
                 doi = n_state.get("doi")
+                n_match = n_stage.get("number_matched_repositories")
                 break
-        if "publisher_id" in hit["_source"].keys():
-            publisher_id = hit["_source"]["publisher_id"]
+        if "publisher_id" in note["_source"].keys():
+            publisher_id = note["_source"]["publisher_id"]
+        note_index = "jper-failed"
+        if n_match > 0:
+            note_index = "jper-routed*" # Cannot do anything more specific ...
     else: # Is it an old notification without a routing ID?
         # The following should happen only in case of a mis-typed notification ID on the jper portal
         app.logger.info(f"No routing history record found linked to notification ID {notification_id} - checking if it's an old notification without routing ID")
         conn = esprit.raw.Connection(host_name, index, port=port)
-        note = get_notifications_for(conn=conn, notification_id=notification_id)
+        note = get_notifications_for(conn=conn, notification_id=notification_id)['hits']['hits'][0]
         if not note or len(note.get("hits", {}).get("hits", [])) != 1:
             app.logger.info(f"No notification found in ES with ID {notification_id}. Routing towards FAILED.")
             update_deletion_log_files(del_log_file, log_url, notification_id, "failed", doi)
@@ -265,25 +269,22 @@ def get_single_note_extrainfo(routing_tuple):
                 "value": f"No notification found in ES with ID {notification_id}."}
             return message
 
-    # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
-    app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
-    note_index = note["hits"]["hits"][0]["_index"]
-    note_info = {
-        "id" : notification_id,
-        "index" : note_index,
-        "pub_id" : publisher_id,
-        "pub_email" : publisher_email,
-        "num_repos" : num_repos,
-        "doi" : doi,
-        "sftp_url" : sftp_url,
-        "sftp_port" : sftp_port,
-        "sftp_username" : sftp_username
-    }
-    rh_tuple = create_routing_history_record_for_del(note_info, log_url=log_url)
-    routing_id = rh_tuple[0]
-    if not publisher_id:
-        publisher_id = rh_tuple[1]
-    doi = rh_tuple[2]
+        # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
+        app.logger.info(f"Found notification with ID {notification_id} but no routing history record - creating a routing history record for it to enable deletion")
+        note_index = note["hits"]["hits"][0]["_index"]
+        note_info = {
+            "id" : notification_id,
+            "index" : note_index,
+            "pub_id" : publisher_id,
+            "pub_email" : publisher_email,
+            "num_repos" : num_repos,
+            "doi" : doi,
+            "sftp_url" : sftp_url,
+            "sftp_port" : sftp_port,
+            "sftp_username" : sftp_username
+        }
+        rh_tuple = create_routing_history_record_for_del(note_info, log_url=log_url)
+        routing_id = rh_tuple.id
     app.logger.info(f"Publisher : {publisher_id}, RH : {routing_id}, Note : {notification_id}")
     mess = { "status": "success" }
     mess["doi"] = doi
@@ -408,10 +409,8 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
     app.logger.info(f"from: {brom}")
     app.logger.info(f"upto: {upto}")
 
-    if not info_to_run:
-        if notification_id:
-            info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id, None, None)]
-        elif status_values and status_values[0] == 'failure': # Error
+    if info_to_run is None or len(info_to_run) == 0:
+        if status_values and status_values[0] == 'failure': # Error
             info_to_run = find_notifications_from_routing_history(brom, upto, publisher_id, status_values, rerouting, deletion_reason)
         else:
             if not status_values or len(status_values) == 2:
@@ -462,7 +461,8 @@ def read_notifications_to_delete(max_map_length):
         with open(file, 'r') as f:
             data = json.loads(f.read())
         for notification in data["notifications"]:
-            notification.append(str(file))
+            if len(notification) == 8:
+                notification.append(str(file))
             info_to_run.append(notification)
             kount += 1
             if kount >= notifications_to_process or kount >= max_map_length:
