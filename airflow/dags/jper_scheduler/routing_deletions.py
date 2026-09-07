@@ -13,19 +13,222 @@ from octopus.core import app
 from octopus.modules.store import store
 
 from service import models
-from jper_scheduler.utils import get_notifications_for
+from jper_scheduler.utils import get_notifications_for, create_routing_history_record_for_del
 
-dryRun = app.config.get("AIRFLOW_DELETION_DRY_RUN", True)
+from opensearchpy import OpenSearch
+from opensearchpy.helpers import bulk
+
 del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
 notifications_to_process = app.config.get("AIRFLOW_DELETION_NOTIFICATION_BATCH_SIZE", 5000) # Notifications to process at a given time.
 
 # Elasticsearch configuration
 max_query = app.config.get("AIRFLOW_DELETION_MAX_QUERY", 2000) # Max number of notifications to fetch in one query from ES - adjust as needed based on performance and memory constraints.
 host = app.config.get("ELASTIC_SEARCH_HOST", "localhost")  # includes port
+if host.endswith("/"):
+    host = host[:-1]
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
+host = host_name
+if host.startswith("http://"):
+    host = host[7:]
+if host.startswith("https://"):
+    host = host[8:]
 
 ##### Useful stand-alone functions
+
+def build_bulk_actions(index_name, updates):
+    """
+    updates: list of dicts like {"_id": doc_id, "notification_id": notification_id}
+    """
+    now_utc = datetime.now(timezone.utc).isoformat()
+
+    script_source = """
+        boolean found = false;
+        for (int i = 0; i < ctx._source.notification_states.length; i++) {
+            def item = ctx._source.notification_states[i];
+            if (item.notification_id == params.notification_id) {
+                if (item.deleted != true) {
+                    item.status = params.status;
+                    item.deleted = params.deleted;
+                    item.deleted_date = params.deleted_date;
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            ctx.op = 'noop';
+        }
+    """
+
+    actions = []
+    for u in updates:
+        actions.append({
+            "_op_type": "update",
+            "_index": index_name,
+            "_id": u[0],
+            "script": {
+                "source": script_source,
+                "lang": "painless",
+                "params": {
+                    "notification_id": u[1],
+                    "status": "deleted",
+                    "deleted": True,
+                    "deleted_date": now_utc,
+                },
+            },
+        })
+    return actions
+
+#####
+
+def bulk_set_rh_tombstone(note_rh_list, log_url, failed_set_note_del, del_cleanup_files, failed_to_delete):
+    index_name = 'jper-routing_history'
+    operation = "update"
+    app.logger.debug(f"OpenSearch host: {host}, port: {port}")
+    app.logger.info(f"Doing bulk {operation} of {len(note_rh_list)} routing history records.")
+
+    notes_to_tombstone = []
+    for note_rh in note_rh_list:
+        note_id = note_rh[1]
+        if note_id in failed_to_delete and '404' in failed_to_delete[note_id] and 'not found' in failed_to_delete[note_id]:
+            pass
+        else:
+            notes_to_tombstone.append(note_rh)
+
+    if len(notes_to_tombstone) == 0:
+        app.logger.info("No notes to tombstone after filtering already deleted notifications. Returning.")
+        return None, None
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True, # enables gzip compression for request bodies
+        use_ssl = False,
+        verify_certs = False,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False
+    )
+
+    actions = []
+    now_utc = datetime.now(timezone.utc).isoformat()
+    for note_rh in notes_to_tombstone:
+        rh_id = note_rh[0]
+        note_id = note_rh[1]
+        status_values = note_rh[3]
+        rerouting = note_rh[4]
+        deletion_reason = note_rh[5]
+
+        message = f"Rerouting: {rerouting}, deletion reason: {deletion_reason}, Request status values: {status_values}."
+        message = f"{message} Notification ID: {note_id} deleted as part of cleanup with status success."
+        if failed_set_note_del and rh_id in failed_set_note_del.keys():
+            message = f"{message} FailedToSetNotificationDeletedInRoutingHistoryReason: {failed_set_note_del.get(rh_id, '')}."
+        if del_cleanup_files and rh_id in del_cleanup_files.keys():
+            message = f"{message} Files cleaned up: {del_cleanup_files.get(rh_id, '')}."
+
+        new_state = {
+            "date": now_utc,
+            "action": "tombstone",
+            # "file_location":,
+            "notification_id": note_id,
+            "status": "success",
+            "message": message,
+            "log_url": log_url
+        }
+        a = {"_op_type": operation,
+            "_index": index_name,
+            "_id": rh_id,
+            "script": {
+                "source": """
+                    if (ctx._source.workflow_states == null) {
+                        ctx._source.workflow_states = new ArrayList()
+                    }
+                    ctx._source.workflow_states.add(params.new_state)
+                """,
+                "params": {"new_state": new_state}
+            },
+            # Creates document with the array initialized if the _id doesn't exist
+            "upsert": {"workflow_states": [new_state]}
+        }
+        actions.append(a)
+
+    success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    if failed:
+        app.logger.error(f"Failed to update routing history records: {failed}")
+    return success, failed
+
+#####
+def bulk_set_notification_deleted_in_rh(note_rh_list):
+    index_name = 'jper-routing_history'
+    operation = "update"
+    app.logger.debug(f"OpenSearch host: {host}, port: {port}")
+    if len(note_rh_list) == 0:
+        app.logger.info("No routing history records to update.")
+        return
+    app.logger.info(f"Doing bulk {operation} of {len(note_rh_list)} routing history records.")
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True, # enables gzip compression for request bodies
+        use_ssl = False,
+        verify_certs = False,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False
+    )
+
+    actions = build_bulk_actions(index_name, note_rh_list)
+    success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    return success, failed
+
+#####
+
+def do_bulk_deletion(index, note_list):
+    operation = "delete"
+    app.logger.debug(f"OpenSearch host: {host}, port: {port}")
+    app.logger.info(f"Doing bulk {operation} of {len(note_list)} notes.")
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True, # enables gzip compression for request bodies
+        use_ssl = False,
+        verify_certs = False,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False
+    )
+
+    actions = []
+    for note in note_list:
+        a = {"_op_type": operation, "_index": index, "_id": note}
+        actions.append(a)
+
+    success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    return success, failed
+
+#####
+
+def do_bulk_creation(routing_history_tocreate):
+    index_name = 'jper-routing_history'
+    operation = "create"
+    app.logger.debug(f"OpenSearch host: {host}, port: {port}")
+    app.logger.info(f"Doing bulk {operation} of {len(routing_history_tocreate)} routing history records.")
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True, # enables gzip compression for request bodies
+        use_ssl = False,
+        verify_certs = False,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False
+    )
+
+    actions = []
+    for rh_tocreate in routing_history_tocreate:
+        rh = json.loads(rh_tocreate.json())
+        a = {"_op_type": operation, "_index": index_name, "_id": rh["id"],  "_source": rh}
+        actions.append(a)
+
+    success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    return success, failed
+
+##### ##### #####
 
 def find_notifications_from_routing_history(since, upto, publisher_id, status_values, rerouting, deletion_reason):
     a = RoutingHistory()
@@ -42,10 +245,12 @@ def find_notifications_from_routing_history(since, upto, publisher_id, status_va
     for hit in records.get('hits', {}).get('hits', []):
         for note_state in hit.get("notification_states", []):
             notification_id = note_state.get("notification_id", "None")
-            if "scheduled" in deletion_reason:
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id, hit.get("id")))
+            tmp_stat = note_state.get("status", "failure")
+            if temp_stat == "failure":
+                notification_index = "jper-failed"
             else:
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+                notification_index = "jper-routed"
+            info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id))
     return info_to_run
 
 #####
@@ -72,7 +277,17 @@ def find_notifications_from_ES_directly(conn, since, upto, publisher_id, status_
     info_to_run = []
     for hit in records["hits"]["hits"]:
         notification_id = hit["_id"]
-        info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+        notification_index = hit["_index"]
+        num_repos = 0
+        doi = None
+        if "fields" in hit:
+            if "repositories" in hit["fields"]:
+                num_repos = len(hit["fields"]["repositories"])
+            if "metadata.identifier.id" in hit["fields"]:
+                for item in hit["fields"]["metadata.identifier.id"]:
+                    if len(item) > 12:
+                        doi = item
+        info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi))
 
     if num_records > page_size:
         page = 2
@@ -92,7 +307,17 @@ def find_notifications_from_ES_directly(conn, since, upto, publisher_id, status_
                 break
             for hit in records["hits"]["hits"]:
                 notification_id = hit["_id"]
-                info_to_run.append((notification_id, status_values, rerouting, deletion_reason, publisher_id))
+                notification_index = hit["_index"]
+                num_repos = 0
+                doi = None
+                if "fields" in hit:
+                    if "repositories" in hit["fields"]:
+                        num_repos = len(hit["fields"]["repositories"])
+                    if "metadata.identifier.id" in hit["fields"]:
+                        for item in hit["fields"]["metadata.identifier.id"]:
+                            if len(item) > 12:
+                                doi = item
+                info_to_run.append((notification_id, notification_index, status_values, rerouting, deletion_reason, publisher_id, num_repos, doi))
     return info_to_run
 
 ##### Write to a file, every notification that we have been asked to delete.
@@ -119,10 +344,8 @@ def write_notifications_to_delete(params, del_file, info_to_run=None):
     app.logger.info(f"from: {brom}")
     app.logger.info(f"upto: {upto}")
 
-    if not info_to_run:
-        if notification_id:
-            info_to_run = [(notification_id, status_values, rerouting, deletion_reason, publisher_id)]
-        elif status_values and status_values[0] == 'failure': # Error
+    if info_to_run is None or len(info_to_run) == 0:
+        if status_values and status_values[0] == 'failure': # Error
             info_to_run = find_notifications_from_routing_history(brom, upto, publisher_id, status_values, rerouting, deletion_reason)
         else:
             if not status_values or len(status_values) == 2:
@@ -173,7 +396,8 @@ def read_notifications_to_delete(max_map_length):
         with open(file, 'r') as f:
             data = json.loads(f.read())
         for notification in data["notifications"]:
-            notification.append(str(file))
+            if len(notification) == 8:
+                notification.append(str(file))
             info_to_run.append(notification)
             kount += 1
             if kount >= notifications_to_process or kount >= max_map_length:
@@ -186,135 +410,146 @@ def read_notifications_to_delete(max_map_length):
 
 ##### Update the deletion log files. Of course, we need to read the file, update the buffer, and write it back.
 
-def update_deletion_log_files(del_log_file, airflow_log_url, notification_id, status, doi):
-    if not del_log_file:
-        app.logger.info(f"No deletion log file specified : {del_log_file}. Returning.")
-        return
-    if "TODO" not in del_log_file.parts:
-        app.logger.info(f"Deletion log file {del_log_file} is not a TODO file. Returning.")
-        return
+def _update_log_file(final_file, data, tmp_list, notes, airflow_log_url):
+    note_list = []
+    for item in tmp_list:
+        b = item.extend([notes[item[0]], airflow_log_url])
+        note_list.append(b)
 
-    words = []
-    for word in del_log_file.parts:
-        if word == "TODO":
-            if status == "success":
-                word = "DONE"
-            else:
-                word = "FAILED"
-        words.append(word)
-    final_file = Path("/".join(words)[1:])
-    if not os.path.exists(final_file.parent):
-        os.makedirs(final_file.parent)
-
-    # Read the input log file, update it, and write it back
-    # Note that we will only update with a single notification for a single task
-    tmp_list = []
-    with open(del_log_file, 'r+') as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        data = json.loads(f.read())
-
-        for note_list in data["notifications"]:
-            if notification_id in note_list:
-                tmp_list = note_list
-        try:
-            data["notifications"].remove(tmp_list)
-        except ValueError:
-            app.logger.info(f"No notification found with id {notification_id} in DONE log file")
-            app.logger.info("You are likely rerunning a successful task. Stopping here.")
-            raise ValueError(f"No notification found with id {notification_id} while updating DONE log file")
-        data["remaining_notifications"] = len(data["notifications"])
-        f.seek(0)
-        f.truncate(0)
-        f.write(json.dumps(data))
-        fcntl.flock(f, fcntl.LOCK_UN)
-    if data["remaining_notifications"] == 0:
-        del_log_file.unlink()
-
-    # Read the updated log file and append the new notification that has just been deleted
-    if not tmp_list:
-        app.logger.info(f"No notification found with id {notification_id}?")
-        raise ValueError(f"No notification found with id {notification_id} while updating DONE log file")
-
-    tmp_list.extend([doi, airflow_log_url])
     if final_file.exists():
         with open(final_file, 'r+') as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
             data = json.loads(f.read())
-            data["notifications"].append(tmp_list)
+            data["notifications"].extend(note_list)
             data["completed_notifications"] = len(data["notifications"])
             f.seek(0)  # Go to the beginning of the file
             f.truncate(0)  # Clear the file before writing for safety
             f.write(json.dumps(data))
-            fcntl.flock(f, fcntl.LOCK_UN)
     else:
-        data["completed_notifications"] = 1
-        data["notifications"] = [tmp_list]
+        data["completed_notifications"] = len(note_list)
+        data["notifications"] = note_list
         # The rest of the data comes from reading the above file
         with open(final_file, 'w') as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
             f.write(json.dumps(data))
-            fcntl.flock(f, fcntl.LOCK_UN)
+
+#####
+
+def update_deletion_log_files(log_url, note_del_update):
+    if not note_del_update:
+        app.logger.info(f"Nothing to update: {note_del_update}. Returning.")
+        return
+
+    for del_log_file in note_del_update.keys():
+        # Sanity check
+        if "TODO" not in del_log_file.parts:
+            app.logger.info(f"Deletion log file {del_log_file} is not a TODO file. Look at next file.")
+            continue
+
+        # Get the output file names
+        words_done = []
+        words_fail = []
+        for word in del_log_file.parts:
+            if word == "TODO":
+                words_done.append("DONE")
+                words_fail.append("FAILED")
+            else:
+                words_done.append(word)
+                words_fail.append(word)
+        final_file_done = Path("/".join(words_done)[1:])
+        final_file_fail = Path("/".join(words_fail)[1:])
+
+        if not os.path.exists(final_file_done.parent):
+            os.makedirs(final_file_done.parent)
+        if not os.path.exists(final_file_fail.parent):
+            os.makedirs(final_file_fail.parent)
+
+        # List of successful and failed notifications
+        notes_done = {}
+        notes_fail = {}
+        # [notification_id, status['status'], doi]
+        for item in note_del_update[del_log_file]:
+            if item[1] == "success":
+                notes_done[item[0]] = item[2]
+            else:
+                notes_fail[item[0]] = item[2]
+
+        # Read the input log file, separate into todo, success and fail
+        tmp_list = []
+        data = {}
+        with open(del_log_file, 'r') as f:
+            data = json.loads(f.read())
+
+        todo_tmp_list = []
+        done_tmp_list = []
+        fail_tmp_list = []
+
+        for note_list in data["notifications"]:
+            if note_list[0] in notes_done:
+                done_tmp_list.append(note_list)
+            elif note_list[0] in notes_fail:
+                fail_tmp_list.append(note_list)
+            else:
+                todo_tmp_list.append(note_list)
+
+        # Write the remaining notifications back to the TODO file
+        data["remaining_notifications"] = len(todo_tmp_list)
+        data["notifications"] = todo_tmp_list
+        with open(del_log_file, 'w') as f:
+            f.write(json.dumps(data))
+        if data["remaining_notifications"] == 0:
+            del_log_file.unlink()
+
+
+        # Read and / or update the done / failed files
+        data["notifications"] = []
+        _update_log_file(final_file_done, data, done_tmp_list, notes_done, log_url)
+        _update_log_file(final_file_fail, data, fail_tmp_list, notes_fail, log_url)
 
 ##### ##### #####
 # This class inherits from PublisherFiles (publisher_transfer.py) and will only perform deletions.
 class RoutingDeletion(PublisherFiles):
-    def __init__(self, publisher_id=None, routing_id=None):
+    def __init__(self, publisher_id=None, routing_id=None, verbose=True):
+        self.clean_store = False
         if not publisher_id or not routing_id:
             app.logger.debug(f"Invalid publisher {publisher_id} or routing_id {routing_id}")
             return None
-        super().__init__(publisher_id, routing_id=routing_id)
-    def routing_history_status(self):
-        status = "active"
-        statusList = []
-        for state in self.routing_history.notification_states:
-            statusList.append(state.get("status", ""))
-        if len(statusList) > 0 and all(s == "deleted" for s in statusList):
-            status = "deleted"
-        else:
-            status = "partial"
-        return status
+        super().__init__(publisher_id, routing_id=routing_id, verbose=verbose)
 
-    def _delete_file_in_server(self, remote_file):
+    def clean_sftp_file(self, file_name):
         # Delete one file in the sftp server
+        status = 0
         try:
             if not self._is_scp:
                 self.__init_sftp_connection__()
-            self.scp.remove(remote_file)
-            app.logger.info(f"Successfully removed {remote_file}.")
+            self.scp.remove(file_name)
+            app.logger.debug(f"Successfully removed {file_name}.")
         except Exception as e:
-            app.logger.error(f"Failed to remove {remote_file}. Error : {str(e)}")
-            return -1
-        remote_dir = os.path.dirname(remote_file)
-        try:
-            self.scp.rmdir(remote_dir)
-            app.logger.info(f"Successfully removed {remote_dir}.")
-        except Exception as e:
-            app.logger.info(
-                f"Failed to remove directory {remote_dir}. Error : {str(e)}"
-            )
-            app.logger.info("Directory probably not empty.")
-        return 0
-
-    # Clean file on the sftp server
-    def clean_sftp_file(self, file_name, file_location):
-        # This will be just one call per file / routing history id. So, this can be
-        # self contained with extra calls as needed.
-        # a = PublisherFiles(route['publisher_id'], routing_id=route['id'])
-        status = self._delete_file_in_server(file_name)
+            app.logger.error(f"Failed to remove {file_name}. Error : {str(e)}")
+            status = -1
         if status == 0:
-            app.logger.info(f"Successfully cleaned {file_name} from {file_location}")
+            remote_dir = os.path.dirname(file_name)
+            try:
+                self.scp.rmdir(remote_dir)
+                app.logger.debug(f"Successfully removed {remote_dir}.")
+            except Exception as e:
+                app.logger.debug(
+                    f"Failed to remove directory {remote_dir}. Error : {str(e)}"
+                )
+                app.logger.debug("Directory probably not empty.")
         return status
 
     # Clean file on jper store
     def clean_store_file(self, file_name):
+        if self.clean_store:
+            return 0
         sf = store.StoreFactory.get()
         store_id = file_name.split("/")[5]
         file_path = Path(file_name)
-        return_code = sf.delete(store_id, file_path.name)
+        return_code = sf.delete(store_id)
         if return_code == 200:
-            app.logger.info(f"Successfully removed {file_name} from store")
+            app.logger.debug(f"Successfully removed {file_name} from store")
         else:
             app.logger.error(f"Failed to remove {file_name} from store. Return code: {return_code}")
+        self.clean_store = True
         return return_code
 
     # Clean local files and directories, except the ones in "keep" locations of RoutingHistory
@@ -333,61 +568,43 @@ class RoutingDeletion(PublisherFiles):
             shutil.rmtree(file_name, ignore_errors=True)
         return 0
 
-    def clean_wfs_final_files(self, notification_id=None, keep=None):
+    def clean_final_files(self, notification_id=None, keep=None):
         # Here, assume there is only one notification in the routing history
         cleanup_files = {}
         app.logger.debug(f"Cleaning final files for notification ID {notification_id} in routing history ID {self.routing_history.id}")
         for final_location in self.routing_history.final_file_locations:
             file_name = final_location["file_location"]
             file_location = final_location["location_type"]
-            if (
-                keep
-                and isinstance(keep, list)
-                and len(keep) > 0
-                and file_location in keep
-            ):
+            if (keep and isinstance(keep, list) and len(keep) > 0 and file_location in keep):
                 # retain files in the above locations. They are precious.
                 cleanup_files["retained"] = cleanup_files.get("retained", []) + [file_name]
                 app.logger.debug(f"Retain file {file_name} from {file_location}")
                 continue
-            app.logger.debug(
-                f"--- Looking at file {file_name} in location {file_location}"
-            )
+            app.logger.debug(f"--- Looking at file {file_name} in location {file_location}")
             if file_location == "store":
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete store file {file_name}")
-                else:
-                    ret_code = self.clean_store_file(file_name)
-                    if ret_code == 200:
-                        cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-                    else:
-                        cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
-            elif "dg_storage" in file_name:
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete local file {file_name}")
-                else:
-                    self.clean_local_file(file_name, file_location) # Always returns 0
+                ret_code = self.clean_store_file(file_name)
+                if ret_code == 200 or ret_code == 0:
                     cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-            elif "xfer" in file_name:
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete sftp file {file_name}")
                 else:
-                    ret_code = self.clean_sftp_file(file_name, file_location)
-                    if ret_code == 0:
-                        cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-                    else:
-                        cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
+                    cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
+            elif "dg_storage" in file_name:
+                self.clean_local_file(file_name, file_location) # Always returns 0
+                cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
+            elif "xfer" in file_name:
+                ret_code = self.clean_sftp_file(file_name)
+                if ret_code == 0:
+                    cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
+                else:
+                    cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
             else:
-                app.logger.warn(
-                    f"Unknown location of file : {file_name}. Doing nothing"
-                )
+                app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
         return {
             "status": "success",
             "message": f"Cleaned up files for only notification {notification_id} in routing history ID {self.routing_history.id}",
             "cleanup_files": cleanup_files,
         }
 
-    def clean_all_files_for_notification(self, notification_id=None, keep=None):
+    def clean_files_from_wfstates(self, notification_id=None, keep=None):
         # Clean all files linked to a notification ID in the routing history.
         cleanup_files = {}
         for wfs in self.routing_history.workflow_states:
@@ -406,7 +623,7 @@ class RoutingDeletion(PublisherFiles):
                     for k in keep:
                         if k in action or k in message:
                             okay_to_delete = False
-                            app.logger.info(
+                            app.logger.debug(
                                 f"Retain file {file_name} linked to workflow state with action {action} and message {message}"
                             )
                             break
@@ -419,32 +636,29 @@ class RoutingDeletion(PublisherFiles):
                    not file_name or len(file_name) < 20 or file_name.count("/") < 2
                 ):  # Minor sanity check
                     app.logger.warn(f"Wrongness: File name {file_name} fails basic sanity check. Skipping.")
-                    app.logger.info(f"Action : {action}")
-                    app.logger.info(f"Message : {message}")
+                    app.logger.warn(f"Action : {action}")
+                    app.logger.warn(f"Message : {message}")
                     cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
                     continue
 
-                if dryRun:
-                    app.logger.info(f"DRY RUN: Would delete file {file_name} linked to workflow state with action {wfs['action']}")
-                else:
-                    if "dg_storage" in file_name:
-                        self.clean_local_file(file_name, wfs.get("location_type", "unknown"))
+                if "dg_storage" in file_name:
+                    self.clean_local_file(file_name, wfs.get("location_type", "unknown"))
+                    cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
+                elif "xfer" in file_name:
+                    return_code = self.clean_sftp_file(file_name)
+                    if return_code == 0:
                         cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-                    elif "xfer" in file_name:
-                        return_code = self.clean_sftp_file(file_name, wfs.get("location_type", "unknown"))
-                        if return_code == 0:
-                            cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-                        else:
-                            cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
-                    elif "store" in file_name:
-                        return_code = self.clean_store_file(file_name)
-                        if return_code == 200:
-                            cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
-                        else:
-                            cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
                     else:
-                        cleanup_files["retained"] = cleanup_files.get("retained", []) + [file_name]
-                        app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
+                        cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
+                elif "store" in file_name:
+                    return_code = self.clean_store_file(file_name)
+                    if return_code == 200 or return_code == 0:
+                        cleanup_files["deleted"] = cleanup_files.get("deleted", []) + [file_name]
+                    else:
+                        cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
+                else:
+                    cleanup_files["retained"] = cleanup_files.get("retained", []) + [file_name]
+                    app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
 
         return {
             "status": "success",
@@ -452,175 +666,37 @@ class RoutingDeletion(PublisherFiles):
             "cleanup_files": cleanup_files,
         }
 
-
-    def delete_notification_routed(self, notification_id):
-        notification_obj = models.RoutedNotification.pull(notification_id)
-        del_status = "success"
-        if notification_obj:
-            app.logger.info(f"Deleting routed notification {notification_id}")
-            app.logger.debug(f"Routed notification object: {notification_obj}")
-            if dryRun:
-                app.logger.info(f"DRY RUN: Would delete routed notification {notification_id}")
-            else:
-                try:
-                    notification_obj.delete()
-                except Exception as e:
-                    app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
-                    del_status = "failure"
-        else:
-            app.logger.warn(f"Notification {notification_id} not found in RoutedNotification")
-        return {
-            "status": del_status
-        }
-
-    def delete_notification_no_matches(self, notification_id):
-        notification_obj = models.FailedNotification.pull(notification_id)
-        del_status = "success"
-        if notification_obj:
-            app.logger.info(f"Deleting failed notification {notification_id}")
-            app.logger.debug(f"Failed notification object: {notification_obj}")
-            if dryRun:
-                app.logger.info(f"DRY RUN: Would delete routed notification {notification_id}")
-            else:
-                try:
-                    notification_obj.delete()
-                except Exception as e:
-                    app.logger.error(f"Failed to delete routed notification {notification_id}. Error: {str(e)}")
-                    del_status = "failure"
-        else:
-            app.logger.warn(f"Notification {notification_id} not found in FailedNotification")
-        return {
-            "status": del_status
-        }
-
-    # Clean all notifications
-    def delete_notification(self, notification_id=None, status_values=None, note_pass=None):
-        del_status = "success"
-        both = False # Do I look in all types of notifications : routed, no matches, error?
-        if not status_values or len(status_values) == 2:  # The date-range + publisher option
-            both = True
-        if note_pass and note_pass == "Single notification": # Explicit notification to delete
-            both = True
-
-        if both:
-            status = self.delete_notification_routed(notification_id)
-            if status["status"] == "failure":
-                status = self.delete_notification_no_matches(notification_id)
-            del_status = status["status"]
-        else:
-            if status_values[0] == "success-routed": # Routed
-                status = self.delete_notification_routed(notification_id)
-            elif status_values[0] == "success-no-matches": # Failed
-                status = self.delete_notification_no_matches(notification_id)
-            elif status_values[0] == 'failure': # Error
-                app.logger.info(f"Error finding notification {notification_id} in jper indices. Nothing to delete.")
-                status = {"status": "success", "message": "No notification found in jper indices"}
-            else: # Should not hapen
-                status = {"status": "failure", "message": "Unknown status"}
-            del_status = status["status"]
-
-        return {
-            "status": del_status,
-            "message": "Cleaned up notifications for routing id {self.routing_history.id}",
-        }
-
     # Clean everything for this routing history
     def clean_all(
         self,
         notification_id=None,
-        status_values=None,
         rerouting=None,
-        deletion_reason=None,
-        note_pass=None,
     ):
 
-        keep = []
+        app.logger.debug(f"Cleaning up for routing id {self.routing_history.id}")
+        keep = None
         if rerouting:
             keep = ["sftp_server"]
 
-        note_message = ""
-        # Delete up the notification object
-        app.logger.debug(f"Notification to delete: {notification_id}")
-        statusN = self.delete_notification(notification_id=notification_id, status_values=status_values, note_pass=note_pass)
-        app.logger.info(f"Notification cleanup status: {statusN['status']}, Message: {statusN['message']}")
-        if statusN['status'] == "success":
-            mess = f"Notification {notification_id} deleted"
-        else:
-            mess = "Error in previous steps - please check messages above."
-        note_message = mess
-
-        app.logger.info("Looking to see if there are any files to clean up")
-
-        # At this point, we should have a decent routing history. Proceed to do the file cleanup
         n_active_notifications = 0
-        if len(self.routing_history.notification_states) == 0:
-            app.logger.info("Notification without routing history? We have an error upstream.")
-            return {
-                "status": "error",
-                "message": f"Notification {notification_id} has no routing history states. This should not happen.",
-            }
-        elif len(self.routing_history.notification_states) == 1:
-            # If there is only one notification in the routing history, we can clean all final files linked to the routing history
-            app.logger.info(f"Only one notification in routing history {self.routing_history.id}. Cleaning all final files linked to the routing history.")
-            statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
-        else:
-            for state in self.routing_history.notification_states:
-                if state.get("status", "") != "deleted":
-                    n_active_notifications += 1
-            if n_active_notifications == 0:
-                # Will I ever come here? Just in case ...
-                app.logger.info(f"All notifications in routing history {self.routing_history.id} are deleted.")
-                app.logger.info("Cleaning all final files linked to the routing history.")
-                statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
-            elif n_active_notifications == 1:
-                app.logger.info(f"Last active notification in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}.")
-                app.logger.info(f"First clean files for notification ID {notification_id} in routing history {self.routing_history.id}.")
-                # Ignore statusF for clean_all_files_for_notificationas it will be success always.
-                statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
-                app.logger.info(f"Now clean all final files linked to the routing history ID {self.routing_history.id}.")
-                statusF = self.clean_wfs_final_files(notification_id=notification_id, keep=keep)
-            else:
-                app.logger.info(f"{n_active_notifications} active notifications in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}.")
-                app.logger.info(f"Cleaning only files linked to notification ID {notification_id} in routing history {self.routing_history.id}.")
-                statusF = self.clean_all_files_for_notification(notification_id=notification_id, keep=keep)
-        app.logger.info(f"File cleanup status: {statusF['status']}, Message: {statusF['message']}")
+        for state in self.routing_history.notification_states:
+            if state.get("status", "") != "deleted":
+                n_active_notifications += 1
 
-        if not dryRun:
-            # Set the notification to deleted
-            if n_active_notifications > 0:  # The if condition is for sanity check. We should have already returned if there are no active notifications
-                app.logger.info(f"Setting notification {notification_id} to deleted in routing history")
-                now_utc = datetime.now(timezone.utc).isoformat()
-                self.routing_history.add_notification_state(
-                    statusF["status"],
-                    notification_id,
-                    deleted=True,
-                    deleted_date=now_utc,
-                )
-            # Add a tombstone state to workflow states
-            message = f"Notification {notification_id} deleted with status {statusF['status']}"
-            if rerouting:
-                message = message + ". Retaining file on sftp server"
-            if deletion_reason:
-                message = message + ", " + deletion_reason
-            message = message + ", " + note_message
-            # Add list of files to the above message and pass it along to the tombstone
-            for k, v in statusF['cleanup_files'].items():
-                message += f". Deletion status for :::: {k} files : ["
-                for f_name in v:
-                    message += f"{f_name}, "
-                message += "]"
-            app.logger.info(message)
-            self.routing_history.add_workflow_state(
-                "tombstone",
-                "server, store, jper",
-                notification_id=notification_id,
-                status=statusF["status"],
-                message=message,
-                log_url=self.airflow_log_location,
-            )
-            self.routing_history.save()
+        cleanup_files = {}
+        if n_active_notifications <= 1:
+            app.logger.debug(f"Cleaning routing history {self.routing_history.id} with active notification {notification_id}.")
+            statusF = self.clean_final_files(notification_id=notification_id, keep=keep)
+            cleanup_files = statusF["cleanup_files"]
+        else:
+            app.logger.debug(f"{n_active_notifications} active notifications in routing history {self.routing_history.id} out of {len(self.routing_history.notification_states)}.")
+            app.logger.debug(f"Cleaning only files linked to notification ID {notification_id} in routing history {self.routing_history.id}.")
+            statusF = self.clean_files_from_wfstates(notification_id=notification_id, keep=keep)
+            cleanup_files = statusF["cleanup_files"]
+        app.logger.debug(f"File cleanup status: {statusF['status']}, Message: {statusF['message']}")
 
         return {
             "status": "success",
             "message": f"Cleaned up routing history ID {self.routing_history.id}",
+            "cleanup_files": cleanup_files,
         }

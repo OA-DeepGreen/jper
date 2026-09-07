@@ -15,18 +15,19 @@ from service.models.routing_history import RoutingHistory
 from octopus.modules.store import store
 
 class PublisherFiles:
-    def __init__(self, publisher_id=None, publisher=None, routing_id=None):
+    def __init__(self, publisher_id=None, publisher=None, routing_id=None, verbose=True):
         logging.getLogger("paramiko").setLevel(logging.WARNING)
+        self.verbose = verbose
+        self._is_scp = False
         self.__init_constants__()  # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         if routing_id:
             self.__init_routing_id__(routing_id, publisher=publisher)
-        self._is_scp = False
 
     def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
-        app.logger.info(f"Routing history id: {routing_id}")
+        app.logger.debug(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
         if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
@@ -115,18 +116,21 @@ class PublisherFiles:
 
     def __init_publishers__(self, publisher_id=None, publisher=None):
         if not publisher_id:
-            app.logger.info("Retrieving all active publishers")
+            if self.verbose:
+                app.logger.info("Retrieving all active publishers")
             self.publishers = models.Account.pull_all_active_publishers()
         else:
             self.__init_publisher__(publisher_id, publisher=publisher)
 
     def __init_publisher__(self, publisher_id, publisher=None):
-        app.logger.info(f"Initialising for publisher {publisher_id}")
+        if self.verbose:
+            app.logger.info(f"Initialising for publisher {publisher_id}")
         # Initialise for a given publisher
         self.id = publisher_id
         if not publisher:
             publisher = models.Account().pull(self.id, wrap=False)
-        app.logger.info(f"Publisher email : {publisher['email']}")
+        if self.verbose:
+            app.logger.info(f"Publisher email : {publisher['email']}")
         self.publisher_email = publisher['email']
         server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():

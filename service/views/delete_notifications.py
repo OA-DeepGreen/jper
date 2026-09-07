@@ -367,7 +367,7 @@ def _read_file(file_io, file_type):
     if jper_url.endswith('/'):
         jper_url = jper_url[:-1]
     for note in data["notifications"]:
-        if substr in note[-1]:
+        if note and note[-1] and substr in note[-1]:
             idx = note[-1].index(substr)
             log_url = f"{jper_url}{note[-1][:idx]}{extra_substr}"
             if not log_url in logs_list:
