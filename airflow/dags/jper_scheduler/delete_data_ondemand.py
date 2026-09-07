@@ -1,8 +1,4 @@
 # Python stuff
-from logging import info
-import os
-import time
-
 from pathlib import Path
 from datetime import datetime
 
@@ -20,7 +16,7 @@ from service import models
 from service.models.routing_history import RoutingHistory
 from jper_scheduler.utils import create_routing_history_record_for_del, get_log_url, get_notifications_for, set_task_name
 from jper_scheduler.routing_deletions import RoutingDeletion, bulk_set_notification_deleted_in_rh, write_notifications_to_delete, read_notifications_to_delete
-from jper_scheduler.routing_deletions import update_deletion_log_files, do_bulk_creation, bulk_set_rh_tombstone, do_bulk_deletion, get_single_note_extrainfo
+from jper_scheduler.routing_deletions import update_deletion_log_files, do_bulk_creation, bulk_set_rh_tombstone, do_bulk_deletion
 
 import logging
 logging.getLogger("opensearch").setLevel(logging.WARNING)
