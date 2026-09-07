@@ -27,7 +27,7 @@
                 <!--<td>{{ item["name"] }}</td>-->
                 <td>{{ item["date_requested"] }}</td>
                 <td>{{ item["last_modified"] | datetimeformat }}</td>
-                <td>
+                <td style="word-wrap: break-word;">
                     <dl>
                         {% if item["notification_id"] %}
                             <dt>Notification</dt><dd>{{ item["notification_id"] }}</dd><br/>
@@ -51,9 +51,9 @@
                             <dt>Deletion reason</dt><dd>{{ item["deletion_reason"] }}</dd><br/>
                         {% endif %}
                         {% if item["logs_list"] %}
-                            {% for log_url in item["logs_list"] %}
-                            <dt>Log URL</dt><dd><a href="{{ log_url }}">Log url {{ loop.index }}</a></dd><br/>
-                            {% endfor %}
+                            <dt>Log URLs:</dt>
+                            {% for log_url in item["logs_list"] %}{% if not loop.first %}, {% endif %}<a href="{{ log_url }}">Log-URL_{{ loop.index }} </a>
+                            {%- endfor %}
                         {% endif %}
                         <dt> <a href="/delete_notifications/csv/{{item["name"]}}">CSV download</a></dt><dd></dd><br/>
 
