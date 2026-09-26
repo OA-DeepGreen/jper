@@ -125,7 +125,7 @@ class XSLT(object):
               <xsl:value-of select="//article-meta/volume"/>
             </xsl:attribute>
           </xsl:if>
-          <xsl:if test="//article-meta/issue">
+          <xsl:if test="//article-meta/issue/text()">
             <xsl:attribute name="issue">
               <xsl:value-of select="//article-meta/issue"/>
             </xsl:attribute>
@@ -710,7 +710,7 @@ class XSLT(object):
                             <mods:number><xsl:value-of select="//article-meta/volume"/></mods:number>
                         </mods:detail>
                     </xsl:if>
-                    <xsl:if test="//article-meta/issue">
+                    <xsl:if test="//article-meta/issue/text()">
                         <mods:detail type="issue">
                             <mods:number><xsl:value-of select="//article-meta/issue"/></mods:number>
                         </mods:detail>
