@@ -24,12 +24,25 @@
         return dt.toLocaleString("en-GB", options);
     }
 
+    function has_routing_history(val) {
+        let dt = new Date(parseInt(Date.parse(val)))
+        // See https://github.com/CottageLabs/deepgreen/issues/211 for history date
+        let history_date = new Date(2025, 11, 27)
+        let has_history = false
+        if (dt >= history_date) {
+            has_history = true
+        }
+        return has_history
+    }
+
     let fieldRender = {
         titleField: function (val, resultobj, renderer) {
             var field = '<div><h3>';
             if (resultobj.id) {
                 display = "<a href='/api/v1/notification/" + resultobj.id + "'>" + resultobj.id + "</a> | ";
-                display = display + "<a href='/routing_history/notification/" + resultobj.id + "'>view routing history</a>";
+                if (has_routing_history(resultobj.created_date)) {
+                    display = display + "<a href='/routing_history/notification/" + resultobj.id + "'>view routing history</a>";
+                }
                 return display;
             } else {
                 return false;
