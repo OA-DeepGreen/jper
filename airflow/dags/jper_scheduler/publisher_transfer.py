@@ -44,10 +44,10 @@ class PublisherFiles:
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
-        c = paramiko.SSHClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.c = paramiko.SSHClient()
+        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            c.connect(hostname=self.sftp_server, port=self.sftp_port,
+            self.c.connect(hostname=self.sftp_server, port=self.sftp_port,
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
@@ -55,9 +55,19 @@ class PublisherFiles:
             app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
             app.logger.error(traceback.format_exc())
             return -1
-        self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
+        self.scp = paramiko.SFTPClient.from_transport(self.c.get_transport())
         self._is_scp = True
         return 0
+
+    def __close_sftp__(self):
+        if self._is_scp:
+            self.scp.close()
+            self._is_scp = False
+        try:
+            self.c.close()
+        except Exception as e:
+            app.logger.debug(f"Error closing SFTP connection for publisher {self.id} {self.publisher_email}")
+            app.logger.debug(f"Probably never initialised. Message: {e}")
 
     def __init_constants__(self):
         # Stuff that is not picked up from elsewhere
@@ -201,6 +211,7 @@ class PublisherFiles:
                     app.logger.warning(f"Error creating directory in ftp server. "
                                        f"Directory {path} probably exists already. "
                                        f"Error: {str(e)}")
+        self.__close_sftp__()
 
     def _move_files_in_server(self, file, remote_path, r_new, cleanUp):
         # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
