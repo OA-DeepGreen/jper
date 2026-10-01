@@ -32,47 +32,6 @@ if host.endswith("/"):
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
 
-import os
-import psutil
-
-def log_open_resources():
-    pid = os.getpid()
-    proc = psutil.Process(pid)
-
-    app.logger.info(f"=== Resource Report for PID {pid} ===")
-
-    # 1. List active network connections (OpenSearch, SFTP, etc.)
-    app.logger.info("\n--- Open Network Connections ---")
-    connections = proc.connections(kind='inet')
-    for conn in connections:
-        # laddr = local address, raddr = remote address
-        remote = f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else "NONE"
-        app.logger.info(f"Status: {conn.status:12} | Local: {conn.laddr.ip}:{conn.laddr.port:5} | Remote: {remote}")
-    app.logger.info(f"Total open connections: {len(connections)}")
-
-    # 2. List open regular files
-    app.logger.info("\n--- Open Regular Files ---")
-    open_files = proc.open_files()
-    for file in open_files:
-        app.logger.info(f"FD: {file.fd:3} | Path: {file.path}")
-    app.logger.info(f"Total open files: {len(open_files)}")
-
-    # 1. Check all network connections
-    connections = proc.connections(kind='all')
-    app.logger.info(f"Total Network Sockets: {len(connections)}")
-
-    status_counts = {}
-    for c in connections:
-        status_counts[c.status] = status_counts.get(c.status, 0) + 1
-        # Print out any socket pointing to OpenSearch or SFTP
-        if c.raddr:
-            app.logger.info(f"  -> Socket [{c.status}] to {c.raddr.ip}:{c.raddr.port}")
-    app.logger.info(f"Socket Status Breakdown: {status_counts}")
-    # 3. Total Count
-    app.logger.info(f"\nTotal Open File Descriptors: {proc.num_fds()}")
-    app.logger.info("===================================\n")
-
-
 # Create a filter to silence logging from logging_mixin.py at WARNING level and below
 class SilenceUnnecessaryLogs(logging.Filter):
     def filter(self, record):
@@ -340,7 +299,6 @@ def delete_data_ondemand():
             if del_log_file not in note_del_update.keys():
                 note_del_update[del_log_file] = []
             note_del_update[del_log_file].append((notification_id, status['status'], doi))
-            # log_open_resources()
 
         app.logger.info(f"Deleted local files for the following routing history, notification pairs.")
         app.logger.info(f"{rh_note_pair_list}")
