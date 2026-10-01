@@ -32,6 +32,47 @@ if host.endswith("/"):
 port = host.split(':')[-1]
 host_name = host.split(port)[0][:-1]
 
+import os
+import psutil
+
+def log_open_resources():
+    pid = os.getpid()
+    proc = psutil.Process(pid)
+
+    app.logger.info(f"=== Resource Report for PID {pid} ===")
+
+    # 1. List active network connections (OpenSearch, SFTP, etc.)
+    app.logger.info("\n--- Open Network Connections ---")
+    connections = proc.connections(kind='inet')
+    for conn in connections:
+        # laddr = local address, raddr = remote address
+        remote = f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else "NONE"
+        app.logger.info(f"Status: {conn.status:12} | Local: {conn.laddr.ip}:{conn.laddr.port:5} | Remote: {remote}")
+    app.logger.info(f"Total open connections: {len(connections)}")
+
+    # 2. List open regular files
+    app.logger.info("\n--- Open Regular Files ---")
+    open_files = proc.open_files()
+    for file in open_files:
+        app.logger.info(f"FD: {file.fd:3} | Path: {file.path}")
+    app.logger.info(f"Total open files: {len(open_files)}")
+
+    # 1. Check all network connections
+    connections = proc.connections(kind='all')
+    app.logger.info(f"Total Network Sockets: {len(connections)}")
+
+    status_counts = {}
+    for c in connections:
+        status_counts[c.status] = status_counts.get(c.status, 0) + 1
+        # Print out any socket pointing to OpenSearch or SFTP
+        if c.raddr:
+            app.logger.info(f"  -> Socket [{c.status}] to {c.raddr.ip}:{c.raddr.port}")
+    app.logger.info(f"Socket Status Breakdown: {status_counts}")
+    # 3. Total Count
+    app.logger.info(f"\nTotal Open File Descriptors: {proc.num_fds()}")
+    app.logger.info("===================================\n")
+
+
 # Create a filter to silence logging from logging_mixin.py at WARNING level and below
 class SilenceUnnecessaryLogs(logging.Filter):
     def filter(self, record):
@@ -207,9 +248,9 @@ def delete_data_ondemand():
                 routing_id = hit['_source']['id']
                 full_rh_list.append((routing_id, notification_id, publisher_id, status_values, rerouting, deletion_reason, doi, del_log_file))
                 if "failed" in notification_index:
-                    note_list_failed.append((routing_id, notification_id))
+                    note_list_failed.append((routing_id, notification_id, notification_index))
                 else:
-                    note_list_success.append((routing_id, notification_id))
+                    note_list_success.append((routing_id, notification_id, notification_index))
             else:
                 # Found a notification without a routing history. Create a routing history record for it, so it can be deleted like the others
                 note_info = {
@@ -228,9 +269,9 @@ def delete_data_ondemand():
                 full_rh_list.append((routing_history.id, notification_id, publisher_id, status_values, rerouting, deletion_reason, doi, del_log_file))
                 routing_history_tocreate.append(routing_history)
                 if "failed" in notification_index:
-                    note_list_failed.append((routing_history.id, notification_id))
+                    note_list_failed.append((routing_history.id, notification_id, notification_index))
                 else:
-                    note_list_success.append((routing_history.id, notification_id))
+                    note_list_success.append((routing_history.id, notification_id, notification_index))
 
         app.logger.info(f"Found {len(note_list_success)} successful and {len(note_list_failed)} failed notifications to delete.")
 
@@ -243,33 +284,18 @@ def delete_data_ondemand():
         app.logger.info(f"Successfully created routing history for {success} notifications.")
 
         # Do bulk deletion of notifications
-        notes_to_delete = []
         failed_to_delete = {}
-        for note in note_list_success:
-            notes_to_delete.append(note[1])
-        if len(notes_to_delete) == 1:
-            index = notification_index
-        else:
-            index = "jper-routed*"
-        success, failed = do_bulk_deletion(index, notes_to_delete)
+        success, failed = do_bulk_deletion(note_list_success + note_list_failed)
         if failed:
-            app.logger.error(f"Failed to delete {len(failed)} routed notifications")
+            app.logger.error(f"Failed to delete {len(failed)} routed/failed notifications")
             app.logger.info(f"{failed}")
             for ff in failed:
-                failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
-        # del_status = models.RoutedNotification.bulk_delete(notes_to_delete)
-        # app.logger.info(f"Deleted {del_status} routed notifications")
-        notes_to_delete = []
-        for note in note_list_failed:
-            notes_to_delete.append(note[1])
-        success, failed = do_bulk_deletion("jper-failed", notes_to_delete)
-        if failed:
-            app.logger.error(f"Failed to delete {len(failed)} unrouted notifications")
-            app.logger.info(f"{failed}")
-            for ff in failed:
-                failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
-        # del_status = models.FailedNotification.bulk_delete(notes_to_delete)
-        # app.logger.info(f"Deleted {del_status} failed notifications.")
+                if 'result' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
+                elif 'reason' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
+                else:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
 
         # Bulk update routing history that the notifications have been deleted, removing the notifications that were
         # already missing / deleted for some reason.
@@ -302,6 +328,8 @@ def delete_data_ondemand():
             a = RoutingDeletion(publisher_id=publisher_id, routing_id=routing_id, verbose=False)
             a.airflow_log_location = log_url
             status = a.clean_all(notification_id=notification_id, rerouting=rerouting)
+            a.__close_sftp__()
+
             if status["status"] != "success":
                 app.logger.error(f"Error cleaning up routing history {routing_id}: {status['message']}")
             # app.logger.info(f"Cleanup files for routing history {routing_id}: {status['cleanup_files']}")
@@ -312,6 +340,7 @@ def delete_data_ondemand():
             if del_log_file not in note_del_update.keys():
                 note_del_update[del_log_file] = []
             note_del_update[del_log_file].append((notification_id, status['status'], doi))
+            # log_open_resources()
 
         app.logger.info(f"Deleted local files for the following routing history, notification pairs.")
         app.logger.info(f"{rh_note_pair_list}")

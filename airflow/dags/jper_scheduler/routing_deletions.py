@@ -1,7 +1,6 @@
 import os
 import math
 import json
-import fcntl
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,8 +11,7 @@ from jper_scheduler.publisher_transfer import PublisherFiles
 from octopus.core import app
 from octopus.modules.store import store
 
-from service import models
-from jper_scheduler.utils import get_notifications_for, create_routing_history_record_for_del
+from jper_scheduler.utils import get_notifications_for
 
 from opensearchpy import OpenSearch
 from opensearchpy.helpers import bulk
@@ -105,7 +103,10 @@ def bulk_set_rh_tombstone(note_rh_list, log_url, failed_set_note_del, del_cleanu
         use_ssl = False,
         verify_certs = False,
         ssl_assert_hostname = False,
-        ssl_show_warn = False
+        ssl_show_warn = False,
+        timeout=60,                   # Sets the global connection timeout to 60 seconds
+        max_retries=3,                # Optional: number of retries before failing
+        retry_on_timeout=True         # Optional: retry if a request times out
     )
 
     actions = []
@@ -151,6 +152,8 @@ def bulk_set_rh_tombstone(note_rh_list, log_url, failed_set_note_del, del_cleanu
         actions.append(a)
 
     success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    client.close()
+
     if failed:
         app.logger.error(f"Failed to update routing history records: {failed}")
     return success, failed
@@ -171,16 +174,20 @@ def bulk_set_notification_deleted_in_rh(note_rh_list):
         use_ssl = False,
         verify_certs = False,
         ssl_assert_hostname = False,
-        ssl_show_warn = False
+        ssl_show_warn = False,
+        timeout=60,                   # Sets the global connection timeout to 60 seconds
+        max_retries=3,                # Optional: number of retries before failing
+        retry_on_timeout=True         # Optional: retry if a request times out
     )
 
     actions = build_bulk_actions(index_name, note_rh_list)
     success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    client.close()
     return success, failed
 
 #####
 
-def do_bulk_deletion(index, note_list):
+def do_bulk_deletion(note_list):
     operation = "delete"
     app.logger.debug(f"OpenSearch host: {host}, port: {port}")
     app.logger.info(f"Doing bulk {operation} of {len(note_list)} notes.")
@@ -191,15 +198,19 @@ def do_bulk_deletion(index, note_list):
         use_ssl = False,
         verify_certs = False,
         ssl_assert_hostname = False,
-        ssl_show_warn = False
+        ssl_show_warn = False,
+        timeout=60,                   # Sets the global connection timeout to 60 seconds
+        max_retries=3,                # Optional: number of retries before failing
+        retry_on_timeout=True         # Optional: retry if a request times out
     )
 
     actions = []
     for note in note_list:
-        a = {"_op_type": operation, "_index": index, "_id": note}
+        a = {"_op_type": operation, "_index": note[2], "_id": note[1]}
         actions.append(a)
 
     success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    client.close()
     return success, failed
 
 #####
@@ -216,7 +227,10 @@ def do_bulk_creation(routing_history_tocreate):
         use_ssl = False,
         verify_certs = False,
         ssl_assert_hostname = False,
-        ssl_show_warn = False
+        ssl_show_warn = False,
+        timeout=60,                   # Sets the global connection timeout to 60 seconds
+        max_retries=3,                # Optional: number of retries before failing
+        retry_on_timeout=True         # Optional: retry if a request times out
     )
 
     actions = []
@@ -226,6 +240,7 @@ def do_bulk_creation(routing_history_tocreate):
         actions.append(a)
 
     success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+    client.close()
     return success, failed
 
 ##### ##### #####
@@ -410,11 +425,11 @@ def read_notifications_to_delete(max_map_length):
 
 ##### Update the deletion log files. Of course, we need to read the file, update the buffer, and write it back.
 
-def _update_log_file(final_file, data, tmp_list, notes, airflow_log_url):
+def _update_log_file(final_file, data, tmp_list, airflow_log_url):
     note_list = []
     for item in tmp_list:
-        b = item.extend([notes[item[0]], airflow_log_url])
-        note_list.append(b)
+        item.extend([airflow_log_url])
+        note_list.append(item)
 
     if final_file.exists():
         with open(final_file, 'r+') as f:
@@ -473,7 +488,6 @@ def update_deletion_log_files(log_url, note_del_update):
                 notes_fail[item[0]] = item[2]
 
         # Read the input log file, separate into todo, success and fail
-        tmp_list = []
         data = {}
         with open(del_log_file, 'r') as f:
             data = json.loads(f.read())
@@ -493,16 +507,16 @@ def update_deletion_log_files(log_url, note_del_update):
         # Write the remaining notifications back to the TODO file
         data["remaining_notifications"] = len(todo_tmp_list)
         data["notifications"] = todo_tmp_list
-        with open(del_log_file, 'w') as f:
-            f.write(json.dumps(data))
         if data["remaining_notifications"] == 0:
             del_log_file.unlink()
-
+        else:
+            with open(del_log_file, 'w') as f:
+                f.write(json.dumps(data))
 
         # Read and / or update the done / failed files
         data["notifications"] = []
-        _update_log_file(final_file_done, data, done_tmp_list, notes_done, log_url)
-        _update_log_file(final_file_fail, data, fail_tmp_list, notes_fail, log_url)
+        _update_log_file(final_file_done, data, done_tmp_list, log_url)
+        _update_log_file(final_file_fail, data, fail_tmp_list, log_url)
 
 ##### ##### #####
 # This class inherits from PublisherFiles (publisher_transfer.py) and will only perform deletions.
@@ -523,7 +537,7 @@ class RoutingDeletion(PublisherFiles):
             self.scp.remove(file_name)
             app.logger.debug(f"Successfully removed {file_name}.")
         except Exception as e:
-            app.logger.error(f"Failed to remove {file_name}. Error : {str(e)}")
+            app.logger.debug(f"Failed to remove {file_name}. Error : {str(e)}")
             status = -1
         if status == 0:
             remote_dir = os.path.dirname(file_name)
@@ -531,10 +545,9 @@ class RoutingDeletion(PublisherFiles):
                 self.scp.rmdir(remote_dir)
                 app.logger.debug(f"Successfully removed {remote_dir}.")
             except Exception as e:
-                app.logger.debug(
-                    f"Failed to remove directory {remote_dir}. Error : {str(e)}"
-                )
+                app.logger.debug(f"Failed to remove directory {remote_dir}. Error : {str(e)}")
                 app.logger.debug("Directory probably not empty.")
+        self.__close_sftp__()
         return status
 
     # Clean file on jper store
@@ -543,12 +556,11 @@ class RoutingDeletion(PublisherFiles):
             return 0
         sf = store.StoreFactory.get()
         store_id = file_name.split("/")[5]
-        file_path = Path(file_name)
         return_code = sf.delete(store_id)
         if return_code == 200:
             app.logger.debug(f"Successfully removed {file_name} from store")
         else:
-            app.logger.error(f"Failed to remove {file_name} from store. Return code: {return_code}")
+            app.logger.debug(f"Failed to remove {file_name} from store. Return code: {return_code}")
         self.clean_store = True
         return return_code
 
@@ -597,7 +609,7 @@ class RoutingDeletion(PublisherFiles):
                 else:
                     cleanup_files["failed"] = cleanup_files.get("failed", []) + [file_name]
             else:
-                app.logger.warn(f"Unknown location of file : {file_name}. Doing nothing")
+                app.logger.debug(f"Unknown location of file : {file_name}. Doing nothing")
         return {
             "status": "success",
             "message": f"Cleaned up files for only notification {notification_id} in routing history ID {self.routing_history.id}",
@@ -612,9 +624,10 @@ class RoutingDeletion(PublisherFiles):
                 "notification_id" in wfs.keys()
                 and wfs["notification_id"] == notification_id
             ):
-                file_name = wfs["file_location"]
-                action = wfs["action"]
-                message = wfs["message"]
+
+                file_name = wfs.get("file_location", "")
+                action = wfs.get("action", "")
+                message = wfs.get("message", "")
                 if not file_name or file_name == "None":
                     continue  # For checkunrouted or update states
 
