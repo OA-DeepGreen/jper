@@ -204,6 +204,7 @@ def get_list_todo_done_current():
     files_gathered = {}
     # filename - time started
     # last modified
+
     for file_io in path_todo:
         stats = _read_file(file_io, 'todo')
         files_gathered[stats['name']] = stats
@@ -211,18 +212,25 @@ def get_list_todo_done_current():
     for file_io in path_done:
         stats = _read_file(file_io, 'done')
         if stats['name'] in files_gathered:
-            files_gathered[stats['name']].update(stats)
+            for key in stats.keys():
+                if key == 'logs_list':
+                    files_gathered[stats['name']][key].extend(stats[key])
+                else:
+                    files_gathered[stats['name']][key] = stats[key]
         else:
             files_gathered[stats['name']] = stats
 
     for file_io in path_failed:
         stats = _read_file(file_io, 'failed')
         if stats['name'] in files_gathered:
-            files_gathered[stats['name']].update(stats)
+            for key in stats.keys():
+                if key == 'logs_list':
+                    files_gathered[stats['name']][key].extend(stats[key])
+                else:
+                    files_gathered[stats['name']][key] = stats[key]
         else:
             files_gathered[stats['name']] = stats
 
-    app.logger.debug(f"files_gathered: {files_gathered.keys()}")
     for file_name in files_gathered.keys():
         stats = files_gathered[file_name]
         stats["remaining_notifications"] = stats.get("total_notifications", 0) - stats.get("done_notifications", 0)
@@ -271,7 +279,9 @@ def serve_csv(filename):
             data = json.loads(f.read())
         if "notifications" in data.keys():
             for item in data["notifications"]:
-                notes_list.append(f"{item[0]}, TODO,")
+                if item and item[0]: # Protection from error in writing
+                    # Notification ID, TODO, doi
+                    notes_list.append(f"{item[0]}, TODO, {item[-1]}")
         for key in data.keys():
             if key != "notifications":
                 csv_info[key] = data[key]
@@ -281,24 +291,44 @@ def serve_csv(filename):
     else:
         todo_complete = True
 
+    logs_list = {}
+    done = 0
     done_file = f"{del_log_path}/DONE/{words[0]}"
     if os.path.exists(done_file):
         with open(done_file, 'r') as f:
             data = json.loads(f.read())
         if "notifications" in data.keys():
             for item in data["notifications"]:
-                notes_list.append(f"{item[0]}, DONE, {jper_url}{item[6]}")
+                if item and item[0]: # Protection from error in writing
+                    print(f"Notification : {item}")
+                    if item[-1] not in logs_list:
+                        indx = 0
+                        if logs_list:
+                            indx = max(logs_list.values()) + 1
+                        logs_list[item[-1]] = indx
+                    # Notification ID, DONE, doi, log index
+                    notes_list.append(f"{item[0]}, DONE, {item[-2]}, {logs_list[item[-1]]}")
+                    done += 1
         for key in data.keys():
             if key != "notifications" and key not in csv_info.keys():
                 csv_info[key] = data[key]
 
+    failed = 0
     failed_file = f"{del_log_path}/FAILED/{words[0]}"
     if os.path.exists(failed_file):
         with open(failed_file, 'r') as f:
             data = json.loads(f.read())
         if "notifications" in data.keys():
             for item in data["notifications"]:
-                notes_list.append(f"{item[0]}, FAILED, {jper_url}{item[6]}")
+                if item and item[0]: # Protection from error in writing
+                    if item[-1] not in logs_list:
+                        indx = 0
+                        if logs_list:
+                            indx = max(logs_list.values()) + 1
+                        logs_list[item[-1]] = indx
+                        # Notification ID, FAILED, doi, log index
+                    notes_list.append(f"{item[0]}, FAILED, {item[-2]}, {logs_list[item[-1]]}")
+                    failed += 1
         for key in data.keys():
             if key != "notifications":
                 if key == "completed_notifications":
@@ -322,15 +352,24 @@ def serve_csv(filename):
             print(f"Failed to remove {csv_path}: {e}")
 
     with open(csv_path, 'w') as f:
-        f.write(f"Publisher, {csv_info['publisher_email']}")
+        f.write(f"Publisher, {csv_info['publisher_email']}\n")
         f.write("\n")
-        f.write(f"Selection, {csv_info['status_values']}, {csv_info['from']}, {csv_info['upto']}, {csv_info['rerouting']}")
+        f.write(f"Deletion reason : {csv_info['deletion_reason']}\n")
         f.write("\n")
-        done = 0
-        failed = 0
+        f.write(f"Selection statuses, {csv_info['status_values']}\n")
+        f.write(f"Selection From, {csv_info['from']}\n")
+        f.write(f"Selection Upto, {csv_info['upto']}\n")
+        f.write(f"Selection Rerouting, {csv_info['rerouting']}\n")
         f.write("\n")
-        f.write(f"Notifications (Total, Done, Failed), {csv_info['total_notifications']}, {done}, {failed}")
+        f.write(f"Notifications - Total, {csv_info['total_notifications']}\n")
+        f.write(f"Notifications - Done, {done}\n")
+        f.write(f"Notifications - Failed, {failed}\n")
         f.write("\n")
+        f.write(f"Log link, Log number\n")
+        for key, value in logs_list.items():
+            f.write(f"{jper_url}{key}, {value}\n")
+        f.write("\n")
+        f.write(f"Notification ID, Status, DOI, Log ID\n")
         for item in notes_list:
             f.write(item + "\n")
 
@@ -361,17 +400,24 @@ def _read_file(file_io, file_type):
     stats["notifications"] = []
 
     substr = "map_index"
+    substr2 = "delete_notifications"
     extra_substr = "tab=logs"
     logs_list = []
     jper_url = app.config.get("BASE_URL", "http://localhost")
-    if jper_url.endswith('/'):
-        jper_url = jper_url[:-1]
+    jper_url = jper_url.removesuffix('/')
     for note in data["notifications"]:
-        if note and note[-1] and substr in note[-1]:
-            idx = note[-1].index(substr)
-            log_url = f"{jper_url}{note[-1][:idx]}{extra_substr}"
-            if not log_url in logs_list:
-                logs_list.append(log_url)
+        if note and isinstance(note, list) and len(note) > 2 and note[-1]:
+            if substr in note[-1]:
+                idx = note[-1].index(substr)
+                log_url = f"{jper_url}{note[-1][:idx]}{extra_substr}"
+                if not log_url in logs_list:
+                    logs_list.append(log_url)
+            elif substr2 in note[-1]:
+                log_url = f"{jper_url}{note[-1]}"
+                if log_url not in logs_list:
+                    logs_list.append(log_url)
+
+    # print(file_io.name, logs_list)
     stats["logs_list"] = logs_list
 
     # Getting only 3 or fewer notifications for display.
