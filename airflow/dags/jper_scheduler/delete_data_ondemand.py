@@ -70,13 +70,13 @@ def delete_data_ondemand():
             rerouting = context["params"].get("rerouting", None)
             deletion_reason = context["params"].get("deletion_reason", None)
             status_values = context["params"].get("status_values", [])
+            app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
+            app.logger.info(f"Deletion reason provided: {deletion_reason}")
 
             notification_id = context["params"].get("notification_id", None)
             if notification_id:
                 # Deletion of single notification. Do it immediately and return / stop the run.
                 app.logger.info(f"Notification ID provided: {notification_id} - searching for routing history records linked to this notification")
-                app.logger.info(f"Rerouting value provided: {rerouting} - setting status values accordingly")
-                app.logger.info(f"Deletion reason provided: {deletion_reason}")
                 # Get the full information before passing it along.
                 conn = esprit.raw.Connection(host_name, "jper-routed*,jper-failed,jper-unrouted", port=port)
                 note = get_notifications_for(conn=conn, notification_id=notification_id)['hits']['hits']
