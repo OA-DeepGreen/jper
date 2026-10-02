@@ -70,11 +70,13 @@ def index():
     if request.values.get('rerouting'):
         form_options['rerouting'] = request.values.get('rerouting')
 
-    # deletion reason
-    if request.values.get('deletion_reason'):
-        form_options['deletion_reason'] = request.values.get('deletion_reason')
+    # deletion reason - there are three deletion_reason-s returned by the form.
+    # Pick the correct one based on the deletion_type
+    reasons = request.values.getlist('deletion_reason')
 
     if deletion_type == "single_notification":
+        if reasons and len(reasons) > 0:
+            form_options['deletion_reason'] = reasons[0]
         notification_id = request.values.get('notification_id')
         if notification_id:
             form_options['notification_id'] = notification_id
@@ -86,6 +88,12 @@ def index():
                                    status_values=[], notification_id=notification_id, deletion_type=None)
 
     # Get filter options used for both routed and failed notifications and errored notifications
+    if deletion_type == "routed_and_failed":
+        if reasons and len(reasons) > 1:
+            form_options['deletion_reason'] = reasons[1]
+    else: # The errored notifications
+        if reasons and len(reasons) > 2:
+            form_options['deletion_reason'] = reasons[2]
 
     # Get publisher_id
     publisher_email = request.values.get('publisher_email')
@@ -187,9 +195,7 @@ def call_airflow_dag_to_delete_notifications(form_options):
         return render_template('delete_notifications/deletion_sent.html', publisher_email=form_options['publisher_email'],
                                publisher_emails=form_options['publisher_emails'], since=form_options['from'], upto=form_options['upto'],
                                status_values=form_options['status_values'])
-    # print(f"Airflow deletion request: {r.request.body}")
-    # print(f"Airflow deletion url: {r.url}")
-    # print(f"Airflow deletion response: {r.text}")
+
     if jper_url.endswith('/'):
         jper_url = jper_url[:-1]
     airflow_display_url = f"{jper_url}/airflow/dags/{deletion_dag}/graph"
@@ -236,7 +242,6 @@ def get_list_todo_done_current():
         stats["remaining_notifications"] = stats.get("total_notifications", 0) - stats.get("done_notifications", 0)
         files_gathered[file_name] = stats
     files_gathered_sort = sorted(files_gathered.values(), key=lambda d: d['last_modified'], reverse=True)
-    # print(files_gathered_sort)
 
     return files_gathered_sort
 
