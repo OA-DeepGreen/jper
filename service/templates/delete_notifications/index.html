@@ -13,7 +13,8 @@
             var optionSections = [
                 document.getElementById("single_notification_options"),
                 document.getElementById("routed_and_failed_options"),
-                document.getElementById("errored_options")
+                document.getElementById("errored_options"),
+                document.getElementById("filter_notification_options")
             ];
 
             function showSelectedDeletionOptions() {
@@ -28,9 +29,15 @@
                 if (selectedInput) {
                     var selectedOptionsId = selectedInput.value + "_options";
                     var selectedOptions = document.getElementById(selectedOptionsId);
-
                     if (selectedOptions) {
                         selectedOptions.style.display = "block";
+                    }
+                    if (selectedOptionsId == "routed_and_failed_options" || selectedOptionsId == "errored_options") {
+                      var filterOptions = document.getElementById("filter_notification_options");
+
+                      if (filterOptions) {
+                          filterOptions.style.display = "block";
+                      }
                     }
                 }
             }
