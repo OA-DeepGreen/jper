@@ -42,7 +42,7 @@
                            <dt>Search upto</dt><dd>{{ item["upto"] }}</dd><br/>
                         {% endif %}
                         {% if item["status_values"] %}
-                           <dt>Search statuses</dt><dd>{{ item["status_values"] }}</dd><br/>
+                           <dt>Search statuses</dt><dd>{{ item["status_values"] | join(", ") }}</dd><br/>
                         {% endif %}
                         {% if item["rerouting"] != None %}
                             <dt>Rerouting</dt><dd>{{ item["rerouting"] }}</dd><br/>
