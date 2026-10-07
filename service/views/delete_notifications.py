@@ -67,16 +67,10 @@ def index():
 
     # get common options - rerouting and reason
     # Rerouting
-    if request.values.get('rerouting'):
-        form_options['rerouting'] = request.values.get('rerouting')
-
-    # deletion reason - there are three deletion_reason-s returned by the form.
-    # Pick the correct one based on the deletion_type
-    reasons = request.values.getlist('deletion_reason')
+    form_options['rerouting'] = request.values.get('rerouting', None)
+    form_options['deletion_reason'] = request.values.get('deletion_reason', None)
 
     if deletion_type == "single_notification":
-        if reasons and len(reasons) > 0:
-            form_options['deletion_reason'] = reasons[0]
         notification_id = request.values.get('notification_id')
         if notification_id:
             form_options['notification_id'] = notification_id
@@ -86,14 +80,6 @@ def index():
             return render_template('delete_notifications/index.html', publisher_id=None,
                                    publisher_emails=publisher_emails, since=default_from, upto=default_upto,
                                    status_values=[], notification_id=notification_id, deletion_type=None)
-
-    # Get filter options used for both routed and failed notifications and errored notifications
-    if deletion_type == "routed_and_failed":
-        if reasons and len(reasons) > 1:
-            form_options['deletion_reason'] = reasons[1]
-    else: # The errored notifications
-        if reasons and len(reasons) > 2:
-            form_options['deletion_reason'] = reasons[2]
 
     # Get publisher_id
     publisher_email = request.values.get('publisher_email')
