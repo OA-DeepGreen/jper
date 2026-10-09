@@ -258,6 +258,9 @@ def do_bulk_deletion_miscindices(note_list, index_name, field_name="notification
 
     if len(actions) > 0:
         success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+        if failed:
+            app.logger.debug(f"Failed to delete {len(failed)} routed/failed notifications from index {index_name}")
+            app.logger.info(f"{failed}")
         return success, failed
     else:
         app.logger.info(f"No matching documents found in OpenSearch for the provided IDs in index {index_name}.")

@@ -256,11 +256,49 @@ def delete_data_ondemand():
                 else:
                     failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
 
-        # Also delete the notifications in the other indices
+        # Also delete the notifications in the other indices - jper-match_prov
         success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-match_prov")
+        if failed:
+            for ff in failed:
+                if 'result' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
+                elif 'reason' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
+                else:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
+
+        # Also delete the notifications in the other indices - jper-contentlog
         success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-contentlog")
+        if failed:
+            for ff in failed:
+                if 'result' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
+                elif 'reason' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
+                else:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
+
+        # Also delete the notifications in the other indices - jper-sword_deposit_record
         success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-sword_deposit_record")
+        if failed:
+            for ff in failed:
+                if 'result' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
+                elif 'reason' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
+                else:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
+
+        # Also delete the notifications in the other indices - jper-request
         success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-request", field_name="notification_id")
+        if failed:
+            for ff in failed:
+                if 'result' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Result: {ff['delete']['result']}"
+                elif 'reason' in ff['delete']:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
+                else:
+                    failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
 
         # Bulk update routing history that the notifications have been deleted, removing the notifications that were
         # already missing / deleted for some reason.
