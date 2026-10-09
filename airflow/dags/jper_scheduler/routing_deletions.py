@@ -240,7 +240,7 @@ def do_bulk_deletion_miscindices(note_list, index_name, field_name="notification
             "bool": {
                 "must": {
                     "terms": { # Use terms (instead of match) to accept an array
-                        "notification.exact": notification_ids
+                        f"{field_name}.exact": notification_ids
                     }
                 }
             }
