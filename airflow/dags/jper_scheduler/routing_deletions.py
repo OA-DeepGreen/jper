@@ -14,7 +14,7 @@ from octopus.modules.store import store
 from jper_scheduler.utils import get_notifications_for
 
 from opensearchpy import OpenSearch
-from opensearchpy.helpers import bulk
+from opensearchpy.helpers import bulk, scan
 
 del_log_path = app.config.get("AIRFLOW_DELETION_LOGS_PATH", '/logs/data_deletion_logs')
 notifications_to_process = app.config.get("AIRFLOW_DELETION_NOTIFICATION_BATCH_SIZE", 5000) # Notifications to process at a given time.
@@ -212,6 +212,60 @@ def do_bulk_deletion(note_list):
     success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
     client.close()
     return success, failed
+
+#####
+
+def do_bulk_deletion_miscindices(note_list, index_name, field_name="notification"):
+    app.logger.debug(f"OpenSearch host: {host}, port: {port}")
+    app.logger.info(f"Doing bulk deletion of {len(note_list)} notes from index {index_name}.")
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True, # enables gzip compression for request bodies
+        use_ssl = False,
+        verify_certs = False,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False,
+        timeout=60,                   # Sets the global connection timeout to 60 seconds
+        max_retries=3,                # Optional: number of retries before failing
+        retry_on_timeout=True         # Optional: retry if a request times out
+    )
+
+    notification_ids = []
+    for note in note_list:
+        notification_ids.append(note[1])
+
+    search_query = {
+        "query": {
+            "bool": {
+                "must": {
+                    "terms": { # Use terms (instead of match) to accept an array
+                        f"{field_name}.exact": notification_ids
+                    }
+                }
+            }
+        }
+    }
+
+    actions = [
+        {
+            "_op_type": "delete",
+            "_index": index_name,
+            "_id": doc["_id"]
+        }
+        for doc in scan(client, query=search_query, index=index_name)
+    ]
+
+    if len(actions) > 0:
+        app.logger.info(f"Found {len(actions)} records to delete from index {index_name}")
+        success, failed = bulk(client, actions, chunk_size=500, raise_on_error=False)
+        if failed:
+            app.logger.info(f"Failed to delete {len(failed)} routed/failed notifications from index {index_name}")
+            app.logger.info(f"{failed}")
+        return success, failed
+    else:
+        app.logger.info(f"No matching documents found in OpenSearch for the provided IDs in index {index_name}.")
+    return None, None
 
 #####
 
