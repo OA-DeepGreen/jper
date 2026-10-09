@@ -16,7 +16,7 @@ from service import models
 from service.models.routing_history import RoutingHistory
 from jper_scheduler.utils import create_routing_history_record_for_del, get_log_url, get_notifications_for, set_task_name
 from jper_scheduler.routing_deletions import RoutingDeletion, bulk_set_notification_deleted_in_rh, write_notifications_to_delete, read_notifications_to_delete
-from jper_scheduler.routing_deletions import update_deletion_log_files, do_bulk_creation, bulk_set_rh_tombstone, do_bulk_deletion
+from jper_scheduler.routing_deletions import update_deletion_log_files, do_bulk_creation, bulk_set_rh_tombstone, do_bulk_deletion, do_bulk_deletion_miscindices
 
 import logging
 logging.getLogger("opensearch").setLevel(logging.WARNING)
@@ -255,6 +255,12 @@ def delete_data_ondemand():
                     failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}, Reason: {ff['delete']['reason']}"
                 else:
                     failed_to_delete[ff["delete"]["_id"]] = f"Status: {ff['delete']['status']}"
+
+        # Also delete the notifications in the other indices
+        success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-match_prov")
+        success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-contentlog")
+        success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-sword_deposit_record")
+        success, failed = do_bulk_deletion_miscindices(note_list_success + note_list_failed, "jper-request", field_name="notification_id")
 
         # Bulk update routing history that the notifications have been deleted, removing the notifications that were
         # already missing / deleted for some reason.
