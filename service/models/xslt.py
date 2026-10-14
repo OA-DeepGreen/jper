@@ -505,8 +505,10 @@ class XSLT(object):
     if abstract contains sub elements, it likely contains chemical formulas and the text contents will be used as is.
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
     <xsl:choose>
-      <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*) != 'tex-math']">
+      <xsl:when test="descendant::sub or descendant::sup">
+        <xsl:for-each select="descendant-or-self::text()
+          [local-name(parent::*) != 'tex-math' and
+           not (local-name(parent::*)='title' and (.='Abstract' or .='ABSTRACT'))]">
                 <xsl:value-of select="."/>
         </xsl:for-each>
       </xsl:when>
@@ -514,7 +516,7 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()[
           string-length(normalize-space())&gt;0 and
           local-name(parent::*) != 'tex-math' and
-          not(local-name(parent::*)='title' and .='Abstract')]">
+           not (local-name(parent::*)='title' and (.='Abstract' or .='ABSTRACT'))]">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title' "> <!-- when text of title element is selected, add line breaks before and after-->
                 <xsl:text>
@@ -1004,8 +1006,10 @@ class XSLT(object):
     if abstract contains sub elements, it likely contains chemical formulas and the text contents will be used as is.
     Otherwise, this template deliberately adds white spaces between the text contents of each child element. If the current element is a title element, line breaks will be added before and after the current text to improve readability and approximate intended document structure. -->
       <xsl:choose>
-      <xsl:when test="descendant::sub">
-        <xsl:for-each select="descendant-or-self::text()[local-name(parent::*)!='tex-math']">
+      <xsl:when test="descendant::sub or descendant::sup">
+        <xsl:for-each select="descendant-or-self::text()
+          [local-name(parent::*) != 'tex-math' and
+           not (local-name(parent::*)='title' and (.='Abstract' or .='ABSTRACT'))]">
           <xsl:value-of select="."/>
         </xsl:for-each>
       </xsl:when>
@@ -1013,7 +1017,7 @@ class XSLT(object):
         <xsl:for-each select="descendant-or-self::text()[
          string-length(normalize-space())&gt;0 and
          local-name(parent::*)!='tex-math' and
-         not(local-name(parent::*)='title' and .='Abstract')]">
+           not (local-name(parent::*)='title' and (.='Abstract' or .='ABSTRACT'))]">
             <xsl:choose>
               <xsl:when test="local-name(parent::*)='title'">
                 <!-- when text of title element is selected, add line breaks before and after-->
