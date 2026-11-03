@@ -10,13 +10,13 @@
                   </span>
                 </a>
             </p>
-            
+
             <div class="nav-wrapper" data-mobilemenu="">
               	<nav class="masthead__nav header___nav--primary" role="navigation" data-dropdown="">
-                    <ul>                    
+                    <ul>
 
                     {% if not current_user.is_anonymous  %}
-                        
+
                         <li class="nav__item {% if request.path == url_for('account.username', username=current_user.id)%}
                          active
                         {% endif %}">
@@ -36,8 +36,8 @@
                                     <li><a href="{{ url_for('test_xml.index') }}">Test XML transformations</a></li>
                                     <li><a href="{{ url_for('routing_history.index') }}">View routing history</a></li>
                                     <li><a href="{{ url_for('delete_notifications.index') }}">Delete old notifications</a></li>
-                                    <li><a href="{{ url_for('reprocess_repository.index') }}">Reprocess repository</a></li>
-                                    <li><a href="{{ url_for('regenerate_metsmods.index') }}">Repackage Notifications</a></li>
+                                    <!--<li><a href="{{ url_for('reprocess_repository.index') }}">Reprocess repository</a></li>
+                                    <li><a href="{{ url_for('regenerate_metsmods.index') }}">Repackage Notifications</a></li>-->
                                 </ul>
                             </div>
                         </li>
@@ -68,7 +68,7 @@
                     <a href="{{ url_for('account.login') }}">
                         <div class="btn btn--rounded"> <span class="btn__text">Log in</span></div>
                     </a>
-                </div> 
+                </div>
             {% else %}
                 <div class="credentials">
                     <a href="{{ url_for('account.logout') }}">
