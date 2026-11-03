@@ -100,7 +100,7 @@ def get_all_notifications(out_dir=None, since=None, upto=None):
     if not since or not upto:
         print("Error: since and upto parameters are required to fetch notifications.")
         return 0
-    
+
     print(f"Fetching notifications between {since} and {upto} : page {page}")
     b = get_notifications_for(upto=upto, since=since, page=page, page_size=max_query)
     print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
@@ -222,15 +222,18 @@ def process_notification(note_json=None, bibids={}, log_url=None):
             app.logger.error(f"Error accessing data from store? Cannot process further : {str(e)}")
             return -1
 
-        metadata_json = json.loads(metadata.json())['metadata']
+        m2 = note["metadata"]
+        if metadata:
+            metadata_json = json.loads(metadata.json())['metadata']
+            m2 |= metadata_json
         if not metadata:
             app.logger.warn(f"Metadata is empty")
             return 0
         else:
-            kkeys = metadata_json.keys()
+            kkeys = m2.keys()
             for key in kkeys:
                 if "date" in key:
-                    value = metadata_json[key]
+                    value = m2[key]
                     if len(value) == 10:
                         new_date_str = ""
                         try:
@@ -239,15 +242,15 @@ def process_notification(note_json=None, bibids={}, log_url=None):
                         except ValueError:
                             datetime_obj = datetime.datetime.strptime(value, "%Y-%d-%m")
                             new_date_str = datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
-                        metadata_json[key] = new_date_str
+                        m2[key] = new_date_str
                         print(f"Updating {key} to {new_date_str}")
                     if len(value) == 11:
                         if key == "date_accepted":
                             # A weird / corrupted format with a 3-digit (not letter) month? Set it to date_submitted
-                            metadata_json[key] = metadata_json["date_submitted"]
-                            print(f"Updating {key} to {metadata_json[key]}")
+                            m2[key] = m2["date_submitted"]
+                            print(f"Updating {key} to {m2[key]}")
 
-        note["metadata"] = metadata_json
+        note["metadata"] = m2
 
         obj = models.RoutedNotification(note)
         from_failed = True
@@ -325,7 +328,8 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         repos.extend(match_ids)
         obj.repositories = list(set(repos))
         obj.save()
-        repackage_notification(notification_id, repo_ids=[repo_id], packaging_formats=[], add_new_links=True)
+        for repo_id in repos:
+            repackage_notification(notification_id, repo_id=repo_id, packaging_format=None, add_new_links=True)
 
         app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
         if from_failed:
@@ -413,7 +417,7 @@ def reprocess_repository():
         return files_to_process
 
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
-        retries=3, max_active_tis_per_dag=4)
+        retries=3, max_active_tis_per_dag=12)
     def process_one_notification(note):
         context = get_current_context()
         ti = context['ti']  # TaskInstance
