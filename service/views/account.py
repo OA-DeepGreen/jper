@@ -874,6 +874,33 @@ def pubinfo(username):
     return redirect(url_for('.username', username=username))
 
 
+@blueprint.route('/<username>/retentioninfo', methods=['POST'])
+def retentioninfo(username):
+    acc = models.Account.pull(username)
+    if current_user.id != acc.id and not current_user.is_super:
+        abort(401)
+
+    add_retention_info = False
+    retention_details = {}
+    if request.values.get('retention_form', False):
+        add_retention_info = True
+        if 'retention_failed' in request.values:
+            retention_details['failed'] = request.values['retention_failed']
+        if 'retention_routed' in request.values:
+            retention_details['routed'] = request.values['retention_routed']
+        if 'retention_errored' in request.values:
+            retention_details['errored'] = request.values['retention_errored']
+
+    try:
+        if add_retention_info:
+            acc.notification_retention_period = retention_details
+            acc.save()
+            flash('Thank you. Your retention details have been updated.', "success")
+    except Exception as e:
+        ex_type, ex_value, ex_traceback = sys.exc_info()
+        flash('Error updating retention details: ' + str(ex_value), 'error')
+    return redirect(url_for('.username', username=username))
+
 @blueprint.route('/<username>/repoinfo', methods=['POST'])
 def repoinfo(username):
     acc = models.Account.pull(username)

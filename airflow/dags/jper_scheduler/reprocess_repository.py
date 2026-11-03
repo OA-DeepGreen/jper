@@ -9,6 +9,7 @@ from octopus.modules.store import store
 from service import packages, models
 from service.lib import request_deposit_helper
 from service import routing_deepgreen as routing
+from service.lib.repackage_notifications import repackage_notification
 
 from airflow.exceptions import AirflowSkipException, AirflowFailException
 from airflow.decorators import dag, task
@@ -99,7 +100,7 @@ def get_all_notifications(out_dir=None, since=None, upto=None):
     if not since or not upto:
         print("Error: since and upto parameters are required to fetch notifications.")
         return 0
-    
+
     print(f"Fetching notifications between {since} and {upto} : page {page}")
     b = get_notifications_for(upto=upto, since=since, page=page, page_size=max_query)
     print(f"Fetched {len(b['hits']['hits'])} notifications for page {page}")
@@ -198,10 +199,10 @@ def process_notification(note_json=None, bibids={}, log_url=None):
     app.logger.info(f"Processing notification {note['id']} for bibid : {bibids}")
 
     obj = None
+    repo_id = list(bibids.values())[0]
     if note_json['_index'].startswith('jper-routed'):
         app.logger.info(f"Processing routed notification id: {note['id']}")
         obj = models.RoutedNotification(note)
-        repo_id = list(bibids.values())[0]
         if repo_id in obj.repositories:
             return 0 # No need to process if we already know this notification has been matched already to this repository
 
@@ -221,15 +222,18 @@ def process_notification(note_json=None, bibids={}, log_url=None):
             app.logger.error(f"Error accessing data from store? Cannot process further : {str(e)}")
             return -1
 
-        metadata_json = json.loads(metadata.json())['metadata']
+        m2 = note["metadata"]
+        if metadata:
+            metadata_json = json.loads(metadata.json())['metadata']
+            m2 |= metadata_json
         if not metadata:
             app.logger.warn(f"Metadata is empty")
             return 0
         else:
-            kkeys = metadata_json.keys()
+            kkeys = m2.keys()
             for key in kkeys:
                 if "date" in key:
-                    value = metadata_json[key]
+                    value = m2[key]
                     if len(value) == 10:
                         new_date_str = ""
                         try:
@@ -238,15 +242,15 @@ def process_notification(note_json=None, bibids={}, log_url=None):
                         except ValueError:
                             datetime_obj = datetime.datetime.strptime(value, "%Y-%d-%m")
                             new_date_str = datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
-                        metadata_json[key] = new_date_str
+                        m2[key] = new_date_str
                         print(f"Updating {key} to {new_date_str}")
                     if len(value) == 11:
                         if key == "date_accepted":
                             # A weird / corrupted format with a 3-digit (not letter) month? Set it to date_submitted
-                            metadata_json[key] = metadata_json["date_submitted"]
-                            print(f"Updating {key} to {metadata_json[key]}")
+                            m2[key] = m2["date_submitted"]
+                            print(f"Updating {key} to {m2[key]}")
 
-        note["metadata"] = metadata_json
+        note["metadata"] = m2
 
         obj = models.RoutedNotification(note)
         from_failed = True
@@ -324,6 +328,9 @@ def process_notification(note_json=None, bibids={}, log_url=None):
         repos.extend(match_ids)
         obj.repositories = list(set(repos))
         obj.save()
+        for repo_id in repos:
+            repackage_notification(notification_id, repo_id=repo_id, packaging_format=None, add_new_links=True)
+
         app.logger.info(f"Saved routed notification id: {notification_id} with matched repositories: {match_ids}")
         if from_failed:
             # If this notification was from the failed index, we need to move it to the routed index
@@ -358,6 +365,7 @@ def reprocess_repository():
         global notifications_to_process
         # Always do the cleanup
         delete_empty_folders(outputPath)
+        files_to_process = []
         # Basic sanity check to avoid processing too many notifications at once and overwhelming Airflow
         max_map_length = conf.getint("core", "max_map_length")
         if notifications_to_process > max_map_length:
@@ -369,12 +377,16 @@ def reprocess_repository():
         print(f"Parameters received: {context['params']}")
         if len(context['params']) > 0:
             repository_tuple = context['params'].get('repository_id', None)
-            upto = context['params'].get('upto', None)
-            since = context['params'].get('from', None)
-            repository_name = repository_tuple.split()[0]
-            repository_id = repository_tuple.split()[1]
+            if repository_tuple:
+                upto = context['params'].get('upto', None)
+                since = context['params'].get('from', None)
+                repository_name = repository_tuple.split()[0]
+                repository_id = repository_tuple.split()[1]
+            else:
+                app.logger.debug("No repository requested for reprocessing.")
 
-            if since and upto and repository_tuple:
+
+            if repository_tuple and since and upto:
                 print(f"Fetching notifications for repository_id: {repository_tuple} between {since} and {upto}")
                 # Construct the path for storing the notifications to reprocess
                 input_path = f"{outputPath}/{repository_name}_{repository_id}/TODO"
@@ -389,7 +401,6 @@ def reprocess_repository():
         # Retrieve the next <notifications_to_process> (if any) files to process.
         path = Path(outputPath).rglob('TODO/**/*.json')
         local_count = 0
-        files_to_process = []
         for file in path:
             files_to_process.append(file.__str__())
             local_count += 1
@@ -406,7 +417,7 @@ def reprocess_repository():
         return files_to_process
 
     @task(task_id="process_one_notification", map_index_template="{{ map_index_template }}",
-        retries=3, max_active_tis_per_dag=4)
+        retries=3, max_active_tis_per_dag=12)
     def process_one_notification(note):
         context = get_current_context()
         ti = context['ti']  # TaskInstance

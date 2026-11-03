@@ -15,18 +15,19 @@ from service.models.routing_history import RoutingHistory
 from octopus.modules.store import store
 
 class PublisherFiles:
-    def __init__(self, publisher_id=None, publisher=None, routing_id=None):
+    def __init__(self, publisher_id=None, publisher=None, routing_id=None, verbose=True):
         logging.getLogger("paramiko").setLevel(logging.WARNING)
+        self.verbose = verbose
+        self._is_scp = False
         self.__init_constants__()  # First to be done
         self.__init_from_app__()
         self.__init_publishers__(publisher_id=publisher_id, publisher=publisher)
         if routing_id:
             self.__init_routing_id__(routing_id, publisher=publisher)
-        self._is_scp = False
 
     def __init_routing_id__(self, routing_id, publisher=None):
         self.routing_history = RoutingHistory()
-        app.logger.info(f"Routing history id: {routing_id}")
+        app.logger.debug(f"Routing history id: {routing_id}")
         g = self.routing_history.query(routing_id)['hits']['hits']
         if len(g) == 1:  # Found the routing history in OS
             h = g[0]['_source']
@@ -43,20 +44,30 @@ class PublisherFiles:
 
     def __init_sftp_connection__(self):
         # Initialise the sFTP connection
-        c = paramiko.SSHClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.c = paramiko.SSHClient()
+        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            c.connect(hostname=self.sftp_server, port=self.sftp_port,
+            self.c.connect(hostname=self.sftp_server, port=self.sftp_port,
                   username=self.username, key_filename=self.dg_pubkey_file,
                   # passphrase=self.dg_passphrase
                   )
-        except exception as e:
+        except Exception as e:
             app.logger.error(f"Connection error for publisher {self.id} {self.publisher_email}")
             app.logger.error(traceback.format_exc())
             return -1
-        self.scp = paramiko.SFTPClient.from_transport(c.get_transport())
+        self.scp = paramiko.SFTPClient.from_transport(self.c.get_transport())
         self._is_scp = True
         return 0
+
+    def __close_sftp__(self):
+        if self._is_scp:
+            self.scp.close()
+            self._is_scp = False
+        try:
+            self.c.close()
+        except Exception as e:
+            app.logger.debug(f"Error closing SFTP connection for publisher {self.id} {self.publisher_email}")
+            app.logger.debug(f"Probably never initialised. Message: {e}")
 
     def __init_constants__(self):
         # Stuff that is not picked up from elsewhere
@@ -115,18 +126,21 @@ class PublisherFiles:
 
     def __init_publishers__(self, publisher_id=None, publisher=None):
         if not publisher_id:
-            app.logger.info("Retrieving all active publishers")
+            if self.verbose:
+                app.logger.info("Retrieving all active publishers")
             self.publishers = models.Account.pull_all_active_publishers()
         else:
             self.__init_publisher__(publisher_id, publisher=publisher)
 
     def __init_publisher__(self, publisher_id, publisher=None):
-        app.logger.info(f"Initialising for publisher {publisher_id}")
+        if self.verbose:
+            app.logger.info(f"Initialising for publisher {publisher_id}")
         # Initialise for a given publisher
         self.id = publisher_id
         if not publisher:
             publisher = models.Account().pull(self.id, wrap=False)
-        app.logger.info(f"Publisher email : {publisher['email']}")
+        if self.verbose:
+            app.logger.info(f"Publisher email : {publisher['email']}")
         self.publisher_email = publisher['email']
         server = publisher.get('sftp_server', {}).get('url', '')
         if server and server.strip():
@@ -141,6 +155,15 @@ class PublisherFiles:
             self.username = uname
         else:
             self.username = self.id
+
+        # Months after which the deletion task will clean the notifications
+        self.retain_routed = 0
+        self.retain_failed = 0
+        self.retain_errored = 0
+        if 'notification_retention_period' in publisher.keys():
+            self.retain_routed = publisher['notification_retention_period']['routed']
+            self.retain_failed = publisher['notification_retention_period']['failed']
+            self.retain_errored = publisher['notification_retention_period']['errored']
 
         self.acc = publisher
         self.apiurl += '?api_key=' + self.acc['api_key']
@@ -188,6 +211,7 @@ class PublisherFiles:
                     app.logger.warning(f"Error creating directory in ftp server. "
                                        f"Directory {path} probably exists already. "
                                        f"Error: {str(e)}")
+        self.__close_sftp__()
 
     def _move_files_in_server(self, file, remote_path, r_new, cleanUp):
         # Longer function due to the remote filesystem interaction and consequent greater need to trap errors
